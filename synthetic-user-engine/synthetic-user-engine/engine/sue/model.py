@@ -1,0 +1,117 @@
+"""The model behind step 4. Only Google-approved Gemini models (CLAUDE.md rule 9)."""
+
+from __future__ import annotations
+
+import time
+from typing import Protocol
+
+from .prompt import RESPONSE_SCHEMA
+
+
+class ModelError(Exception):
+    """A call that returned nothing usable. label is a platform failure code."""
+
+    def __init__(self, label: str, message: str):
+        super().__init__(message)
+        self.label = label
+
+
+class Model(Protocol):
+    model_id: str
+
+    def propose(self, system: str, turn: str, screenshot: bytes) -> str:
+        """Returns the raw reply text for one screen."""
+        ...
+
+
+class GeminiModel:
+    def __init__(self, api_key: str, model_id: str, temperature: float, timeout_s: int):
+        from google import genai  # imported here so tests run without the SDK configured
+
+        self.model_id = model_id
+        self.temperature = temperature
+        self.timeout_ms = timeout_s * 1000
+        self.client = genai.Client(api_key=api_key)
+
+    def propose(self, system: str, turn: str, screenshot: bytes) -> str:
+        from google.genai import errors, types
+
+        config = types.GenerateContentConfig(
+            system_instruction=system,
+            response_mime_type="application/json",
+            response_json_schema=RESPONSE_SCHEMA,
+            temperature=self.temperature,
+            http_options=types.HttpOptions(timeout=self.timeout_ms),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        )
+        contents = [types.Part.from_text(text=turn), types.Part.from_bytes(data=screenshot, mime_type="image/png")]
+        try:
+            response = self.client.models.generate_content(model=self.model_id, contents=contents, config=config)
+        except errors.APIError as error:
+            raise ModelError("model_timeout", f"API error {error.code}: {error.message}") from error
+        except Exception as error:  # noqa: BLE001 - network timeouts surface as several exception types
+            raise ModelError("model_timeout", str(error)) from error
+        if not response.text:
+            raise ModelError("invalid_json", "empty reply")
+        return response.text
+
+
+class ScriptedModel:
+    """Replays fixed replies, for tests and for checking a run's plumbing without a model."""
+
+    def __init__(self, replies: list[str], model_id: str = "scripted"):
+        self.model_id = model_id
+        self.replies = list(replies)
+        self.turns: list[str] = []
+
+    def propose(self, system: str, turn: str, screenshot: bytes) -> str:
+        self.turns.append(turn)
+        if not self.replies:
+            return '{"candidates": []}'
+        return self.replies.pop(0)
+
+
+class LabelScriptModel:
+    """Proposes one fixed action per screen, finding the element by the text he sees.
+    Checks a whole run's plumbing on the real platform without calling a model; it
+    proves nothing about how a model would behave."""
+
+    def __init__(self, script: list[dict], model_id: str = "label-script"):
+        self.model_id = model_id
+        self.script = list(script)
+
+    def propose(self, system: str, turn: str, screenshot: bytes) -> str:
+        import json
+
+        if not self.script:
+            return '{"candidates": []}'
+        step = self.script[0]
+        if "observe" in step:  # answer the list question with this quote, and offer nothing to do
+            self.script.pop(0)
+            return json.dumps({"candidates": [], "observations": {
+                "list_has_new_budget": {"answer": True, "quote": step["observe"]}}}, ensure_ascii=False)
+        candidate = {k: v for k, v in step.items() if k != "label"}
+        candidate.setdefault("why", "script")
+        label = step.get("label")
+        if label:
+            rows = [[c.strip() for c in line.split("|")] for line in turn.splitlines()]
+            rows = [r for r in rows if len(r) >= 3 and r[0].startswith("el_")]
+            # An exact match first, so "Finish" is not found inside "I'm finished".
+            match = next((r for r in rows if r[2].lower() == label.lower()), None) or next(
+                (r for r in rows if label.lower() in r[2].lower()), None
+            )
+            if match:
+                candidate["element"] = match[0]
+            elif "They are looking at: the whole screen" in turn:
+                # Not on this screen: look further down, and try the same step next time.
+                return json.dumps({"candidates": [{"action": "scroll", "value": "down", "evidence": [], "why": f"looking for {label}"}]})
+            else:
+                return '{"candidates": []}'  # not in the piece he is looking at: he looks elsewhere
+        self.script.pop(0)
+        return json.dumps({"candidates": [candidate]}, ensure_ascii=False)
+
+
+def timed(model: Model, system: str, turn: str, screenshot: bytes) -> tuple[str, int]:
+    start = time.monotonic()
+    text = model.propose(system, turn, screenshot)
+    return text, int((time.monotonic() - start) * 1000)

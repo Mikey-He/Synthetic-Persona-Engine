@@ -1,0 +1,468 @@
+<title>Participant Questionnaire</title>
+<style>
+/* Layout: one question per screen in a narrow centred column, a hairline progress bar on top.
+   System UI faces, white ground, one blue accent; nothing boxed but the choices. */
+:root{
+  --bg:#ffffff; --fill:#f5f5f7; --fill-2:#ebebf0; --line:#e3e3e8;
+  --fg:#1d1d1f; --fg-2:#6e6e73; --fg-3:#a1a1a6;
+  --accent:#0071e3; --accent-fg:#ffffff; --accent-soft:rgba(0,113,227,.08);
+  --ok:#248a3d; --warn:#b25000;
+  --f-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",Arial,sans-serif;
+  --f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000; --fill:#1c1c1e; --fill-2:#2c2c2e; --line:#2c2c2e;
+    --fg:#f5f5f7; --fg-2:#a1a1a6; --fg-3:#6e6e73;
+    --accent:#2997ff; --accent-fg:#ffffff; --accent-soft:rgba(41,151,255,.14);
+    --ok:#30d158; --warn:#ff9f0a;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --fill:#1c1c1e; --fill-2:#2c2c2e; --line:#2c2c2e;
+  --fg:#f5f5f7; --fg-2:#a1a1a6; --fg-3:#6e6e73;
+  --accent:#2997ff; --accent-fg:#ffffff; --accent-soft:rgba(41,151,255,.14);
+  --ok:#30d158; --warn:#ff9f0a;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:16px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg)}
+.track{height:3px;background:var(--fill-2)}
+.track i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s ease}
+.bar{max-width:640px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px}
+.back{border:0;background:none;color:var(--accent);font-size:15px;padding:6px 0;display:inline-flex;align-items:center;gap:4px}
+.back[hidden]{display:none}
+.back svg{width:14px;height:14px}
+.where{flex:1;min-width:0;text-align:center;font-size:13px;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.langs{display:inline-flex;gap:2px;font-size:13px}
+.langs button{border:0;background:none;padding:6px 8px;border-radius:6px;color:var(--fg-3)}
+.langs button[aria-pressed="true"]{color:var(--fg);font-weight:600}
+
+main{max-width:640px;margin:0 auto;padding-inline:20px;padding-block:clamp(28px,8vh,72px) 64px}
+.eyebrow{font-size:13px;color:var(--fg-2);margin:0 0 10px}
+h1{font-size:clamp(26px,5vw,32px);font-weight:600;letter-spacing:-.01em;line-height:1.25;margin:0;text-wrap:balance}
+h2{font-size:clamp(21px,4vw,25px);font-weight:600;letter-spacing:-.005em;line-height:1.35;margin:0;text-wrap:balance}
+.sub{color:var(--fg-2);font-size:15px;margin:10px 0 0;max-width:34em}
+.body{margin-top:28px;display:flex;flex-direction:column;gap:22px}
+.lines{display:flex;flex-direction:column;gap:12px;color:var(--fg-2);font-size:15.5px;max-width:34em}
+.lines p{margin:0}
+
+.choices{display:flex;flex-direction:column;gap:8px}
+.choice{display:flex;align-items:flex-start;gap:14px;width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:14px 16px;transition:background .15s,border-color .15s}
+.choice:hover{background:var(--fill)}
+.choice .mark{flex:none;width:20px;height:20px;margin-top:1px;border:1.5px solid var(--fg-3);border-radius:50%;display:grid;place-items:center;transition:border-color .15s,background .15s}
+.choice.box .mark{border-radius:6px}
+.choice .mark::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent-fg);transform:scale(0);transition:transform .15s}
+.choice.box .mark::after{width:10px;height:6px;border-radius:0;background:none;border-left:2px solid var(--accent-fg);border-bottom:2px solid var(--accent-fg);transform:rotate(-45deg) scale(0);margin-top:-2px}
+.choice .txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.choice .t{font-size:16px}
+.choice .d{font-size:13.5px;color:var(--fg-2)}
+.choice[aria-checked="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.choice[aria-checked="true"] .mark{border-color:var(--accent);background:var(--accent)}
+.choice[aria-checked="true"] .mark::after{transform:scale(1)}
+.choice.box[aria-checked="true"] .mark::after{transform:rotate(-45deg) scale(1)}
+
+.field{display:flex;flex-direction:column;gap:8px}
+.field span{font-size:13.5px;color:var(--fg-2)}
+.input{width:100%;min-width:0;border:1px solid transparent;background:var(--fill);border-radius:12px;padding:13px 14px;font-size:16px;transition:border-color .15s,background .15s}
+.input:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+textarea.input{min-height:132px;resize:vertical;line-height:1.55}
+.input::placeholder{color:var(--fg-3)}
+
+.task{margin:0;padding:18px 20px;background:var(--fill);border-radius:14px;font-size:15.5px;line-height:1.6;white-space:pre-line}
+
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:6px}
+.btn{border:0;border-radius:980px;padding:12px 24px;font-size:16px;font-weight:500;background:var(--fill);color:var(--fg);min-height:46px;transition:opacity .15s,background .15s}
+.btn:hover{background:var(--fill-2)}
+.btn.primary{background:var(--accent);color:var(--accent-fg)}
+.btn.primary:hover{opacity:.9;background:var(--accent)}
+.btn:disabled{opacity:.35;cursor:default}
+.link{border:0;background:none;color:var(--accent);font-size:15px;padding:8px 2px}
+.hint{font-size:13px;color:var(--fg-3)}
+@media (max-width:520px){.actions .btn{flex:1}}
+
+.word{font-size:clamp(40px,10vw,56px);font-weight:600;letter-spacing:-.01em;text-align:center;margin:12px 0 4px}
+.count{text-align:center;font-size:13px;color:var(--fg-3);font-variant-numeric:tabular-nums}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:28px}
+.pair .choice{justify-content:center;padding:18px 12px}
+.pair .choice .mark{display:none}
+.pair .choice .t{font-weight:500}
+
+.status{font-size:14px;color:var(--fg-2)}
+.status.ok{color:var(--ok)}
+.status.warn{color:var(--warn)}
+details{border-top:1px solid var(--line);padding-top:14px}
+details summary{cursor:pointer;color:var(--fg-2);font-size:14px}
+details textarea{margin-top:12px;font-family:var(--f-mono);font-size:12.5px;min-height:160px}
+.todo{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.todo li{border-bottom:1px solid var(--line)}
+.todo button{width:100%;display:flex;justify-content:space-between;gap:12px;border:0;background:none;padding:13px 2px;text-align:left;font-size:15px}
+.todo button span:last-child{color:var(--accent);flex:none}
+.fade{animation:fade .22s ease}
+@keyframes fade{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="top">
+  <div class="track"><i id="track"></i></div>
+  <div class="bar">
+    <button type="button" class="back" id="back" data-act="back"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M9.5 2 4.5 7l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="back-t"></span></button>
+    <span class="where" id="where"></span>
+    <div class="langs" role="group" aria-label="Language">
+      <button type="button" id="lang-zh" data-lang="zh">中文</button>
+      <button type="button" id="lang-en" data-lang="en">EN</button>
+    </div>
+  </div>
+</div>
+<main id="main"></main>
+
+<!-- The task, the experience sources, groups and questions, copied from the workflow
+     definition (data/version-a/flow.json) by tools/sync_flow.py. -->
+<script type="application/json" id="qdata">{
+"flow": {"name": "Version A · Cloud Console (prototype) budget setup", "task": "You manage your team's cloud spending. Create a fixed monthly budget of $1,000 for the Atlas project. The budget should reset at the start of each calendar month. Include all Atlas project costs and exclude costs from other projects.\n\nConfigure an email alert for when the project's actual spending during the month exceeds 80% of the budget. Only the Atlas project owner should receive this alert.\n\nSave your settings and indicate when you have finished."},
+"sources": [
+  {"id": "product", "legacy": "产品"},
+  {"id": "work", "legacy": "职业"},
+  {"id": "study", "legacy": "学过"},
+  {"id": "life", "legacy": "生活"}
+],
+"groups": [
+  {"id": "gmail-docs", "source": "product", "label": {"en": "Gmail, Google Docs or Sheets", "zh": "Gmail、Google 文档或表格"}},
+  {"id": "gcp-console", "source": "product", "label": {"en": "Google Cloud console", "zh": "Google Cloud 控制台"}},
+  {"id": "aws-console", "source": "product", "label": {"en": "AWS console", "zh": "AWS 控制台"}},
+  {"id": "other-cloud", "source": "product", "label": {"en": "Another cloud platform, such as Azure or Alibaba Cloud", "zh": "其他云平台，比如 Azure、阿里云"}},
+  {"id": "admin-panels", "source": "product", "label": {"en": "Website admin panels or dashboards", "zh": "网站后台或管理面板"}},
+  {"id": "this-platform", "source": "product", "label": {"en": "This mock platform (Version A)", "zh": "这个模拟平台（Version A）"}},
+  {"id": "cloud-courses", "source": "study", "label": {"en": "Cloud computing certificates or courses", "zh": "云计算的证书或课程"}},
+  {"id": "gcp-docs", "source": "study", "label": {"en": "Google Cloud documentation or tutorials", "zh": "Google Cloud 的官方文档或教程"}},
+  {"id": "statistics", "source": "study", "label": {"en": "Statistics or data analysis", "zh": "统计或数据分析"}},
+  {"id": "accounting-courses", "source": "study", "label": {"en": "Accounting or finance courses", "zh": "会计或财务课"}},
+  {"id": "finance-work", "source": "work", "label": {"en": "Finance, accounting or budget work", "zh": "财务、会计或管预算的工作"}},
+  {"id": "it-admin", "source": "work", "label": {"en": "IT administrator", "zh": "IT 管理员"}},
+  {"id": "build-admin", "source": "work", "label": {"en": "Building admin panels or dashboards", "zh": "开发网站后台或管理面板"}},
+  {"id": "manage-members", "source": "work", "label": {"en": "Managing project members and roles", "zh": "管项目成员和角色"}},
+  {"id": "personal-budget", "source": "life", "label": {"en": "A spending budget for yourself or your household", "zh": "给自己或家里做开支预算"}}
+],
+"experiences": [
+  {"id": "X01", "group": "gmail-docs", "question": {"en": "Do you use Gmail, Google Docs or Google Sheets?", "zh": "你平时用 Gmail 或 Google 文档、表格吗？"}},
+  {"id": "X02", "group": "gcp-console", "question": {"en": "Have you looked at the billing pages in the Google Cloud console?", "zh": "你在 Google Cloud 控制台里看过账单页吗？"}},
+  {"id": "X03", "group": "gcp-console", "question": {"en": "Have you set up a budget or an overspending alert in Google Cloud?", "zh": "你在 Google Cloud 里设过预算或超支提醒吗？"}},
+  {"id": "X04", "group": "gcp-console", "question": {"en": "Have you created resources or turned on APIs in Google Cloud?", "zh": "你在 Google Cloud 里创建过资源，或者开过 API 吗？"}},
+  {"id": "X05", "group": "gcp-console", "question": {"en": "Have you used Google Cloud Pub/Sub or Cloud Monitoring?", "zh": "你用过 Google Cloud 的 Pub/Sub 或 Cloud Monitoring 吗？"}},
+  {"id": "X06", "group": "aws-console", "question": {"en": "Have you looked at billing in AWS, or set up a billing alert there?", "zh": "你在 AWS 里看过账单，或者设过账单提醒吗？"}},
+  {"id": "X07", "group": "aws-console", "question": {"en": "Have you used SNS, SQS or CloudWatch on AWS?", "zh": "你在 AWS 上用过 SNS、SQS 或 CloudWatch 吗？"}},
+  {"id": "X08", "group": "aws-console", "question": {"en": "Have you set up actions in AWS Budgets that run automatically when you overspend?", "zh": "你在 AWS Budgets 里设过超支后自动执行的动作吗？"}},
+  {"id": "X17", "group": "other-cloud", "question": {"en": "On that platform, have you looked at billing or set up a budget alert?", "zh": "在那个云平台上，你看过账单，或者设过预算提醒吗？"}},
+  {"id": "X09", "group": "admin-panels", "question": {"en": "Have you used admin panels or dashboards where you fill in forms and click Save?", "zh": "你用过网站后台、管理面板这类要填表、点保存的系统吗？"}},
+  {"id": "X18", "group": "this-platform", "question": {"en": "Have you built, tested or looked closely at this mock Cloud Console platform?", "zh": "你搭过、测过或者仔细看过这个模拟的 Cloud Console 平台吗？"}},
+  {"id": "X10", "group": "cloud-courses", "question": {"en": "Have you studied for a cloud computing certificate or taken a cloud course? Did it cover billing and budgets?", "zh": "你学过云计算的证书或课程吗？里面讲过账单和预算吗？"}},
+  {"id": "X11", "group": "gcp-docs", "question": {"en": "Have you read Google Cloud documentation or tutorials about billing or budgets?", "zh": "你读过 Google Cloud 账单或预算的文档、教程吗？"}},
+  {"id": "X12", "group": "statistics", "question": {"en": "Have you studied statistics or data analysis?", "zh": "你学过统计或数据分析吗？"}},
+  {"id": "X14", "group": "accounting-courses", "question": {"en": "Have you taken accounting or finance courses?", "zh": "你上过会计或财务方面的课吗？"}},
+  {"id": "X13", "group": "finance-work", "question": {"en": "Have you worked in finance or accounting, or managed a budget at work?", "zh": "你做过财务、会计或者管预算的工作吗？"}},
+  {"id": "X16", "group": "it-admin", "question": {"en": "Have you worked as an IT administrator, creating accounts and giving people permissions?", "zh": "你当过 IT 管理员，给别人开过账号、分过权限吗？"}},
+  {"id": "X19", "group": "build-admin", "question": {"en": "Have you built a website admin panel or dashboard yourself?", "zh": "你自己开发过网站后台或管理面板吗？"}},
+  {"id": "X20", "group": "manage-members", "question": {"en": "Have you managed project members and roles in a cloud platform or company system? For example, giving someone Owner or Editor access.", "zh": "你在云平台或公司系统里管过项目成员和角色吗？比如给人加 Owner、Editor 权限"}},
+  {"id": "X15", "group": "personal-budget", "question": {"en": "Have you made a spending budget for yourself or your household?", "zh": "你自己给个人或家里做过开支预算吗？"}}
+]
+}</script>
+
+<script>
+(function(){
+"use strict";
+/* ---------- questions (ids and stored values are what tools/persona-builder.html reads) ---------- */
+var DATA=JSON.parse(document.getElementById("qdata").textContent);
+var T=function(zh,en){return {zh:zh,en:en};};
+var SOURCES=[
+  {k:"product",t:T("用过的产品和工具","Products and tools"),ask:T("你平时用哪些软件、网站和设备？具体做过哪些操作？","What software, websites and devices do you use, and what have you done with them?"),ph:T("比如：天天用 Google 文档；在 AWS 设过一次账单提醒","For example: I use Google Docs every day; I once set up a billing alert in AWS"),sq:T("下面这些，你用过哪些？","Which of these have you used?")},
+  {k:"work",t:T("工作经历","Work"),ask:T("你做过什么工作？平时具体负责哪些事？","What jobs have you had, and what were you responsible for?"),ph:T("学生可以写课程项目、实习和助教","Students can include course projects, internships and TA work"),sq:T("下面这些工作，你做过哪些？","Which of these kinds of work have you done?")},
+  {k:"study",t:T("学过的东西","Study"),ask:T("你上过哪些课、考过哪些证、自学过什么？","What courses, certificates or self-study have you done?"),ph:T("同事教的和公司培训也算","Training at work and things colleagues taught you count too"),sq:T("下面这些，你学过哪些？","Which of these have you studied?")},
+  {k:"life",t:T("工作以外","Outside work"),ask:T("工作以外，你自己处理过哪些和管钱、记账有关的事？","Outside work, what have you done to manage money, such as tracking spending?"),ph:T("比如：自己记账，给每个月的开支定预算","For example: I track my spending and set a monthly budget"),sq:T("工作以外，下面这些事你做过哪些？","Outside work, which of these have you done?")}
+];
+var LEVELS=[
+  {v:4,t:T("熟练","Expert"),d:T("经常做，不用想就会","I do it often without thinking")},
+  {v:3,t:T("做过","Done it"),d:T("亲手做过几次，跟着 AI 或教程做的也算","A few times myself; following an AI or a tutorial counts")},
+  {v:2,t:T("学过","Studied it"),d:T("在课上、证书或文档里学过，没亲手做过","Learned it in a class, a certificate or docs, never done it")},
+  {v:1,t:T("学过但忘了","Studied, but forgot"),d:T("学过，现在基本想不起来","Learned it once, can barely remember it")},
+  {v:0,t:T("没有","Never"),d:T("没做过，也没学过","Haven't done or studied it")}
+];
+var UI_LANGS=[{v:"English",t:T("英文","English")},{v:"Chinese",t:T("中文","Chinese")},{v:"Spanish",t:T("西班牙文","Spanish")},{v:"Other",t:T("其他","Another language")}];
+var ENGLISH=[{v:"fluent",t:T("母语或流利","Native or fluent"),d:T("英文界面基本都看得懂字面意思","I understand almost everything in English software")},{v:"intermediate",t:T("中等","Intermediate"),d:T("常见的词看得懂，少见的词看不懂","I know common words but not rarer ones")},{v:"beginner",t:T("初级","Beginner"),d:T("没学过的英文词基本看不懂","I don't understand English words I haven't studied")}];
+var VOCAB=["river","brastle","severe","hammer","vocational","courteous","idea","poverty","plintery","grief","stitch","copious","fire","drama","beard","mornacle","rectangular","assailant","brother","chamber","comply","vapor","sleptive","adrift","drink","reasonable","wheat","depiction","perforated","fendrous","honest","experiment","pledge","quantrel","manageable","crackling","prevent","desperate","likelihood","obsprate","mixer","sarcophagus","shape","recover","trelmish","forehead","prevail","conflenish","gemstone","dovicant"];
+var HABITS=[
+  {id:"R1",q:T("在没用过的网站上看不懂某个按钮，你上次是怎么办的？","Last time you didn't understand a button on a website you hadn't used before, what did you do?"),sub:T("按不能上网搜、不能问 AI 的情况选。","Answer as if you couldn't search online or ask an AI."),o:[T("不点，先找说明或者问人","Didn't click it; looked for an explanation or asked someone"),T("先找说明，找不到再点点看","Looked for an explanation first, then clicked to see"),T("直接点开看看","Just clicked it to see")]},
+  {id:"R2",q:T("设置跟钱有关的东西，比如付款、订阅、预算，点确认之前你会怎么做？","Before confirming a money-related setting, like a payment, subscription or budget, what do you do?"),o:[T("每一项都看懂才点","Make sure I understand every item"),T("大概看懂就点","Confirm once I roughly understand"),T("差不多就点，错了再改","Confirm once it looks about right; fix it later if needed")]},
+  {id:"P1",q:T("上次在网站上找不到想要的功能，你试了多久？","Last time you couldn't find a feature on a website, how long did you keep trying?"),o:[T("试两三下就放弃，或者去问人","Gave up after two or three tries, or asked someone"),T("把能想到的地方都找一遍","Looked everywhere I could think of"),T("一直找，换各种办法直到找到","Kept trying different ways until I found it")]},
+  {id:"P2",q:T("一个操作试了几次都失败，你一般会怎么办？","When something fails a few times in a row, what do you usually do?"),o:[T("不弄了","Stop"),T("换一两个办法再试","Try one or two other ways"),T("一直试到成功为止","Keep trying until it works")]},
+  {id:"D1",q:T("第一次打开一个新页面，你一般怎么看？","When you open a new page for the first time, how do you usually look at it?"),o:[T("看到像的就点","Click the first thing that looks right"),T("扫一眼主要的再点","Skim the main parts, then click"),T("整页看完再动手","Read the whole page first")]},
+  {id:"D2",q:T("填一个选项很多的表单，没让你改的默认选项你会看吗？","In a form with many options, do you check the defaults you weren't asked to change?"),o:[T("不看","No"),T("看一眼显眼的","I glance at the obvious ones"),T("每个都看一遍","I check every one")]},
+  {id:"D3",q:T("上次填一个选项很多的表单，遇到看不懂的选项，你是怎么做的？","Last time you filled in a form and met an option you didn't understand, what did you do?"),o:[T("不管它，保持原样","Left it as it was"),T("看了旁边的说明，但没去改它","Read the explanation next to it, but didn't change it"),T("点一下或改一下试试，看完再改回来","Tried changing it to see what happened, then changed it back")]},
+  {id:"H",q:T("在一个新网站上找某个功能，你一般先怎么找？","When you look for a feature on a new website, what do you try first?"),o:[T("先用搜索","Search"),T("先翻菜单","Look through the menus"),T("看情况，都可以","It depends")]}
+];
+var SENSES=[
+  {id:"V",q:T("看电脑上的小字，比如表单下面的提示，你觉得吃力吗？","Is small text on a computer, like the hints under a form field, hard for you to read?"),o:[T("不吃力","Not hard"),T("又小又淡的才吃力","Only when it's small and faint"),T("比正文小的都吃力","Anything smaller than normal text")]},
+  {id:"C",q:T("你分得清红色和绿色吗？","Can you tell red from green?"),o:[T("分得清","Yes"),T("不太分得清","Not easily")]},
+  {id:"M",q:T("用鼠标或触控板点很小的东西，比如勾选框，你会点偏吗？","When you click very small things, like checkboxes, do you miss?"),o:[T("基本不会","Rarely"),T("特别小的会","Only very small ones"),T("经常会","Often")]},
+  {id:"S",q:T("读界面上的说明文字，你比身边的人快还是慢？","Compared with people around you, do you read on-screen explanations faster or slower?"),sub:T("按读界面语言的速度来答。","Answer for the language the screen is in."),o:[T("快","Faster"),T("差不多","About the same"),T("慢","Slower")]}
+];
+var DONE_WAYS=[{v:"action",t:T("点完最后一个按钮就算","Once I click the last button")},{v:"toast",t:T("看到成功提示","I see a success message")},{v:"list",t:T("回到列表或详情页看一眼","I check the list or details page")},{v:"external",t:T("等邮件或手机通知","I wait for an email or notification")},{v:"test",t:T("想办法让它真触发一次","I make it actually trigger once")}];
+var DONE_MISS=[T("不管了","Let it go"),T("回去查一下","Go back and check"),T("重新做一遍","Do it all again"),T("其他","Something else")];
+
+/* ---------- state ---------- */
+var KEY="sue-questionnaire-v2", OLD_KEY="sue-questionnaire-v1";
+var A={name:"",background:{},screen:{},screenOther:{},answers:{},expNotes:{},lang:{},vocab:{},tendStory:"",tendFollow:"",tend:{},perc:{},careText:"",done:[],doneMiss:null,doneMissOther:""};
+var ui={at:"intro",lang:null,msg:"",msgCls:"",confirmReset:false};
+var downloads=null; // the viewer's save capability; false when this view has none
+var inViewer=!!(window.claude&&typeof window.claude.use==="function"); // claude.ai frame: page-started downloads are blocked there
+var advancing=null, shownId=null;
+function load(){
+  try{
+    var s=JSON.parse(localStorage.getItem(KEY)||"null"), old=!s;
+    if(old)s=JSON.parse(localStorage.getItem(OLD_KEY)||"null");
+    if(s&&s.A){for(var k in s.A)A[k]=s.A[k];if(old)upgrade();ui.at=old?"intro":(s.at||"intro");ui.lang=s.lang||null;}
+  }catch(e){}
+}
+/* A draft saved by the first version of this page used Chinese keys; map them to the ids. */
+function upgrade(){
+  var src={},grp={},lang={"英文":"English","中文":"Chinese","西班牙文":"Spanish","其他":"Other"},en={"母语或流利":"fluent","中等":"intermediate","初级":"beginner"};
+  (DATA.sources||[]).forEach(function(x){src[x.legacy]=x.id;});
+  (DATA.groups||[]).forEach(function(g){grp[g.label.zh]=g.id;});
+  ["background","screen","screenOther"].forEach(function(f){var o={};Object.keys(A[f]||{}).forEach(function(k){o[src[k]||k]=A[f][k];});A[f]=o;});
+  Object.keys(A.screen).forEach(function(k){A.screen[k]=(A.screen[k]||[]).map(function(g){return grp[g]||g;});});
+  A.lang={ui:lang[A.lang.ui]||A.lang.ui,english:en[A.lang.english]||A.lang.english};
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({A:A,at:ui.at,lang:ui.lang}));}catch(e){}}
+function L(x){return x==null?"":(typeof x==="string"?x:(x[ui.lang]||x.en));}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function $(id){return document.getElementById(id);}
+
+function groupOf(id){for(var i=0;i<DATA.groups.length;i++)if(DATA.groups[i].id===id)return DATA.groups[i];return null;}
+function sourceOf(e){var g=groupOf(e.group);return g?g.source:"";}
+function groupsOf(k){return DATA.groups.filter(function(g){return g.source===k&&DATA.experiences.some(function(e){return e.group===g.id;});}).map(function(g){return {v:g.id,t:g.label};});}
+function shownExps(k){var sel=A.screen[k]||[];return DATA.experiences.filter(function(e){return sourceOf(e)===k&&sel.indexOf(e.group)>=0;});}
+function asksMiss(){return A.done.some(function(k){return k!=="action";});}
+
+/* ---------- the flow: one screen per question; what is asked follows earlier answers ---------- */
+var PART={you:T("关于你","About you"),exp:T("你的经历","Your experience"),lang:T("语言","Language"),vocab:T("英文词汇","English words"),habits:T("做事习惯","How you work"),senses:T("看和点","Seeing and clicking"),task:T("这次的任务","The task"),end:T("完成","Done")};
+function screens(){
+  var s=[{id:"intro",part:"you"},{id:"name",part:"you"}];
+  SOURCES.forEach(function(src){
+    s.push({id:"bg-"+src.k,part:"exp",src:src});
+    s.push({id:"screen-"+src.k,part:"exp",src:src});
+    shownExps(src.k).forEach(function(e){s.push({id:"exp-"+e.id,part:"exp",src:src,e:e});});
+  });
+  s.push({id:"ui",part:"lang"},{id:"english",part:"lang"},{id:"vintro",part:"vocab"});
+  VOCAB.forEach(function(w,i){s.push({id:"v-"+w,part:"vocab",w:w,i:i});});
+  s.push({id:"story",part:"habits"});
+  HABITS.forEach(function(h){s.push({id:"t-"+h.id,part:"habits",h:h});if(h.id==="R1")s.push({id:"follow",part:"habits"});});
+  SENSES.forEach(function(q){s.push({id:"p-"+q.id,part:"senses",q:q});});
+  s.push({id:"task",part:"task"},{id:"care",part:"task"},{id:"done",part:"task"});
+  if(asksMiss()){s.push({id:"miss",part:"task"});if(A.doneMiss===3)s.push({id:"missother",part:"task"});}
+  s.push({id:"finish",part:"end"});
+  return s;
+}
+/* Whether a screen still needs an answer (text screens are optional unless listed). */
+function answered(sc){
+  var id=sc.id;
+  if(id==="name")return !!A.name.trim();
+  if(id.indexOf("screen-")===0)return !!(A.screen[sc.src.k]||[]).length;
+  if(sc.e)return A.answers[sc.e.id]!=null;
+  if(id==="ui")return !!A.lang.ui;
+  if(id==="english")return !!A.lang.english;
+  if(sc.w)return A.vocab[sc.w]!=null;
+  if(sc.h)return A.tend[sc.h.id]!=null;
+  if(sc.q)return A.perc[sc.q.id]!=null;
+  if(id==="care")return !!A.careText.trim();
+  if(id==="done")return A.done.length>0;
+  if(id==="miss")return A.doneMiss!=null;
+  return true;
+}
+function index(list){for(var i=0;i<list.length;i++)if(list[i].id===ui.at)return i;return 0;}
+
+/* ---------- render ---------- */
+function choices(list,isOn,act,attrs,box){
+  return '<div class="choices" role="'+(box?"group":"radiogroup")+'">'+list.map(function(o,i){
+    var v=o.v!=null?o.v:i, on=isOn(v);
+    return '<button type="button" class="choice'+(box?" box":"")+'" role="'+(box?"checkbox":"radio")+'" aria-checked="'+on+'" data-act="'+act+'" data-v="'+esc(v)+'"'+(attrs||"")+'><span class="mark"></span><span class="txt"><span class="t">'+esc(L(o.t||o))+'</span>'+(o.d?'<span class="d">'+esc(L(o.d))+'</span>':'')+'</span></button>';
+  }).join("")+'</div>';
+}
+function head(eyebrow,title,sub){return (eyebrow?'<p class="eyebrow">'+esc(eyebrow)+'</p>':'')+'<h2>'+esc(title)+'</h2>'+(sub?'<p class="sub">'+esc(sub)+'</p>':'');}
+function cont(enabled,label,skip){return '<div class="actions"><button type="button" class="btn primary" data-act="next"'+(enabled?'':' disabled')+'>'+esc(label||L(T("继续","Continue")))+'</button>'+(skip?'<button type="button" class="link" data-act="next">'+esc(L(T("跳过","Skip")))+'</button>':'')+'</div>';}
+
+function screenHtml(sc){
+  var id=sc.id;
+  if(id==="intro"){
+    return '<h1>'+esc(L(T("参与者问卷","Participant questionnaire")))+'</h1><div class="body"><div class="lines">'+
+      '<p>'+esc(L(T("大约 15 到 20 分钟。问的是你用过什么、学过什么、平时怎么做事，没有对错，按真实情况答。","About 15 to 20 minutes. It asks what you have used, what you have studied and how you usually do things. There are no right or wrong answers.")))+'</p>'+
+      '<p>'+esc(L(T("答完以后，会请你在一个模拟的网站上做一个任务。测试之前请不要去搜这个任务，也不要先去别的网站练习。","Afterwards you will do a task on a mock website. Before the test, please don't look up the task or practise it anywhere.")))+'</p>'+
+      '<p>'+esc(L(T("答案只存在你自己的浏览器里，可以中途离开再回来。最后会给你一份答案，发给研究人员就行。","Your answers stay in your own browser, so you can leave and come back. At the end you'll get a copy to send to the researcher.")))+'</p>'+
+      '</div>'+cont(true,L(T("开始","Start")))+'</div>';
+  }
+  if(id==="name")return head("",L(T("给自己起个代号","Choose a code name")),L(T("不用写真名，比如 P2。研究人员用它认出你的答案。","No real name needed, for example P2. The researcher uses it to find your answers.")))+
+    '<div class="body"><input class="input" id="f-name" data-f="name" value="'+esc(A.name)+'" autocomplete="off" aria-label="'+esc(L(T("代号","Code name")))+'">'+cont(answered(sc))+'</div>';
+  if(id.indexOf("bg-")===0)return head(L(sc.src.t),L(sc.src.ask),L(T("写具体做过的事，几句话就行。可以跳过。","Write what you have actually done; a few sentences is enough. You can skip this.")))+
+    '<div class="body"><textarea class="input" id="f-bg-'+esc(sc.src.k)+'" data-bg="'+esc(sc.src.k)+'" placeholder="'+esc(L(sc.src.ph))+'">'+esc(A.background[sc.src.k])+'</textarea>'+cont(true,"",true)+'</div>';
+  if(id.indexOf("screen-")===0){
+    var k=sc.src.k, sel=A.screen[k]||[], opts=groupsOf(k);
+    opts.push({v:"__other",t:T("其他","Something else")});
+    opts.push({v:"__none",t:T("都没有","None of these")});
+    var h=head(L(sc.src.t),L(sc.src.sq),L(T("可以多选。","Choose all that apply.")))+'<div class="body">'+choices(opts,function(v){return sel.indexOf(v)>=0;},"screen",' data-k="'+esc(k)+'"',true);
+    if(sel.indexOf("__other")>=0)h+='<input class="input" id="f-other-'+esc(k)+'" data-other="'+esc(k)+'" value="'+esc(A.screenOther[k])+'" placeholder="'+esc(L(T("写一下是什么","What is it?")))+'">';
+    return h+cont(answered(sc))+'</div>';
+  }
+  if(sc.e){
+    var e=sc.e;
+    return head(L((groupOf(e.group)||{}).label),L(e.question),"")+'<div class="body">'+choices(LEVELS,function(v){return A.answers[e.id]===v;},"exp",' data-id="'+esc(e.id)+'"')+
+      '<label class="field"><span>'+esc(L(T("想补充的话写在这里，比如做过几次、最近一次是什么时候","Anything to add, for example how many times and when the last time was")))+'</span><input class="input" id="f-note-'+esc(e.id)+'" data-note="'+esc(e.id)+'" value="'+esc(A.expNotes[e.id])+'"></label>'+
+      (answered(sc)?cont(true):'')+'</div>';
+  }
+  if(id==="ui")return head("",L(T("你的手机和电脑平时设成什么语言？","What language are your phone and computer set to?")),"")+'<div class="body">'+choices(UI_LANGS,function(v){return A.lang.ui===v;},"lang",' data-k="ui"')+'</div>';
+  if(id==="english")return head("",L(T("你的英语到什么程度？","How good is your English?")),"")+'<div class="body">'+choices(ENGLISH,function(v){return A.lang.english===v;},"lang",' data-k="english"')+'</div>';
+  if(id==="vintro")return head("",L(T("这些英文词，你认识吗？","Do you know these English words?")),L(T("能说出大概是什么意思就算认识，不确定就选不认识。其中有一些是编出来的词。一共 50 个，大约三分钟。","Choose Know if you could say roughly what it means; if unsure, choose Don't know. Some words are made up. 50 words, about three minutes.")))+
+    '<div class="body"><p class="hint">'+esc(L(T("键盘上按 1 是认识，按 2 是不认识。","On a keyboard, press 1 for Know and 2 for Don't know.")))+'</p>'+cont(true,L(T("开始","Start")))+'</div>';
+  if(sc.w){
+    return '<div class="word" aria-live="polite">'+esc(sc.w)+'</div><p class="count">'+(sc.i+1)+' / '+VOCAB.length+'</p><div class="pair" role="radiogroup">'+
+      [{v:1,t:T("认识","Know")},{v:0,t:T("不认识","Don't know")}].map(function(o){return '<button type="button" class="choice" role="radio" aria-checked="'+(A.vocab[sc.w]===o.v)+'" data-act="vocab" data-v="'+o.v+'"><span class="mark"></span><span class="txt"><span class="t">'+esc(L(o.t))+'</span></span></button>';}).join("")+'</div>';
+  }
+  if(id==="story")return head("",L(T("讲一次你在没用过的网站或后台里找功能的经历","Tell us about a time you looked for a feature on a website you hadn't used before")),L(T("怎么找的，卡住时怎么办，最后做成没有。可以跳过。","How you looked, what you did when stuck, and whether you managed it. You can skip this.")))+
+    '<div class="body"><textarea class="input" id="f-story" data-f="tendStory">'+esc(A.tendStory)+'</textarea>'+cont(true,"",true)+'</div>';
+  if(sc.h)return head(L(T("按上一次真实的做法选","Answer with what you actually did")),L(sc.h.q),L(sc.h.sub))+'<div class="body">'+choices(sc.h.o,function(v){return A.tend[sc.h.id]===v;},"tend",' data-id="'+sc.h.id+'"')+'</div>';
+  if(id==="follow")return head("",L(T("如果当时能上网搜或者问 AI，你会先这么做吗？","If you could have searched online or asked an AI, would you have done that first?")),L(T("可以跳过。","You can skip this.")))+
+    '<div class="body"><input class="input" id="f-follow" data-f="tendFollow" value="'+esc(A.tendFollow)+'">'+cont(true,"",true)+'</div>';
+  if(sc.q)return head(L(T("照实答，戴眼镜的话按戴着答","Answer as it is; with glasses if you wear them")),L(sc.q.q),L(sc.q.sub))+'<div class="body">'+choices(sc.q.o,function(v){return A.perc[sc.q.id]===v;},"perc",' data-id="'+sc.q.id+'"')+'</div>';
+  if(id==="task")return head("",L(T("这是你待会儿要做的任务","This is the task you will do")),L(T("读一遍就好，不用现在去做。测试里也是这段英文。","Just read it; don't try it now. The test shows the same text.")))+
+    '<div class="body"><blockquote class="task">'+esc(DATA.flow.task)+'</blockquote>'+cont(true)+'</div>';
+  if(id==="care")return head("",L(T("做这个任务，你最怕哪里出错？","For this task, what would you most worry about getting wrong?")),L(T("用你自己的话写，一两句就行。","In your own words; a sentence or two is enough.")))+
+    '<div class="body"><textarea class="input" id="f-care" data-f="careText">'+esc(A.careText)+'</textarea>'+cont(answered(sc))+'</div>';
+  if(id==="done")return head("",L(T("设置好一个东西以后，你一般怎么确定真的弄好了？","After you set something up, how do you usually make sure it really worked?")),L(T("按平时真实的做法选，可以多选。","Choose what you really do; choose all that apply.")))+
+    '<div class="body">'+choices(DONE_WAYS,function(v){return A.done.indexOf(v)>=0;},"done","",true)+cont(answered(sc))+'</div>';
+  if(id==="miss")return head("",L(T("如果你等的确认一直没来，你会怎么办？","If the confirmation you're waiting for never comes, what do you do?")),"")+'<div class="body">'+choices(DONE_MISS,function(v){return A.doneMiss===v;},"miss")+'</div>';
+  if(id==="missother")return head("",L(T("你会怎么做？","What would you do?")),L(T("可以跳过。","You can skip this.")))+
+    '<div class="body"><input class="input" id="f-missother" data-f="doneMissOther" value="'+esc(A.doneMissOther)+'">'+cont(true,"",true)+'</div>';
+  return finishHtml();
+}
+function exportText(){return JSON.stringify({kind:"sue-questionnaire",version:2,flow:DATA.flow.name,filledAt:new Date().toISOString(),pageLanguage:ui.lang,answers:A},null,2);}
+function fileName(){return "questionnaire-"+(String(A.name||"answers").replace(/[^A-Za-z0-9_-]+/g,"-").replace(/^-+|-+$/g,"")||"answers")+".json";}
+function finishHtml(){
+  var list=screens(), todo=list.filter(function(sc){return sc.id!=="finish"&&!answered(sc);});
+  var h=head("",todo.length?L(T("差一点就好了","Almost there")):L(T("都答完了，谢谢！","All done, thank you!")),todo.length?L(T("还有 ","There are still "))+todo.length+L(T(" 题没答。可以回去补，也可以直接交。"," unanswered questions. You can go back to them, or send as is.")):L(T("最后一步，把答案发给研究人员。","One last step: send your answers to the researcher.")))+'<div class="body">';
+  if(todo.length){
+    var parts={};todo.forEach(function(sc){parts[sc.part]=parts[sc.part]||{n:0,id:sc.id};parts[sc.part].n++;});
+    h+='<ul class="todo">'+Object.keys(parts).map(function(p){return '<li><button type="button" data-act="go" data-v="'+esc(parts[p].id)+'"><span>'+esc(L(PART[p]))+L(T("，差 "," · "))+parts[p].n+L(T(" 题"," missing"))+'</span><span>'+esc(L(T("去补","Answer")))+'</span></button></li>';}).join("")+'</ul>';
+  }
+  h+='<div class="actions">'+(downloads!==false?'<button type="button" class="btn primary" data-act="savefile">'+esc(L(T("保存答案文件","Save answers file")))+'</button>':'')+'<button type="button" class="btn'+(downloads===false?' primary':'')+'" data-act="copy">'+esc(L(T("复制答案","Copy answers")))+'</button></div>';
+  h+='<p class="status'+(ui.msgCls?" "+ui.msgCls:"")+'" role="status">'+esc(ui.msg||L(T("保存不了文件的话，点「复制答案」，粘贴到邮件或消息里发过去。","If the file can't be saved, copy the answers and paste them into an email or message.")))+'</p>';
+  h+='<details><summary>'+esc(L(T("查看答案内容","Show the answers")))+'</summary><textarea class="input" id="f-out" readonly aria-label="'+esc(L(T("答案","Answers")))+'">'+esc(exportText())+'</textarea></details>';
+  h+='<div><button type="button" class="link" data-act="reset">'+esc(ui.confirmReset?L(T("再点一次，清空全部答案","Click again to erase everything")):L(T("清空，重新开始","Erase and start over")))+'</button></div>';
+  return h+'</div>';
+}
+function render(focusFirst){
+  var list=screens(), i=index(list), sc=list[i];
+  ui.at=sc.id;
+  document.documentElement.lang=ui.lang==="zh"?"zh":"en";
+  $("lang-zh").setAttribute("aria-pressed",String(ui.lang==="zh"));$("lang-en").setAttribute("aria-pressed",String(ui.lang==="en"));
+  $("back").hidden=i===0;$("back-t").textContent=L(T("上一题","Back"));
+  $("where").textContent=sc.id==="intro"?"":L(PART[sc.part]);
+  $("track").style.width=Math.round(i/(list.length-1)*100)+"%";
+  var m=$("main");m.innerHTML='<div'+(sc.id!==shownId?' class="fade"':'')+'>'+screenHtml(sc)+'</div>';shownId=sc.id;
+  // Text screens put the cursor in the box on a computer; phones keep the keyboard closed.
+  if(focusFirst&&/^(name|bg-|story|follow|care|missother)/.test(sc.id)&&window.matchMedia("(pointer:fine)").matches){var f=m.querySelector("input,textarea");if(f)f.focus();}
+}
+function go(id){ui.at=id;ui.msg="";ui.confirmReset=false;save();render(true);window.scrollTo(0,0);}
+function step(d){var list=screens(),i=index(list),j=Math.max(0,Math.min(list.length-1,i+d));go(list[j].id);}
+function soon(){clearTimeout(advancing);advancing=setTimeout(function(){step(1);},220);}
+
+/* ---------- events ---------- */
+document.addEventListener("click",function(ev){
+  var b=ev.target.closest("[data-act],[data-lang]");if(!b||b.disabled)return;
+  if(b.hasAttribute("data-lang")){ui.lang=b.getAttribute("data-lang");save();render();return;}
+  var act=b.getAttribute("data-act"),v=b.getAttribute("data-v");
+  if(act!=="reset")ui.confirmReset=false;
+  switch(act){
+    case "next":step(1);return;
+    case "back":clearTimeout(advancing);step(-1);return;
+    case "go":go(v);return;
+    case "screen":
+      var k=b.getAttribute("data-k"),sel=(A.screen[k]||[]).slice(),at=sel.indexOf(v);
+      if(v==="__none")sel=at>=0?[]:["__none"];
+      else{sel=sel.filter(function(x){return x!=="__none";});at=sel.indexOf(v);if(at>=0)sel.splice(at,1);else sel.push(v);}
+      A.screen[k]=sel;save();render();return;
+    case "done":var d=A.done.slice(),di=d.indexOf(v);if(di>=0)d.splice(di,1);else d.push(v);A.done=d;if(!asksMiss()){A.doneMiss=null;A.doneMissOther="";}save();render();return;
+    case "exp":A.answers[b.getAttribute("data-id")]=parseInt(v,10);break;
+    case "lang":A.lang[b.getAttribute("data-k")]=v;break;
+    case "tend":A.tend[b.getAttribute("data-id")]=parseInt(v,10);break;
+    case "perc":A.perc[b.getAttribute("data-id")]=parseInt(v,10);break;
+    case "miss":A.doneMiss=parseInt(v,10);if(A.doneMiss!==3)A.doneMissOther="";break;
+    case "vocab":A.vocab[screens()[index(screens())].w]=parseInt(v,10);break;
+    case "savefile":saveFile();return;
+    case "copy":copyOut();return;
+    case "reset":
+      if(!ui.confirmReset){ui.confirmReset=true;render();return;}
+      try{localStorage.removeItem(KEY);}catch(e){}
+      location.reload();return;
+    default:return;
+  }
+  save();render();
+  if(!/^exp-/.test(ui.at))soon(); // a single choice moves on by itself; experience questions wait, there is a note box
+});
+document.addEventListener("input",function(ev){
+  var t=ev.target;
+  if(t.hasAttribute("data-f"))A[t.getAttribute("data-f")]=t.value;
+  else if(t.hasAttribute("data-bg"))A.background[t.getAttribute("data-bg")]=t.value;
+  else if(t.hasAttribute("data-other"))A.screenOther[t.getAttribute("data-other")]=t.value;
+  else if(t.hasAttribute("data-note"))A.expNotes[t.getAttribute("data-note")]=t.value;
+  else return;
+  save();
+  var btn=document.querySelector('.btn.primary[data-act="next"]');if(btn){var list=screens();btn.disabled=!answered(list[index(list)]);}
+});
+document.addEventListener("keydown",function(ev){
+  if(ev.metaKey||ev.ctrlKey||ev.altKey)return;
+  var t=ev.target,typing=t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA");
+  if(ev.key==="Enter"&&!typing){var n=document.querySelector('.btn.primary[data-act="next"]:not(:disabled)');if(n){ev.preventDefault();n.click();}return;}
+  if(ev.key==="Enter"&&t&&t.tagName==="INPUT"){var n2=document.querySelector('.btn.primary[data-act="next"]:not(:disabled)');if(n2){ev.preventDefault();n2.click();}return;}
+  if(typing)return;
+  if(/^[1-9]$/.test(ev.key)){var opts=document.querySelectorAll("#main .choice"),o=opts[parseInt(ev.key,10)-1];if(o){ev.preventDefault();o.click();}}
+  else if(ev.key==="ArrowLeft"&&!$("back").hidden){ev.preventDefault();step(-1);}
+});
+
+/* ---------- handing the answers over ---------- */
+function say(msg,cls){ui.msg=msg;ui.msgCls=cls||"";render();}
+function saveFile(){
+  var data=exportText();
+  if(inViewer&&!downloads){downloads=false;say(L(T("这里保存不了文件，请点「复制答案」。","Files can't be saved here. Please use Copy answers.")),"warn");return;}
+  if(downloads){
+    downloads.save({filename:fileName(),data:data}).then(function(){say(L(T("文件已经保存，把它发给研究人员就行。","Saved. Send the file to the researcher.")),"ok");},function(err){
+      var c=err&&err.code;
+      if(c==="declined")return;
+      if(c==="rate_limited"){say(L(T("保存的提示已经打开了，先处理那一个。","A save prompt is already open; finish that one first.")),"warn");return;}
+      downloads=false;say(L(T("这里保存不了文件，请点「复制答案」。","Files can't be saved here. Please use Copy answers.")),"warn");
+    });
+    return;
+  }
+  try{
+    var url=URL.createObjectURL(new Blob([data],{type:"application/json"})),a=document.createElement("a");
+    a.href=url;a.download=fileName();document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    say(L(T("文件已经下载，把它发给研究人员就行。","Downloaded. Send the file to the researcher.")),"ok");
+  }catch(e){say(L(T("这里保存不了文件，请点「复制答案」。","Files can't be saved here. Please use Copy answers.")),"warn");}
+}
+function copyOut(){
+  var data=exportText(),fail=function(){say(L(T("没能自动复制。展开下面的答案，全选后复制。","Couldn't copy automatically. Open the answers below, select all and copy.")),"warn");var d=document.querySelector("details");if(d){d.open=true;var o=$("f-out");if(o){o.focus();o.select();}}};
+  try{navigator.clipboard.writeText(data).then(function(){say(L(T("已复制，粘贴到邮件或消息里发给研究人员。","Copied. Paste it into an email or message to the researcher.")),"ok");},fail);}catch(e){fail();}
+}
+
+/* ---------- boot ---------- */
+load();
+if(!ui.lang)ui.lang="en"; // English first; 中文 stays one tap away
+render();
+if(inViewer){
+  window.claude.use("downloads").then(function(d){downloads=d||false;if(ui.at==="finish")render();},function(){downloads=false;});
+}
+})();
+</script>

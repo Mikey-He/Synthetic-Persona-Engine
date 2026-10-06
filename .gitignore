@@ -1,0 +1,21 @@
+# Only the engine, its tools and its data live in this repository.
+test/
+synthetic-user-engine/synthetic-user-engine/docs/
+synthetic-user-engine/synthetic-user-engine/archive/
+
+# Client report: built locally from the platform logs; not part of the engine
+synthetic-user-engine/synthetic-user-engine/tools/build_client_report.py
+synthetic-user-engine/synthetic-user-engine/tools/assemble_client_report.py
+synthetic-user-engine/synthetic-user-engine/tools/client_report_images.js
+synthetic-user-engine/synthetic-user-engine/tools/client_report_src.html
+
+# Local Claude Code settings
+.claude/
+
+# Secrets, environments, outputs
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+synthetic-user-engine/synthetic-user-engine/engine/runs/
+node_modules/

@@ -1,0 +1,164 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-05T00:34:56.716Z",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "Aryan",
+    "background": {
+      "product": "So the softwares and websites. Software would be basically, in my day-to-day life, I heavily use Chrome. Other than that, VS Code would be the second option. Then I could say WhatsApp, Docker Desktop, YouTube Music, Sublime, Frog, Notion. Notion is also one of the things I use the most. Also AnyDesk. I have two desktops, remote desktops to work on, Zoom, and yeah, and Terminal, which is also an application for which I'm using Linux. Websites, I would say, ChatGPT, Gemini, Grok. These are the AI websites. Other websites would be like college websites. I would say majority college websites, or websites which require college things to be done. And devices, I would say I use two Linux laptop, Windows laptop, and a Mac laptop, and a desktop too. So I have four devices to work on, seven iPhone, I have seven Android phone, I have seven iPad. So I use those devices too. What have you done with them? For the laptops, I usually have different operating systems to test my Trojans on to get detect on it. And for the iPad, I usually use it for notes. Phone is for contact and for having some secret things on it, I would say. And websites, they basically help me perform my day-to-day activities, research, and projects, and applications for my job. And college websites are usually used for the college things which I do. Yeah, that's my answer.",
+      "work": "So I did a variety number of jobs. So initially for my first year, I was, for my high school, I was a web developer, I would say a front-end web developer in my high school. And then in my first year, I became a full-stack mobile Android developer. And then afterwards, I started developing iOS mobile applications. Then I started developing, was a job, I would say full-stack AI web applications, and then an AI/ML engineer. Yeah, so these were my jobs from high school till now. And the internships, for the course projects, I would say course projects. Okay, course projects would be, for the current course projects, I would say the current one is the Google Caption project in which we have to make the Python project module, in which how you have Pandas, NumPy, modules like those. So we'll be having modules like regression, matching, and instrumental variable. Those are the course projects which I am doing right now. And other than this, another course project would be event management application for Cornell, which is a 25Live.com revamp, in which people or students can participate in or create events for Cornell easily without having any issues or waiting a lot of time for getting the approvals for the specific events. These are the two course projects. For the internships, my first internship was as a Flutter Android application. So that was in 2022. My other internships were as an AI/ML engineer at Bristlecone in 2004. Yeah, for the TA work, I would say I did a TAship for cybersecurity in my third year, which was not that good. And right now I am doing the TA for project management, which I am expert in about handling projects. I would say a product basically rather than projects. Yeah, I was responsible for maintaining the slides, conveying the proper knowledge to the students, and resolving issues, conflicts. Yeah.",
+      "study": "So whatever I have done is basically self-study. Courses helped me, helped me like 15 to 20%, but majority of this is like self-study. And courses would be, a lot of courses would be starting from the basic of programming, starting with how a language is being created, how to write a language, how to memorize a language, what are the advantages of those languages. Courses would be data science, computer science, computer engineering, database management systems, operating systems, cybersecurity, speech modulation. Certifications would be AWS certifications about handling the console, and then AWS Cloud certification, Postman, Postman certificate, and yeah, Postman certificate, and yeah, that's it.",
+      "life": "So outside of work, I usually manage my money by budgeting on Google Sheets. Basically, I just track down all my things which I'm going to spend on, and if it goes it never goes out of budget, but if it ever goes out of budget, I had to reduce those things which I usually tend to spend on more on, which is majorly on grocery and food. Other than that, my main budgets won't, like, go too much. And for tracking, I would say the Chase application or the Capital One application usually helps me a lot in tracking where I spend the lot. And yeah, so the bank applications help me a lot for tracking things."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "gcp-console",
+        "aws-console",
+        "other-cloud",
+        "admin-panels"
+      ],
+      "work": [
+        "it-admin",
+        "manage-members",
+        "build-admin"
+      ],
+      "study": [
+        "cloud-courses",
+        "gcp-docs",
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X02": 3,
+      "X03": 4,
+      "X04": 4,
+      "X05": 3,
+      "X06": 1,
+      "X07": 4,
+      "X08": 1,
+      "X17": 2,
+      "X09": 2,
+      "X16": 4,
+      "X19": 4,
+      "X20": 4,
+      "X10": 3,
+      "X11": 3,
+      "X12": 4,
+      "X15": 4
+    },
+    "expNotes": {
+      "X01": "Daily, Still Using.",
+      "X02": "100 times, 3 months ago",
+      "X03": "5-6 Projects, 3 months ago.",
+      "X04": "13-16 times, 3 months ago",
+      "X05": "13-16 times, 3 months ago.",
+      "X06": "2 times, last week.",
+      "X07": "1 time for my portfolio project, last week.",
+      "X08": "2 times, - ",
+      "X17": "1 time, last week.",
+      "X09": "1 time, 3 years ago.",
+      "X16": "17-23 times, 3 months ago.",
+      "X19": "5-8 Projects required admin panel, 4 months ago.",
+      "X20": "50-60 times, 3 months ago.",
+      "X10": "once course, 5 months"
+    },
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {
+      "river": 1,
+      "brastle": 0,
+      "severe": 1,
+      "hammer": 1,
+      "vocational": 1,
+      "courteous": 1,
+      "idea": 1,
+      "poverty": 1,
+      "plintery": 0,
+      "grief": 1,
+      "stitch": 1,
+      "copious": 1,
+      "fire": 1,
+      "drama": 1,
+      "beard": 1,
+      "mornacle": 0,
+      "rectangular": 1,
+      "assailant": 0,
+      "brother": 1,
+      "chamber": 1,
+      "comply": 1,
+      "vapor": 1,
+      "sleptive": 1,
+      "adrift": 1,
+      "drink": 1,
+      "reasonable": 1,
+      "wheat": 1,
+      "depiction": 1,
+      "perforated": 1,
+      "fendrous": 0,
+      "honest": 1,
+      "experiment": 1,
+      "pledge": 1,
+      "quantrel": 0,
+      "manageable": 1,
+      "crackling": 1,
+      "prevent": 1,
+      "desperate": 1,
+      "likelihood": 1,
+      "obsprate": 1,
+      "mixer": 1,
+      "sarcophagus": 1,
+      "shape": 1,
+      "recover": 1,
+      "trelmish": 0,
+      "forehead": 1,
+      "prevail": 1,
+      "conflenish": 1,
+      "gemstone": 1,
+      "dovicant": 0
+    },
+    "tendStory": "I would say for, for Google, for Google Photos, I would say. For Google Photos, I didn't knew we had a feature about matching the faces on the application of the photos of the database which we have. So I hadn't used it before, but I managed it on searching a photo of me and my brother, which was exactly three years ago from now. So had that image and it was, like, really deep down, but I didn't know how to search it. And when I saw the feature of, like, searching me and my brother, there were, like, 200 photos. So it was at the end of the 200 from the 6,000 photos which I had in my Google Cloud. So this was one of the best applications which I felt I was able to look at it.",
+    "tendFollow": "Yes",
+    "tend": {
+      "R1": 1,
+      "R2": 0,
+      "P1": 2,
+      "P2": 2,
+      "D1": 2,
+      "D2": 1,
+      "D3": 0,
+      "H": 2
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 0
+    },
+    "careText": "For this task, I would say I might get— I'll worry the most about getting the budgets wrong or getting, or setting up the email part of it, of me not receiving the over-budgeting limit, or getting the budgets wrong for multiple projects. Yeah, these would be my two most concerns about the email and the missing budget part.",
+    "done": [
+      "test",
+      "external",
+      "list",
+      "toast"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": [
+      "K1",
+      "K3"
+    ]
+  },
+  "note": "Answered in English. Name shortened to a code name; the original is archive/answers-original/Aryan.md."
+}

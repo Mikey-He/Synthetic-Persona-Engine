@@ -1,0 +1,109 @@
+# Synthetic user engine configuration (engine-design.md).
+# Every number is a placeholder until it is tuned against real people (sections 2 and 9). Changing a number needs no code change.
+
+[paths]
+personas = "../data/personas"   # cards built by tools/persona-builder.html
+runs = "runs"                   # screenshots and logs of each run
+
+[platform]
+base_url = "http://localhost:3000"
+variant = "A"
+viewport_width = 1440           # default window; --like-session uses the person's own (engine-design.md 7.5)
+viewport_height = 900
+settle_ms = 400                 # placeholder: wait for page animations to stop before a screenshot
+# The task bar belongs to the test itself; its words are never swapped. Found by its mark, or by the I'm finished button.
+harness_selector = "[data-kl-harness]"
+harness_button_text = "I'm finished"
+
+[words]
+# Words outside the knowledge list (engine-design.md 4.1): the top N of the English frequency list (wordfreq) by English
+# level. Used only when the person did not take the vocabulary test; otherwise their own vocabulary size is used. Placeholder.
+# fluent was raised from 5000 to 20000 on 2026-10-04: 5000 swapped words such as Cancel (rank 5300) and Overview (rank 5991).
+top_n = { "fluent" = 20000, "intermediate" = 2000, "beginner" = 500 }
+# Words that happen to be on the list but are industry jargon here are always swapped. Placeholder; add as needed.
+force_fake = ["FinOps", "CUD"]
+# Interface words: rare in ordinary text but known to anyone who uses a computer (Deselect ranks past 80,000).
+# Known on every card except the blank one, whatever the vocabulary. Placeholder. Words with a special meaning belong in items.
+ui_words = [
+  "deselect", "unselect", "select", "checkbox", "checkboxes", "dropdown", "toggle", "popup",
+  "login", "logout", "username", "password", "email", "settings", "dashboard", "filter", "filters",
+  "sort", "refresh", "reset", "undo", "redo", "edit", "delete", "submit", "cancel", "ok", "menu",
+  "tab", "tabs", "upload", "download", "save", "apply", "close", "back", "next", "previous",
+  "search", "help", "profile", "required", "optional", "default", "enable", "disable", "enabled", "disabled",
+]
+# Data is not knowledge and is shown as it is (names, ids and months in the simulated data).
+data_terms = [
+  "Cloud Console (prototype)", "Northstar Research", "billing-demo-001",
+  "Atlas", "Beacon", "atlas-demo", "beacon-demo",
+  "Alex Kim", "Jordan Lee", "Sam Rivera", "Priya Shah",
+  "Compute Engine", "Cloud Storage", "BigQuery", "Cloud Run",
+  "January", "February", "March", "April", "May", "June", "July", "August",
+  "September", "October", "November", "December",
+  "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec",
+  "USD",
+]
+# After swapping, check that every original word is really gone; at most this many rounds (React may render them back).
+max_rewrite_rounds = 3
+
+[prominence]
+# Placeholder: scoring "most prominent" (engine-design.md 4.3). Larger, higher up, and a filled primary button count more.
+area = 1.0        # the element's share of the viewport, times this weight
+top = 0.5         # higher is more: 1 - y / viewport height, times this weight
+filled = 2.0      # added for a colored filled background (a primary button)
+
+[model]
+# Only Google-approved Gemini models (CLAUDE.md rule 9). The earlier runner used this one; change it to what the project may use.
+id = "gemini-3.8-flash"
+temperature = 0.0     # fixed rules, no randomness (engine-design.md 2). The model itself may still vary slightly
+timeout_s = 60
+retries = 2           # placeholder: retries when a reply is unusable; then the run stops as a technical error
+max_candidates = 8    # placeholder: the most candidates the model may list per piece
+history_steps = 8     # placeholder: how many recent steps the model is shown (engine-design.md 4.2, added 2026-10-04)
+
+[attention]
+# Field of view and reading order (engine-design.md 4.8, 2026-10-04). A piece is what a glance takes in (the part just
+# opened, a list, a table, a group); someone with high detail when finding (detailFind high) takes a whole region at once.
+# Where they look first: the part just opened, the middle of the page, the navigation menu, the side panel, the top bar
+order = ["popup", "main", "nav", "aside", "header", "footer", "other"]
+
+[watch]
+# Watch mode (--watch) only: how the drawn pointer moves and how long each step pauses, so a person can follow. Changes no decision.
+pause_ms = 900        # pause after each step
+move_ms = 650         # time for the pointer to reach its target before clicking
+
+[run]
+max_steps = 80
+loop_repeats = 6      # the same action chosen this many times in a row counts as looping and stops the run (platform build plan)
+# Placeholder: consequential actions, recognised by their text until the platform marks them. Not clicked without
+# understood evidence (high risk tolerance clicks on half-understood), and done last when several are possible.
+# Cancel throws away the whole form, so it counts too (added 2026-10-04: Mikey's card once chose Cancel over Finish).
+consequential_labels = ["Finish", "Save", "Cancel"]
+
+[goal]
+# Completion check (engine-design.md 4.6): "checking the list" counts only on these pages. Version A's budget list.
+list_routes = ["/billing/budgets"]
+# Pages on the success path (the flow's screens). Any other page counts as one wrong turn (engine-design.md 4.5).
+path_routes = ["/billing", "/billing/budgets", "/billing/budgets/create", "/billing/budgets/create?edit"]
+# The item that says "a question-mark icon opens help": people who know it open help first when unsure (4.3).
+help_items = ["T25"]
+# Buttons that move on, such as Next: a form checker finishes the section before clicking them.
+advancing_labels = ["Next"]
+# The item used to open and check a saved budget (Version A: the budget's name link in the list, T43). A careful
+# checker (detail when checking high) who confirms by the list or details page and knows this item opens it and checks
+# it once before declaring done (engine-design.md 4.6).
+review_items = ["T43"]
+# The items that say where the entry is (Version A: budget settings are under Cost control, T04). Someone who
+# understands none of them and whose risk tolerance is not low opens the items of a menu group whose heading
+# matches the task, one by one (engine-design.md 4.3, added 2026-10-04).
+entry_items = ["T04"]
+
+[patience]
+# Wrong turns plus backs above this number means giving up (engine-design.md 4.5). Placeholder.
+limit = { "low" = 3, "medium" = 6, "high" = 10 }
+
+[compare]
+# Comparing an engine run with the person's session (python -m sue.compare). In the platform log a dropdown's name is
+# followed by its current value; cut it off first. Version A's field names.
+field_labels = ["Billing account", "Projects", "Services", "Labels", "Time range", "Budget type", "Trigger on"]
+# Not counted as moves: the start page, clicking Start task, and closing a help popover (people close it differently)
+ignore = ["page /", "click Start task", "click Close"]

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engine Run Log</title>
+<style>
+:root {
+  --bg: #f4f5f7; --card: #fff; --ink: #1d2433; --muted: #667085; --line: #e3e7ee;
+  --sure: #137333; --sure-bg: #e6f4ea; --half: #a05a00; --half-bg: #fef3e0; --void: #8a1c1c; --void-bg: #fdecec;
+  --accent: #1a73e8; --accent-bg: #e8f0fe; --click: #e8710a;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 "Segoe UI", system-ui, sans-serif; display: flex; flex-direction: column; }
+header { flex: none; background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 18px; display: flex; align-items: center; gap: 16px; }
+header h1 { margin: 0; font-size: 16px; white-space: nowrap; }
+.meta { display: flex; flex-wrap: wrap; gap: 2px 16px; color: var(--muted); font-size: 12.5px; flex: 1; }
+.meta b { color: var(--ink); font-weight: 600; }
+.status { font-size: 13px; padding: 3px 12px; border-radius: 99px; background: var(--accent-bg); color: var(--accent); white-space: nowrap; }
+.status.done { background: var(--sure-bg); color: var(--sure); }
+.wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 55fr) minmax(420px, 45fr); }
+
+/* left: what they see */
+.left { min-height: 0; padding: 14px 14px 14px 18px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--line); }
+.screen-head { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+.phase { font-size: 15px; font-weight: 600; }
+.phase small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #d93025; box-shadow: 0 0 0 3px #fce8e6; flex: none; animation: pulse 1.4s infinite; }
+.dot.off { background: var(--muted); box-shadow: none; animation: none; }
+@keyframes pulse { 50% { opacity: .35; } }
+.btn { margin-left: auto; border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.btn[hidden] { display: none; }
+.stage { position: relative; width: 100%; aspect-ratio: 1440 / 900; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pointer { position: absolute; left: 0; top: 0; width: 30px; height: 30px; pointer-events: none; transition: transform .6s cubic-bezier(.3,.7,.3,1); filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); z-index: 3; }
+.ripple { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border: 3px solid var(--click); border-radius: 50%; pointer-events: none; z-index: 2; animation: ripple .7s ease-out forwards; }
+.ripple.still { animation: none; opacity: .9; }
+@keyframes ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+.caption { color: var(--muted); font-size: 13px; min-height: 20px; }
+.caption b { color: var(--ink); }
+
+/* right: the log */
+.right { min-height: 0; overflow-y: auto; padding: 14px 18px 60px; }
+.empty { color: var(--muted); padding: 30px; text-align: center; }
+.step { background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; padding: 10px 12px; cursor: pointer; }
+.step:hover { border-color: #b9c9ec; }
+.step.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+.step h2 { margin: 0; font-size: 14.5px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+.step h2 .route { color: var(--muted); font-weight: 400; font-family: Consolas, monospace; font-size: 12.5px; }
+.step h2 .time { color: var(--muted); font-weight: 400; font-size: 12px; }
+.chosen { margin: 6px 0; padding: 6px 9px; background: var(--accent-bg); border-radius: 7px; }
+.chosen .act { font-weight: 600; }
+.rule { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 99px; background: #fff; border: 1px solid #c6d5f5; font-size: 12px; }
+.facts { display: flex; flex-wrap: wrap; gap: 2px 14px; color: var(--muted); font-size: 12px; margin: 4px 0 6px; }
+.facts b { color: var(--ink); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); padding: 3px 5px; }
+td { border-bottom: 1px solid var(--line); padding: 4px 5px; vertical-align: top; }
+tr.pick td { background: #f3f8ff; }
+tr.dropped td { color: var(--muted); }
+.tag { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.tag.sure { background: var(--sure-bg); color: var(--sure); }
+.tag.half { background: var(--half-bg); color: var(--half); }
+.tag.void { background: var(--void-bg); color: var(--void); }
+.ev { display: block; }
+code { font-family: Consolas, monospace; font-size: 11.5px; background: #f1f3f6; padding: 0 4px; border-radius: 4px; }
+.drop { font-size: 11.5px; color: var(--void); }
+details { margin-top: 6px; }
+summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+pre { white-space: pre-wrap; font: 11.5px/1.5 Consolas, monospace; background: #f6f7f9; border: 1px solid var(--line); border-radius: 6px; padding: 8px; max-height: 320px; overflow: auto; }
+.final { background: var(--card); border: 2px solid var(--sure); border-radius: 10px; padding: 12px 14px; margin-top: 14px; }
+.final.fail { border-color: var(--void); }
+.final h2 { margin: 0 0 6px; font-size: 15px; }
+.crit { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.crit span { padding: 2px 10px; border-radius: 99px; font-size: 12.5px; }
+.crit .ok { background: var(--sure-bg); color: var(--sure); }
+.crit .no { background: var(--void-bg); color: var(--void); }
+.files li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Synthetic User Engine</h1>
+  <div class="meta" id="meta"></div>
+  <span class="status" id="status">Getting ready</span>
+</header>
+<div class="wrap">
+  <section class="left">
+    <div class="screen-head">
+      <span class="dot" id="dot"></span>
+      <span class="phase" id="phase">Waiting for the engine to open the page…</span>
+      <button class="btn" id="back-live" hidden>Back to live</button>
+    </div>
+    <div class="stage" id="stage">
+      <img id="screen" alt="The screen as they see it">
+      <svg class="pointer" id="pointer" viewBox="0 0 24 24"><path d="M4 2.5l6.8 18.2 2.7-7.6 7.7-2.8z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="caption" id="caption">This is the screen as they see it: words they cannot read are swapped for made-up words, and icons they do not recognise are grayed out. The pointer is drawn here only; the model never sees it.</div>
+  </section>
+  <section class="right" id="right">
+    <div id="steps"><p class="empty">Waiting for the first step…</p></div>
+    <div id="final"></div>
+  </section>
+</div>
+<script>
+// Live mode polls the engine's local server; report mode (report.html) has the data
+// embedded, and the left panel shows the screenshot of the selected step.
+const EMBED = window.__SUE_DATA || null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let steps = [], shown = 0, run = null, finished = false, live = !EMBED, selected = null;
+let lastFrame = -1, lastClick = 0, loading = false, viewport = { width: 1440, height: 900 };
+
+// ---- left panel ---------------------------------------------------------------
+
+function scale() { return $("stage").clientWidth / viewport.width; }
+
+function placePointer(x, y) {
+  const s = scale();
+  $("pointer").style.transform = `translate(${x * s - 5}px, ${y * s - 4}px)`;
+}
+
+function ripple(x, y, still) {
+  const r = document.createElement("div");
+  r.className = "ripple" + (still ? " still" : "");
+  r.style.left = x * scale() + "px";
+  r.style.top = y * scale() + "px";
+  $("stage").appendChild(r);
+  if (!still) setTimeout(() => r.remove(), 750);
+  return r;
+}
+
+function showImage(src) {
+  // Load off screen, then swap, so the panel never flashes blank.
+  if (loading) return;
+  loading = true;
+  const img = new Image();
+  img.onload = () => { $("screen").src = src; loading = false; };
+  img.onerror = () => { loading = false; };
+  img.src = src;
+}
+
+function review(step) {
+  live = false;
+  selected = step.step;
+  document.querySelectorAll(".stage .ripple").forEach((r) => r.remove());
+  showImage(step.screenshot);
+  $("dot").classList.add("off");
+  $("phase").innerHTML = `What they saw at step ${step.step}<small>${esc(step.route)}</small>`;
+  const a = step.action;
+  $("pointer").style.display = a && a.box ? "" : "none";
+  if (a && a.box) {
+    const x = a.box.x + a.box.w / 2, y = a.box.y + a.box.h / 2;
+    $("pointer").style.transition = "none";
+    placePointer(x, y);
+    ripple(x, y, true);
+  }
+  $("caption").innerHTML = a ? `This step: ${actionText(a)}. <b>${esc(step.rule)}</b>` : `No action this step: ${esc(step.rule)}`;
+  $("back-live").hidden = !!EMBED || finished;
+  document.querySelectorAll(".step.selected").forEach((el) => el.classList.remove("selected"));
+  document.getElementById(`step-${step.step}`)?.classList.add("selected");
+}
+
+function backToLive() {
+  live = true;
+  selected = null;
+  lastFrame = -1;
+  document.querySelectorAll(".stage .ripple").forEach((r) => r.remove());
+  document.querySelectorAll(".step.selected").forEach((el) => el.classList.remove("selected"));
+  $("pointer").style.display = "";
+  $("pointer").style.transition = "";
+  $("dot").classList.remove("off");
+  $("back-live").hidden = true;
+}
+
+async function pollLive() {
+  if (EMBED || finished) return;
+  try {
+    const st = await (await fetch("/live/state", { cache: "no-store" })).json();
+    viewport = { width: st.width, height: st.height };
+    if (live) {
+      $("phase").textContent = st.phase;
+      if (st.frame !== lastFrame && st.frame > 0) { lastFrame = st.frame; showImage(`/live/frame?f=${st.frame}`); }
+      placePointer(st.x, st.y);
+      if (st.click > lastClick) { if (lastClick) ripple(st.cx, st.cy); lastClick = st.click; }
+    } else {
+      lastClick = st.click;
+    }
+    if (!st.live) { finished = true; $("dot").classList.add("off"); $("back-live").hidden = true; }
+  } catch (e) { /* server busy; try again */ }
+  setTimeout(pollLive, 120);
+}
+
+// ---- right panel ----------------------------------------------------------------
+
+function renderMeta(r) {
+  if (!r) return;
+  $("title").textContent = `Synthetic User Engine · ${r.persona} (${r.card})`;
+  $("meta").innerHTML = [
+    ["Session", r.session], ["Model", r.model], ["Prompt", r.prompt_version],
+    ["Off-list word limit", (r.word_limit || 0).toLocaleString("en-US")], ["Started", r.started_at || ""],
+  ].map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join("");
+}
+
+function actionText(a) {
+  if (a.type === "look") return `looks elsewhere: ${esc(a.note || "")}`;
+  if (a.type === "scroll") return a.value === "up" ? "scrolls up" : "scrolls down";
+  if (a.type === "back") return "goes back to the previous page";
+  if (a.type === "type") return `types <code>${esc(a.value)}</code> into “${esc(a.text || a.element)}”`;
+  return `${a.type === "open_help" ? "opens the help" : "clicks"} “${esc(a.text || a.element || "")}”`;
+}
+
+function evidence(list) {
+  if (!list || !list.length) return '<span style="color:var(--muted)">no evidence</span>';
+  return list.map((v) => `<span class="ev"><code>${esc(v.type)}:${esc(v.ref)}</code> <span class="tag ${esc(v.level)}">${esc(v.level)}</span> ${esc(v.reason)}</span>`).join("");
+}
+
+function stepCard(s) {
+  const a = s.action;
+  const pick = (s.candidates || []).findIndex((c) => a && c.element === a.element && c.action === a.type && (c.value ?? null) === (a.value ?? null));
+  const rows = (s.candidates || []).map((c, i) => `
+    <tr class="${i === pick ? "pick" : c.dropped ? "dropped" : ""}">
+      <td>${i === pick ? "✔ " : ""}${esc(c.element || "")}<br><span style="color:var(--muted)">${esc(c.element_text || "")}</span></td>
+      <td>${esc(c.action)}${c.value ? `<br><code>${esc(c.value)}</code>` : ""}${c.purpose ? `<br><span style="color:var(--muted)">${esc(c.purpose)}</span>` : ""}</td>
+      <td>${esc(c.why)}</td>
+      <td>${evidence(c.evidence)}</td>
+      <td><span class="tag ${esc(c.level)}">${esc(c.level)}</span>${c.dropped ? `<div class="drop">Dropped: ${esc(c.dropped)}</div>` : ""}</td>
+    </tr>`).join("");
+  const m = s.model || {}, st = s.state || {};
+  return `
+  <section class="step" id="step-${s.step}" data-step="${s.step}">
+    <h2>Step ${s.step} <span class="route">${esc(s.route)}</span><span class="time">${esc(s.at || "")} · ${s.elapsed_s ?? "?"} s in · this step ${s.step_s ?? "?"} s</span></h2>
+    <div class="facts">${(s.looks || []).length ? `<span>Looked at first: ${s.looks.map((l) => `<b>${esc(l.looking_at)}</b>`).join(" → ")}, nothing to do there</span>` : ""}<span>Looking at: <b>${esc(s.looking_at || "the whole screen")}</b></span>${s.state && (s.state.wrong || s.state.backs) ? `<span><b>${s.state.wrong}</b> wrong turns, <b>${s.state.backs}</b> backs</span>` : ""}</div>
+    <div class="chosen"><span class="act">${a ? actionText(a) : "No action"}</span><span class="rule">${esc(s.rule)}</span>${a && a.original && a.original !== a.text ? `<div style="font-size:12px;color:var(--muted)">Original text: ${esc(a.original)}</div>` : ""}</div>
+    <div class="facts">
+      <span>Model time <b>${m.latency_ms != null ? (m.latency_ms / 1000).toFixed(1) + " s" : "n/a"}</b>${m.attempts > 1 ? ` (${m.attempts} attempts)` : ""}${m.error ? ` · error <b>${esc(m.error)}</b>` : ""}</span>
+      <span>Rewrite rounds <b>${s.rewrite_rounds}</b></span>
+      <span>Grayed icons <b>${(s.gray_icons || []).join(", ") || "none"}</b></span>
+      <span>Actions tried <b>${st.tried ?? 0}</b></span>
+      <span>Learned this step <b>${(st.learned_now || []).join(", ") || "none"}</b></span>
+    </div>
+    ${s.completion && s.completion.asked ? `<div class="facts"><span>Done yet? The model was asked whether the list shows the new budget: <b>${s.completion.answer === true ? "yes" : s.completion.answer === false ? "no" : "no answer"}</b>${s.completion.quote ? `, quote <code>${esc(s.completion.quote)}</code>` : ""}. Code's check: <b>${esc(s.completion.why)}</b></span></div>` : ""}
+    <table>
+      <thead><tr><th>Element</th><th>Action</th><th>The model's reason</th><th>Evidence, as code checked it</th><th>Confidence</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="color:var(--muted)">The model listed no candidates</td></tr>'}</tbody>
+    </table>
+    ${s.prompt ? `<details><summary>Text sent to the model</summary><pre>${esc(s.prompt)}</pre></details>` : ""}
+  </section>`;
+}
+
+function renderSteps(all) {
+  steps = all;
+  if (!all.length) return;
+  if (shown === 0) $("steps").innerHTML = "";
+  for (const s of all.slice(shown)) $("steps").insertAdjacentHTML("beforeend", stepCard(s));
+  if (all.length > shown && live && !EMBED) $("right").scrollTo({ top: $("right").scrollHeight, behavior: "smooth" });
+  shown = all.length;
+}
+
+function renderFinal(sum) {
+  finished = true;
+  $("status").textContent = "Finished";
+  $("status").classList.add("done");
+  $("dot").classList.add("off");
+  if (live) $("phase").textContent = "Finished";
+  const ev = sum.evaluation || {};
+  const names = { scope: "Atlas only", period: "Monthly", amount: "$1,000", alert: "80% on actual spend", recipients: "Only Sam Rivera", persistence: "Saved" };
+  const crit = Object.entries(ev.criteria || {}).map(([k, v]) => `<span class="${v ? "ok" : "no"}">${v ? "✔" : "✘"} ${esc(names[k] || k)}</span>`).join("");
+  const files = (sum.files || []).map((f) => `<li><code>${esc(f.path)}</code> ${esc(f.what)}</li>`).join("");
+  const rules = Object.entries(sum.rules || {}).map(([k, v]) => `${esc(k)} × ${v}`).join("; ");
+  const missed = (sum.missed_defaults || []).map((m) => `step ${m.step} ${esc(m.original)}`).join("; ");
+  $("final").innerHTML = `
+  <section class="final ${ev.overall ? "" : "fail"}">
+    <h2>Finished: ${esc(sum.stop?.reason)} (${esc(sum.stop?.why)}) · platform grading ${ev.overall ? "passed" : "failed"}</h2>
+    <div class="crit">${crit || "<span>Not graded by the platform yet</span>"}</div>
+    <div class="facts">
+      <span><b>${sum.steps}</b> steps</span><span><b>${sum.seconds ?? "?"}</b> s</span><span><b>${sum.saves ?? 0}</b> saves</span><span><b>${sum.budgets ?? 0}</b> budgets</span>
+      <span>Learned during the test <b>${Object.keys(sum.learned || {}).join(", ") || "none"}</b></span>
+      <span>Items the platform did not mark <b>${(sum.unmarked_items || []).join(", ") || "none"}</b></span>
+    </div>
+    ${missed ? `<div class="facts"><span>Missed defaults: <b>${missed}</b></span></div>` : ""}
+    <div class="facts"><span>Rules used: <b>${rules}</b></span></div>
+    <div class="files"><b>Files are in</b> <code>${esc(sum.dir || "")}</code><ul>${files}</ul></div>
+    <div class="facts"><span>Click any step above to see the screenshot they saw at that step on the left.</span></div>
+  </section>`;
+  if (!EMBED) $("right").scrollTo({ top: $("right").scrollHeight, behavior: "smooth" });
+}
+
+async function getJson(path) {
+  const r = await fetch(path, { cache: "no-store" });
+  return r.ok ? r.json() : null;
+}
+
+async function pollLog() {
+  try {
+    if (!run) { run = await getJson("run.json"); renderMeta(run); if (run) $("status").textContent = "Running"; }
+    const r = await fetch("steps.jsonl", { cache: "no-store" });
+    if (r.ok) renderSteps((await r.text()).split("\n").filter(Boolean).map((l) => JSON.parse(l)));
+    const sum = await getJson("summary.json");
+    if (sum) { renderFinal(sum); return; }
+  } catch (e) { /* the run may be between writes; try again */ }
+  setTimeout(pollLog, 600);
+}
+
+document.addEventListener("click", (e) => {
+  const card = e.target.closest(".step");
+  if (card && !e.target.closest("details")) {
+    const s = steps.find((x) => x.step === Number(card.dataset.step));
+    if (s) review(s);
+  }
+  if (e.target.id === "back-live") backToLive();
+});
+window.addEventListener("resize", () => { if (selected) { const s = steps.find((x) => x.step === selected); if (s) review(s); } });
+
+if (EMBED) {
+  renderMeta(EMBED.run);
+  renderSteps(EMBED.steps);
+  if (EMBED.summary) renderFinal(EMBED.summary);
+  if (EMBED.steps.length) review(EMBED.steps[EMBED.steps.length - 1]);
+} else {
+  pollLive();
+  pollLog();
+}
+</script>
+</body>
+</html>

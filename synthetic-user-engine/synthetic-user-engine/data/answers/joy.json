@@ -1,0 +1,137 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-04T21:59:24.484Z",
+  "pageLanguage": "zh",
+  "answers": {
+    "name": "Joy",
+    "background": {
+      "product": "Google Docs for homework, Codex to build small websites; I use a Mac most.",
+      "work": "Student; courses on UI/UX, PM and AI.",
+      "study": "Courses: UI/UX, PM, programming, game design, psychology courses, statistics\nSelf-taught: how to build a website",
+      "life": "I manage my own monthly living money, and sometimes at the end of the month I review how I spent it."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "other-cloud",
+        "admin-panels"
+      ],
+      "work": [
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X17": 3,
+      "X09": 4,
+      "X19": 3,
+      "X20": 4,
+      "X12": 3,
+      "X15": 4
+    },
+    "expNotes": {
+      "X17": "Did it once, in the June summer break, with AI help",
+      "X19": "A few times, with AI help",
+      "X12": "Took related courses"
+    },
+    "lang": {
+      "ui": "Chinese",
+      "english": "intermediate"
+    },
+    "vocab": {
+      "river": 1,
+      "brastle": 1,
+      "severe": 1,
+      "hammer": 0,
+      "vocational": 1,
+      "courteous": 1,
+      "idea": 1,
+      "poverty": 1,
+      "plintery": 0,
+      "grief": 1,
+      "stitch": 1,
+      "copious": 1,
+      "fire": 1,
+      "drama": 1,
+      "beard": 1,
+      "mornacle": 0,
+      "rectangular": 1,
+      "assailant": 1,
+      "brother": 1,
+      "chamber": 1,
+      "comply": 1,
+      "vapor": 1,
+      "sleptive": 0,
+      "adrift": 1,
+      "drink": 1,
+      "reasonable": 1,
+      "wheat": 1,
+      "depiction": 1,
+      "perforated": 1,
+      "fendrous": 1,
+      "honest": 1,
+      "experiment": 1,
+      "pledge": 1,
+      "quantrel": 1,
+      "manageable": 1,
+      "crackling": 1,
+      "prevent": 1,
+      "desperate": 1,
+      "likelihood": 1,
+      "obsprate": 1,
+      "mixer": 1,
+      "sarcophagus": 0,
+      "shape": 1,
+      "recover": 1,
+      "trelmish": 1,
+      "forehead": 1,
+      "prevail": 1,
+      "conflenish": 1,
+      "gemstone": 1,
+      "dovicant": 1
+    },
+    "tendStory": "I would ask an AI to help me and tell me how to take the next step. If the AI didn't help, I would look at the official documentation or tutorial videos.",
+    "tendFollow": "Yes",
+    "tend": {
+      "R1": 1,
+      "R2": 0,
+      "P1": 1,
+      "P2": 1,
+      "D1": 1,
+      "D2": 1,
+      "D3": 1,
+      "H": 2
+    },
+    "perc": {
+      "V": 1,
+      "C": 0,
+      "M": 0,
+      "S": 1
+    },
+    "careText": "I'm afraid it isn't set up successfully, the system doesn't alert me, and I overspend.\nSecurity: I worry the system charges me too much.",
+    "done": [
+      "toast",
+      "test",
+      "external"
+    ],
+    "doneMiss": 2,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": [
+      "K4",
+      "K1"
+    ]
+  },
+  "note": "Free text translated from Chinese on 2026-10-04; the original is archive/answers-original/Joy.md."
+}

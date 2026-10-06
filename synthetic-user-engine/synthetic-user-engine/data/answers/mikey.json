@@ -1,0 +1,171 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-04T15:30:00Z",
+  "pageLanguage": "zh",
+  "answers": {
+    "name": "Mikey",
+    "background": {
+      "product": "Built a whole platform on AWS and used Lambda, SQS, Aurora and Cognito many times. Configured APIs in GCP and looked at the billing pages; each time an AI walked me through it. Opened the billing pages in AWS and set up a billing alert once.",
+      "work": "Research assistant at an energy lab, maintaining a data-center energy-use database. Now a TA for a business intelligence course and the lead of the data team on this Google project. Currently an information science student.",
+      "study": "Passed the AWS Cloud Practitioner and Solutions Architect Associate certificates; I have forgotten some of it. Undergraduate in statistics and data science, master's in information science.",
+      "life": "I manage my own spending budget."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "gcp-console",
+        "aws-console",
+        "admin-panels",
+        "this-platform"
+      ],
+      "work": [
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "cloud-courses",
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X02": 3,
+      "X03": 0,
+      "X04": 3,
+      "X05": 0,
+      "X06": 3,
+      "X07": 4,
+      "X08": 0,
+      "X09": 4,
+      "X10": 2,
+      "X12": 4,
+      "X15": 4,
+      "X18": 3,
+      "X19": 3,
+      "X20": 3
+    },
+    "expNotes": {
+      "X02": "A few times, each time with an AI walking me through it",
+      "X06": "Opened the billing pages and set up a billing alert once",
+      "X10": "Passed AWS Cloud Practitioner and Solutions Architect Associate; forgot some of it",
+      "X18": "Built Version A from Google screenshots, but never looked closely at what the screens say",
+      "X19": "Information science student; took related courses and did related projects",
+      "X20": "Managed team members and permissions on my own AWS platform; never at a company"
+    },
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {
+      "river": 1,
+      "reasonable": 1,
+      "brastle": 0,
+      "wheat": 1,
+      "severe": 1,
+      "depiction": 1,
+      "hammer": 1,
+      "perforated": 0,
+      "vocational": 1,
+      "fendrous": 0,
+      "courteous": 1,
+      "honest": 1,
+      "idea": 1,
+      "experiment": 1,
+      "poverty": 1,
+      "pledge": 1,
+      "plintery": 0,
+      "quantrel": 0,
+      "grief": 1,
+      "manageable": 1,
+      "stitch": 1,
+      "crackling": 1,
+      "copious": 1,
+      "prevent": 1,
+      "fire": 1,
+      "desperate": 1,
+      "drama": 1,
+      "likelihood": 1,
+      "beard": 1,
+      "obsprate": 1,
+      "mornacle": 0,
+      "mixer": 1,
+      "rectangular": 1,
+      "sarcophagus": 0,
+      "assailant": 0,
+      "shape": 1,
+      "brother": 1,
+      "recover": 1,
+      "chamber": 1,
+      "trelmish": 0,
+      "comply": 1,
+      "forehead": 1,
+      "vapor": 1,
+      "prevail": 1,
+      "sleptive": 0,
+      "conflenish": 0,
+      "adrift": 0,
+      "gemstone": 1,
+      "drink": 1,
+      "dovicant": 0
+    },
+    "tendStory": "The first time I set up a billing alert for an organization in a mock Google Cloud. The left menu had many items and I didn't know which to click, so I opened them one by one until I reached Billing and knew it was roughly what I wanted. Then I filled it in step by step, and hesitated a bit at the end before getting it done. I don't open every question mark; I guess most meanings from what I have studied.",
+    "tendFollow": "",
+    "tend": {
+      "R1": 2,
+      "R2": 2,
+      "P1": 1,
+      "P2": 1,
+      "D1": 1,
+      "D2": 1,
+      "H": 1
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 1
+    },
+    "careText": "",
+    "done": [
+      "list",
+      "external"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": [
+      "K3",
+      "K5"
+    ],
+    "careNote": "Mapped directly in the pilot, before the questionnaire asked the worry as an open question.",
+    "calibration": {
+      "overrides": {
+        "T07": 1,
+        "T12": 1,
+        "T18": 0,
+        "T21": 0,
+        "T22": 1,
+        "T23": 1,
+        "T26": 0,
+        "T32": 0,
+        "T33": 3,
+        "T34": 1,
+        "T35": 1,
+        "T38": 1,
+        "T42": 2
+      },
+      "tendManual": {
+        "detail_check": 2
+      },
+      "note": "Adjusted on 2026-10-04 after the pilot session (cmut8m8290000pk7stzauis43), behaviour over self-report. Items: T07 Billing account, everyday only (took Northstar Research for a project name); T12 Services, everyday only (ticked all four by hand); T18 Alerts only vs Spend cap, none (puzzled by the two types until reading the options); T21 Pub/Sub, none (could not explain it); T22 Monitoring channels, everyday only; T23 billing admins and users, everyday only (did not know who they were); T26 auto-save habit, unaffected (did not assume it saves itself); T32 Read-only, read as something else (alerts go only to project users, via T33); T34 Savings and T35 Labels, everyday only; T38 project owners, everyday only (matched the words without knowing who it was); T42 confirmation email, may mislead (expected one, said it did not matter). Detail when checking a form set to high: D2 said glance at the obvious ones, but the session checked every field, deleted extra thresholds and tried Labels and Savings. D3 did not exist yet. Detail when finding stays medium from D1."
+    }
+  },
+  "note": "Pilot participant, filled in the first workbench (before D3 existed). Free text translated from Chinese on 2026-10-04."
+}

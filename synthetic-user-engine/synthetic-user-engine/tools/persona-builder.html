@@ -1,0 +1,573 @@
+<title>Persona Builder</title>
+<style>
+/* Layout: one narrow column of sections, read top to bottom: load answers, map the worry,
+   review the persona, export. Same tokens as the participant questionnaire. */
+:root{
+  --bg:#ffffff; --fill:#f5f5f7; --fill-2:#ebebf0; --line:#e3e3e8;
+  --fg:#1d1d1f; --fg-2:#6e6e73; --fg-3:#a1a1a6;
+  --accent:#0071e3; --accent-fg:#ffffff; --accent-soft:rgba(0,113,227,.08);
+  --ok:#248a3d; --ok-soft:rgba(36,138,61,.10); --warn:#b25000; --warn-soft:rgba(178,80,0,.10); --bad:#c9341c; --bad-soft:rgba(201,52,28,.09);
+  --f-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000; --fill:#1c1c1e; --fill-2:#2c2c2e; --line:#2c2c2e;
+    --fg:#f5f5f7; --fg-2:#a1a1a6; --fg-3:#6e6e73;
+    --accent:#2997ff; --accent-fg:#ffffff; --accent-soft:rgba(41,151,255,.14);
+    --ok:#30d158; --ok-soft:rgba(48,209,88,.14); --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.14); --bad:#ff6a50; --bad-soft:rgba(255,106,80,.14);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --fill:#1c1c1e; --fill-2:#2c2c2e; --line:#2c2c2e;
+  --fg:#f5f5f7; --fg-2:#a1a1a6; --fg-3:#6e6e73;
+  --accent:#2997ff; --accent-fg:#ffffff; --accent-soft:rgba(41,151,255,.14);
+  --ok:#30d158; --ok-soft:rgba(48,209,88,.14); --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.14); --bad:#ff6a50; --bad-soft:rgba(255,106,80,.14);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:15px;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{max-width:760px;margin:0 auto;padding-inline:20px;padding-block:40px 80px;display:flex;flex-direction:column;gap:36px}
+header .eyebrow{font-size:13px;color:var(--fg-2);margin:0 0 6px}
+h1{font-size:30px;font-weight:600;letter-spacing:-.01em;margin:0}
+h2{font-size:19px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--fg-2);margin:8px 0 0;max-width:40em}
+section{display:flex;flex-direction:column;gap:14px}
+section[hidden]{display:none}
+.hint{font-size:13px;color:var(--fg-3)}
+.drop{border:1.5px dashed var(--line);border-radius:14px;padding:28px 20px;text-align:center;color:var(--fg-2);transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop b{color:var(--fg)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{border:0;border-radius:980px;padding:10px 20px;font-size:15px;font-weight:500;background:var(--fill);color:var(--fg);min-height:42px}
+.btn:hover{background:var(--fill-2)}
+.btn.primary{background:var(--accent);color:var(--accent-fg)}
+.btn.primary:hover{opacity:.9}
+.link{border:0;background:none;color:var(--accent);padding:6px 2px;font-size:14px}
+.input{width:100%;min-width:0;border:1px solid transparent;background:var(--fill);border-radius:10px;padding:10px 12px;font-size:15px}
+.input:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+textarea.input{min-height:120px;font-family:var(--f-mono);font-size:12.5px;resize:vertical}
+.field{display:flex;flex-direction:column;gap:6px}
+.field span{font-size:13px;color:var(--fg-2)}
+.status{font-size:14px;padding:10px 14px;border-radius:10px;background:var(--fill)}
+.status.ok{background:var(--ok-soft);color:var(--ok)}
+.status.warn{background:var(--warn-soft);color:var(--warn)}
+.status.bad{background:var(--bad-soft);color:var(--bad)}
+.quote{margin:0;padding:14px 16px;background:var(--fill);border-radius:12px;white-space:pre-line}
+.choices{display:flex;flex-direction:column;gap:8px}
+.choice{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:12px 14px}
+.choice:hover{background:var(--fill)}
+.choice .mark{flex:none;width:18px;height:18px;margin-top:2px;border:1.5px solid var(--fg-3);border-radius:5px;display:grid;place-items:center}
+.choice[aria-checked="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.choice[aria-checked="true"] .mark{border-color:var(--accent);background:var(--accent)}
+.choice[aria-checked="true"] .mark::after{content:"";width:9px;height:5px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg);margin-top:-2px}
+.choice .d{display:block;font-size:13px;color:var(--fg-2)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.tile{background:var(--fill);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .k{font-size:12.5px;color:var(--fg-2)}
+.tile .v{font-size:19px;font-weight:600}
+.tile .s{font-size:12px;color:var(--fg-3)}
+.tile .s.flag{color:var(--warn)}
+.tile .d{font-size:13px;color:var(--fg-2);margin-top:4px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-size:13px;border-radius:980px;padding:3px 10px;background:var(--fill);color:var(--fg-2);font-variant-numeric:tabular-nums}
+.pill b{color:var(--fg);font-weight:600}
+.r-understands{background:var(--ok-soft);color:var(--ok)}
+.r-vague,.r-may_mislead{background:var(--warn-soft);color:var(--warn)}
+.r-none,.r-misleads{background:var(--bad-soft);color:var(--bad)}
+.r-everyday,.r-other{background:var(--accent-soft);color:var(--accent)}
+details{border-top:1px solid var(--line);padding-top:12px}
+details summary{cursor:pointer;color:var(--fg-2);font-size:14px}
+.tbl{overflow-x:auto;margin-top:12px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--fg-2);font-weight:500;font-size:12px}
+td.id{font-family:var(--f-mono);font-size:12px;color:var(--fg-2);white-space:nowrap}
+.goal{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.goal div{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px}
+.goal .k{color:var(--fg-2)}
+@media (max-width:560px){.goal div{grid-template-columns:minmax(0,1fr)}}
+</style>
+
+<main>
+  <header>
+    <p class="eyebrow" id="flow-name"></p>
+    <h1>Persona Builder</h1>
+    <p class="sub">Turns a participant's questionnaire answers into the persona the engine runs. For researchers only: the persona lists the task's screen words and concepts, so participants must not see it before their test.</p>
+  </header>
+
+  <section id="s-load">
+    <h2>1 · Load answers</h2>
+    <div class="drop" id="drop"><b>Drop the participant's answer file here</b><br><span class="hint">or</span> <label class="link" for="file">choose a file</label><input id="file" type="file" accept=".json,.md,.txt,application/json" hidden></div>
+    <details id="paste-box"><summary>Paste the answers instead</summary><textarea class="input" id="paste" aria-label="Pasted answers" style="margin-top:10px"></textarea><div class="row" style="margin-top:8px"><button class="btn" type="button" data-act="paste">Use pasted answers</button></div></details>
+    <div class="row"><span class="hint">Self-test cards:</span><button class="btn" type="button" data-act="blank">Blank card</button><button class="btn" type="button" data-act="full">Full card</button></div>
+    <div id="load-status" role="status"></div>
+  </section>
+
+  <section id="s-person" hidden>
+    <h2>2 · Participant</h2>
+    <label class="field"><span>Code name (used as the persona's name and file name; no real names)</span><input class="input" id="name" autocomplete="off"></label>
+    <p class="hint" id="person-facts"></p>
+    <div id="calib"></div>
+  </section>
+
+  <section id="s-care" hidden>
+    <h2>3 · Map the worry to key settings</h2>
+    <p class="sub" style="margin:0">The participant answered in their own words. Pick at most two key settings it is about. The engine checks these more carefully.</p>
+    <blockquote class="quote" id="care-text"></blockquote>
+    <div class="choices" id="care"></div>
+  </section>
+
+  <section id="s-review" hidden>
+    <h2>4 · Review</h2>
+    <div class="tiles" id="tiles"></div>
+    <div class="goal" id="goal"></div>
+    <div class="pills" id="counts"></div>
+    <details><summary>Knowledge list, item by item</summary><div class="tbl" id="items"></div></details>
+  </section>
+
+  <section id="s-export" hidden>
+    <h2>5 · Export for the engine</h2>
+    <label class="field"><span>File name</span><input class="input" id="fname" autocomplete="off"></label>
+    <div class="row"><button class="btn primary" type="button" data-act="download">Download persona</button><button class="btn" type="button" data-act="copy">Copy JSON</button></div>
+    <div id="export-status" role="status"></div>
+    <p class="hint" id="next-step"></p>
+  </section>
+</main>
+
+<!-- The workflow definition (data/version-a/flow.json), embedded by tools/sync_flow.py. -->
+<script type="application/json" id="flow">{
+"format": "sue-flow",
+"version": 1,
+"name": "Version A · Cloud Console (prototype) budget setup",
+"updatedAt": "2026-10-04",
+"task": "You manage your team's cloud spending. Create a fixed monthly budget of $1,000 for the Atlas project. The budget should reset at the start of each calendar month. Include all Atlas project costs and exclude costs from other projects.\n\nConfigure an email alert for when the project's actual spending during the month exceeds 80% of the budget. Only the Atlas project owner should receive this alert.\n\nSave your settings and indicate when you have finished.",
+"start": "The test starts on the Billing Overview page with the billing menu open on the left. People first pass the Before you start page and click Start task; the engine's synthetic sessions start on the Overview directly.",
+"note": "Rewritten on 2026-10-04 from the pilot walkthrough of Version A (session cmut8m8290000pk7stzauis43). When several budgets are saved, the platform scores the last one saved before I'm finished. Scoring does not check the budget type, Services, Labels or Savings. After saving, clicking the budget's name in the list opens the Edit Budget page.",
+"screenSize": "Recorded per session; the engine replays at the person's window size (minimum 1440×900).",
+"situation": {"urgency": "calm", "stakes": "low"},
+"org": "He is Alex Kim, Billing Account Administrator: he may manage budgets for the whole account and needs no approval.",
+"signals": {"toast": false, "list": true, "external": false, "test": false},
+"checks": ["The scope is the Atlas project only", "The period is monthly", "The amount is a specified amount of $1,000", "At least one rule fires at 80% on actual spend", "The only person who actually gets the email is Sam Rivera, the Atlas project owner", "The settings are saved"],
+"keySettings": [
+  {"id": "K1", "name": "Amount", "field": "Target amount, Amount section"},
+  {"id": "K2", "name": "Which projects", "field": "Projects, Scope section"},
+  {"id": "K3", "name": "Who gets the alert", "field": "The two email options under Manage notifications, Actions section"},
+  {"id": "K4", "name": "When the alert fires", "field": "Percent of budget and Trigger on, Actions section"},
+  {"id": "K5", "name": "Monthly reset", "field": "Time range, Scope section"}
+],
+"screens": [
+  {"id": "S1", "name": "Billing Overview"},
+  {"id": "S2", "name": "Budget list (Budgets & caps)"},
+  {"id": "S3", "name": "Create page · Define"},
+  {"id": "S4", "name": "Create page · Scope"},
+  {"id": "S5", "name": "Create page · Amount"},
+  {"id": "S6", "name": "Create page · Actions"},
+  {"id": "S7", "name": "Edit Budget (checking after saving)"}
+],
+"steps": [
+  {"id": "A1", "screen": "S1", "action": "In the left menu, under Cost control, click Budgets & caps", "note": "", "ways": [], "risky": false, "defaults": ""},
+  {"id": "A2", "screen": "S2", "action": "Click + Create new", "note": "", "ways": [], "risky": false, "defaults": ""},
+  {"id": "A3", "screen": "S3", "action": "Choose Alerts only, enter a Name, click Next", "note": "", "ways": [], "risky": false, "defaults": "Neither budget type is selected at first"},
+  {"id": "A4", "screen": "S4", "action": "Keep Time range at Monthly; in the Projects dropdown tick only Atlas and click OK; leave the rest; click Next", "note": "", "ways": [], "risky": false, "defaults": "Projects defaults to All projects (2), which means every project; change it to Atlas only"},
+  {"id": "A5", "screen": "S5", "action": "Keep Budget type at Specified amount, enter 1000 as Target amount, click Next", "note": "", "ways": [], "risky": false, "defaults": "Target amount starts empty"},
+  {"id": "A6", "screen": "S6", "action": "Make at least one rule 80% with Trigger on set to Actual", "note": "", "ways": [{"id": "W1", "text": "Change one of the existing rules to 80"}, {"id": "W2", "text": "Add a rule at 80 with + Add threshold"}], "risky": false, "defaults": "The three default rules are 50, 90 and 100; none is 80"},
+  {"id": "A7", "screen": "S6", "action": "Untick Email alerts to billing admins and users; tick Email alerts to project owners", "note": "", "ways": [], "risky": false, "defaults": "Billing admins and users is ticked by default and must be unticked"},
+  {"id": "A8", "screen": "S6", "action": "Click Finish", "note": "", "ways": [], "risky": true, "defaults": ""},
+  {"id": "A9", "screen": "S2", "action": "Click I'm finished in the task bar", "note": "", "ways": [], "risky": true, "defaults": ""}
+],
+"sources": [
+  {"id": "product", "label": {"en": "Products and tools", "zh": "用过的产品和工具"}, "legacy": "产品"},
+  {"id": "work", "label": {"en": "Work", "zh": "工作经历"}, "legacy": "职业"},
+  {"id": "study", "label": {"en": "Study", "zh": "学过的东西"}, "legacy": "学过"},
+  {"id": "life", "label": {"en": "Outside work", "zh": "工作以外"}, "legacy": "生活"}
+],
+"groups": [
+  {"id": "gmail-docs", "source": "product", "label": {"en": "Gmail, Google Docs or Sheets", "zh": "Gmail、Google 文档或表格"}},
+  {"id": "gcp-console", "source": "product", "label": {"en": "Google Cloud console", "zh": "Google Cloud 控制台"}},
+  {"id": "aws-console", "source": "product", "label": {"en": "AWS console", "zh": "AWS 控制台"}},
+  {"id": "other-cloud", "source": "product", "label": {"en": "Another cloud platform, such as Azure or Alibaba Cloud", "zh": "其他云平台，比如 Azure、阿里云"}},
+  {"id": "admin-panels", "source": "product", "label": {"en": "Website admin panels or dashboards", "zh": "网站后台或管理面板"}},
+  {"id": "this-platform", "source": "product", "label": {"en": "This mock platform (Version A)", "zh": "这个模拟平台（Version A）"}},
+  {"id": "cloud-courses", "source": "study", "label": {"en": "Cloud computing certificates or courses", "zh": "云计算的证书或课程"}},
+  {"id": "gcp-docs", "source": "study", "label": {"en": "Google Cloud documentation or tutorials", "zh": "Google Cloud 的官方文档或教程"}},
+  {"id": "statistics", "source": "study", "label": {"en": "Statistics or data analysis", "zh": "统计或数据分析"}},
+  {"id": "accounting-courses", "source": "study", "label": {"en": "Accounting or finance courses", "zh": "会计或财务课"}},
+  {"id": "finance-work", "source": "work", "label": {"en": "Finance, accounting or budget work", "zh": "财务、会计或管预算的工作"}},
+  {"id": "it-admin", "source": "work", "label": {"en": "IT administrator", "zh": "IT 管理员"}},
+  {"id": "build-admin", "source": "work", "label": {"en": "Building admin panels or dashboards", "zh": "开发网站后台或管理面板"}},
+  {"id": "manage-members", "source": "work", "label": {"en": "Managing project members and roles", "zh": "管项目成员和角色"}},
+  {"id": "personal-budget", "source": "life", "label": {"en": "A spending budget for yourself or your household", "zh": "给自己或家里做开支预算"}}
+],
+"experiences": [
+  {"id": "X01", "group": "gmail-docs", "text": "Uses Gmail, Google Docs or Sheets day to day", "question": {"en": "Do you use Gmail, Google Docs or Google Sheets?", "zh": "你平时用 Gmail 或 Google 文档、表格吗？"}},
+  {"id": "X02", "group": "gcp-console", "text": "Has opened the billing pages in the Google Cloud console", "question": {"en": "Have you looked at the billing pages in the Google Cloud console?", "zh": "你在 Google Cloud 控制台里看过账单页吗？"}},
+  {"id": "X03", "group": "gcp-console", "text": "Has set up a budget or alert in the Google Cloud console", "question": {"en": "Have you set up a budget or an overspending alert in Google Cloud?", "zh": "你在 Google Cloud 里设过预算或超支提醒吗？"}},
+  {"id": "X04", "group": "gcp-console", "text": "Has created resources or turned on APIs in the Google Cloud console", "question": {"en": "Have you created resources or turned on APIs in Google Cloud?", "zh": "你在 Google Cloud 里创建过资源，或者开过 API 吗？"}},
+  {"id": "X05", "group": "gcp-console", "text": "Has used Google Cloud Pub/Sub or Cloud Monitoring", "question": {"en": "Have you used Google Cloud Pub/Sub or Cloud Monitoring?", "zh": "你用过 Google Cloud 的 Pub/Sub 或 Cloud Monitoring 吗？"}},
+  {"id": "X06", "group": "aws-console", "text": "Has looked at billing or set up a billing alert in AWS", "question": {"en": "Have you looked at billing in AWS, or set up a billing alert there?", "zh": "你在 AWS 里看过账单，或者设过账单提醒吗？"}},
+  {"id": "X07", "group": "aws-console", "text": "Has used SNS, SQS or CloudWatch on AWS", "question": {"en": "Have you used SNS, SQS or CloudWatch on AWS?", "zh": "你在 AWS 上用过 SNS、SQS 或 CloudWatch 吗？"}},
+  {"id": "X08", "group": "aws-console", "text": "Has set up AWS Budgets actions that run automatically when overspending", "question": {"en": "Have you set up actions in AWS Budgets that run automatically when you overspend?", "zh": "你在 AWS Budgets 里设过超支后自动执行的动作吗？"}},
+  {"id": "X17", "group": "other-cloud", "text": "Has looked at billing or set up a budget alert on another cloud platform", "question": {"en": "On that platform, have you looked at billing or set up a budget alert?", "zh": "在那个云平台上，你看过账单，或者设过预算提醒吗？"}},
+  {"id": "X09", "group": "admin-panels", "text": "Has used admin panels or dashboards where you fill in forms and click Save", "question": {"en": "Have you used admin panels or dashboards where you fill in forms and click Save?", "zh": "你用过网站后台、管理面板这类要填表、点保存的系统吗？"}},
+  {"id": "X18", "group": "this-platform", "text": "Has built, tested or looked closely at this mock platform", "question": {"en": "Have you built, tested or looked closely at this mock Cloud Console platform?", "zh": "你搭过、测过或者仔细看过这个模拟的 Cloud Console 平台吗？"}},
+  {"id": "X10", "group": "cloud-courses", "text": "Has studied a cloud certificate or course that covered billing and budgets", "question": {"en": "Have you studied for a cloud computing certificate or taken a cloud course? Did it cover billing and budgets?", "zh": "你学过云计算的证书或课程吗？里面讲过账单和预算吗？"}},
+  {"id": "X11", "group": "gcp-docs", "text": "Has read Google Cloud documentation or tutorials on billing or budgets", "question": {"en": "Have you read Google Cloud documentation or tutorials about billing or budgets?", "zh": "你读过 Google Cloud 账单或预算的文档、教程吗？"}},
+  {"id": "X12", "group": "statistics", "text": "Has studied statistics or data analysis", "question": {"en": "Have you studied statistics or data analysis?", "zh": "你学过统计或数据分析吗？"}},
+  {"id": "X14", "group": "accounting-courses", "text": "Has taken accounting or finance courses", "question": {"en": "Have you taken accounting or finance courses?", "zh": "你上过会计或财务方面的课吗？"}},
+  {"id": "X13", "group": "finance-work", "text": "Has worked in finance or accounting, or managed a budget at work", "question": {"en": "Have you worked in finance or accounting, or managed a budget at work?", "zh": "你做过财务、会计或者管预算的工作吗？"}},
+  {"id": "X16", "group": "it-admin", "text": "Has worked as an IT administrator, creating accounts and giving permissions", "question": {"en": "Have you worked as an IT administrator, creating accounts and giving people permissions?", "zh": "你当过 IT 管理员，给别人开过账号、分过权限吗？"}},
+  {"id": "X19", "group": "build-admin", "text": "Has built a website admin panel or dashboard", "question": {"en": "Have you built a website admin panel or dashboard yourself?", "zh": "你自己开发过网站后台或管理面板吗？"}},
+  {"id": "X20", "group": "manage-members", "text": "Has managed project members and roles in a cloud platform or company system", "question": {"en": "Have you managed project members and roles in a cloud platform or company system? For example, giving someone Owner or Editor access.", "zh": "你在云平台或公司系统里管过项目成员和角色吗？比如给人加 Owner、Editor 权限"}},
+  {"id": "X15", "group": "personal-budget", "text": "Has made a spending budget for themselves or their household", "question": {"en": "Have you made a spending budget for yourself or your household?", "zh": "你自己给个人或家里做过开支预算吗？"}}
+],
+"items": [
+  {"id": "T04", "step": "A1", "way": null, "needed": true, "kind": "location", "text": "Budget settings are under the Cost control group of the left billing menu", "meaning": "Not under Cost management, and not under Billing management", "everyday": "", "common": "none", "altOf": null, "exps": ["X03", "X18"], "basis": "In the pilot walkthrough, Mikey tried several items under Cost management before finding it"},
+  {"id": "T05", "step": "A4", "way": null, "needed": true, "kind": "word", "text": "Projects", "meaning": "Which projects' spending the budget counts", "everyday": "projects in the general sense", "common": "common", "altOf": null, "exps": ["X02", "X03", "X04", "X11", "X18"], "basis": ""},
+  {"id": "T06", "step": "A1", "way": null, "needed": false, "kind": "word", "text": "Billing", "meaning": "The title of the left menu; the whole billing area", "everyday": "bills and invoices", "common": "common", "altOf": null, "exps": ["X02", "X03", "X06", "X10", "X11", "X17", "X18"], "basis": "AWS calls it Billing too"},
+  {"id": "T07", "step": "A1", "way": null, "needed": false, "kind": "word", "text": "Billing account", "meaning": "The account that pays; here Northstar Research, which holds the Atlas and Beacon projects", "everyday": "an account that gets billed", "common": "common", "altOf": null, "exps": ["X02", "X03", "X10", "X11", "X18"], "basis": "Mikey took Northstar Research for a project name"},
+  {"id": "T08", "step": "A4", "way": null, "needed": true, "kind": "concept", "text": "One billing account holds several projects, and a budget can cover just one of them", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X02", "X03", "X04", "X11", "X18"], "basis": "Needed when choosing Projects in the Scope section"},
+  {"id": "T09", "step": "A1", "way": null, "needed": true, "kind": "word", "text": "Budgets & caps", "meaning": "The page for managing budgets and spending caps", "everyday": "budgets and limits", "common": "common", "altOf": null, "exps": ["X03", "X06", "X10", "X13", "X15", "X17", "X18"], "basis": ""},
+  {"id": "T10", "step": "A2", "way": null, "needed": true, "kind": "location", "text": "The + Create new link next to the list title starts a new budget", "meaning": "It is a blue text link, not a big blue button", "everyday": "", "common": "none", "altOf": null, "exps": ["X01", "X09", "X19", "X18"], "basis": "General interface convention"},
+  {"id": "T11", "step": "A4", "way": null, "needed": true, "kind": "word", "text": "Time range", "meaning": "Whether the budget resets monthly, quarterly or yearly", "everyday": "a period of time", "common": "common", "altOf": null, "exps": ["X03", "X06", "X13", "X17", "X18"], "basis": ""},
+  {"id": "T12", "step": "A4", "way": null, "needed": false, "kind": "word", "text": "Services", "meaning": "Count only some cloud services' spending; none ticked means all", "everyday": "services in the general sense", "common": "common", "altOf": null, "exps": ["X04", "X10", "X11", "X18"], "basis": "Leave the default. Mikey thought all four had to be ticked by hand; not scored"},
+  {"id": "T13", "step": "A4", "way": null, "needed": false, "kind": "word", "text": "Credits", "meaning": "Discounts such as free credits; appears in the left menu and in the Savings explanation", "everyday": "points or credit", "common": "common", "altOf": null, "exps": ["X02", "X03", "X06", "X10", "X11", "X18"], "basis": "People with accounting experience may read it as the accounting term"},
+  {"id": "T14", "step": "A4", "way": null, "needed": false, "kind": "word", "text": "Credits", "meaning": "Credit entries in accounting", "everyday": "", "common": "none", "altOf": "T13", "exps": ["X13", "X14"], "basis": "Easy to read this way after bookkeeping"},
+  {"id": "T15", "step": "A3", "way": null, "needed": true, "kind": "location", "text": "The create page has four sections, Define, Scope, Amount and Actions; Next opens the next one and a section name jumps back to it", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X01", "X09", "X19", "X18"], "basis": "General interface convention"},
+  {"id": "T16", "step": "A5", "way": null, "needed": true, "kind": "word", "text": "Specified amount", "meaning": "Enter a fixed amount yourself", "everyday": "a stated amount", "common": "common", "altOf": null, "exps": ["X03", "X06", "X17", "X18"], "basis": ""},
+  {"id": "T17", "step": "A5", "way": null, "needed": false, "kind": "word", "text": "Last month's spend", "meaning": "Set the amount from what was actually spent last month", "everyday": "what was spent last month", "common": "common", "altOf": null, "exps": ["X03", "X06", "X15", "X17", "X18"], "basis": "The other way to set the amount; choosing it gives the wrong amount"},
+  {"id": "T18", "step": "A3", "way": null, "needed": true, "kind": "concept", "text": "Alerts only sends alerts and never stops services; Spend cap enforcement pauses services", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X03", "X11", "X18"], "basis": "Both the option text and the help popover say so; Mikey chose correctly from the option text"},
+  {"id": "T19", "step": "A6", "way": null, "needed": true, "kind": "word", "text": "Threshold", "meaning": "The share of the budget at which an alert fires (on screen: Set alert threshold rules and Percent of budget)", "everyday": "a limit or a doorstep", "common": "rare", "altOf": null, "exps": ["X03", "X06", "X10", "X12", "X13", "X17", "X18"], "basis": ""},
+  {"id": "T20", "step": "A6", "way": null, "needed": false, "kind": "word", "text": "Forecasted", "meaning": "Spending predicted at the current rate; the task asks for Actual", "everyday": "predicted", "common": "rare", "altOf": null, "exps": ["X03", "X10", "X12", "X13", "X18"], "basis": "Keep Actual"},
+  {"id": "T21", "step": "A7", "way": null, "needed": false, "kind": "word", "text": "Pub/Sub topic", "meaning": "A message topic that programs use to handle alerts automatically", "everyday": "", "common": "none", "altOf": null, "exps": ["X05", "X07", "X10", "X18"], "basis": "The same idea as SNS on AWS"},
+  {"id": "T22", "step": "A7", "way": null, "needed": false, "kind": "word", "text": "Monitoring email notification channels", "meaning": "Notification channels set up in Cloud Monitoring; this account has none", "everyday": "ways of sending notifications", "common": "rare", "altOf": null, "exps": ["X05", "X07", "X10", "X18"], "basis": "No change needed, but people who do not understand it may think it must be filled in"},
+  {"id": "T23", "step": "A7", "way": null, "needed": true, "kind": "word", "text": "Billing admins and users", "meaning": "Everyone with a billing role, here Alex Kim and Jordan Lee. Ticked by default; leaving it ticked emails them too", "everyday": "billing administrators and users", "common": "common", "altOf": null, "exps": ["X02", "X03", "X10", "X16", "X20", "X18"], "basis": ""},
+  {"id": "T24", "step": "A8", "way": null, "needed": true, "kind": "location", "text": "Changes take effect only after clicking Finish (Save when editing)", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X04", "X09", "X19", "X18"], "basis": "General convention of admin systems"},
+  {"id": "T25", "step": "A3", "way": null, "needed": false, "kind": "icon", "text": "The question-mark icon opens an explanation", "meaning": "One next to Alerts only; one next to project owners while it is greyed out", "everyday": "", "common": "none", "altOf": null, "exps": ["X01", "X09", "X18"], "basis": "General interface convention"},
+  {"id": "T26", "step": "A8", "way": null, "needed": true, "kind": "habit", "text": "Google Docs saves changes automatically, so one may think no Save is needed here either", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X01"], "basis": "Anyone who uses Google Docs every day has this habit"},
+  {"id": "T27", "step": "A3", "way": null, "needed": true, "kind": "habit", "text": "AWS budgets can run actions that cap spending, so one may expect this budget to cap spending too", "meaning": "Here it matches the Spend cap option in the Define section and may lead people to choose it", "everyday": "", "common": "none", "altOf": null, "exps": ["X08"], "basis": "AWS Budgets has automatic actions"},
+  {"id": "T28", "step": "A3", "way": null, "needed": true, "kind": "word", "text": "Alerts only", "meaning": "A budget that only sends alerts", "everyday": "only alerts", "common": "common", "altOf": null, "exps": ["X03", "X06", "X10", "X11", "X17", "X18"], "basis": ""},
+  {"id": "T29", "step": "A3", "way": null, "needed": false, "kind": "word", "text": "Spend cap enforcement", "meaning": "A budget that pauses services at the cap; marked Preview", "everyday": "enforcing a spending limit", "common": "rare", "altOf": null, "exps": ["X08", "X10", "X11", "X18"], "basis": ""},
+  {"id": "T30", "step": "A4", "way": null, "needed": true, "kind": "concept", "text": "When Projects shows All projects (2), nothing is ticked, which counts as every project", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X03", "X11", "X18"], "basis": "Without it one may think the scope is already set"},
+  {"id": "T31", "step": "A4", "way": null, "needed": true, "kind": "location", "text": "A multi-select dropdown applies only after clicking OK; clicking outside it cancels", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X03", "X04", "X18"], "basis": "Mikey lost his selection this way the first time"},
+  {"id": "T32", "step": "A4", "way": null, "needed": false, "kind": "word", "text": "Read-only for project users", "meaning": "Project users cannot change this budget", "everyday": "can only be read", "common": "common", "altOf": null, "exps": ["X03", "X11", "X18"], "basis": ""},
+  {"id": "T33", "step": "A4", "way": null, "needed": false, "kind": "word", "text": "Read-only for project users", "meaning": "Alerts go only to project users", "everyday": "", "common": "none", "altOf": "T32", "exps": [], "basis": "How Mikey read it in the walkthrough. No experience leads here; set it only as a calibration adjustment"},
+  {"id": "T34", "step": "A4", "way": null, "needed": false, "kind": "word", "text": "Savings", "meaning": "Whether discounts are subtracted from total spending (Savings programs / Other savings)", "everyday": "saving money", "common": "common", "altOf": null, "exps": ["X02", "X03", "X10", "X11", "X18"], "basis": "Leave the default; not scored"},
+  {"id": "T35", "step": "A4", "way": null, "needed": false, "kind": "word", "text": "Labels", "meaning": "Filter spending by resource labels", "everyday": "tags or name labels", "common": "common", "altOf": null, "exps": ["X04", "X11", "X18"], "basis": "Leave the default; not scored"},
+  {"id": "T36", "step": "A5", "way": null, "needed": true, "kind": "word", "text": "Target amount", "meaning": "The budget amount", "everyday": "an amount to aim for", "common": "common", "altOf": null, "exps": ["X03", "X06", "X17", "X18"], "basis": ""},
+  {"id": "T37", "step": "A6", "way": null, "needed": true, "kind": "word", "text": "Actual", "meaning": "Fire on money already spent (an option of the Trigger on dropdown)", "everyday": "real, actual", "common": "common", "altOf": null, "exps": ["X03", "X06", "X10", "X17", "X18"], "basis": "The task text itself says actual"},
+  {"id": "T38", "step": "A7", "way": null, "needed": true, "kind": "word", "text": "Project owners", "meaning": "The owners of a project; for Atlas, Sam Rivera", "everyday": "people who own a project", "common": "common", "altOf": null, "exps": ["X16", "X20", "X18"], "basis": "Mikey did not know who it was and matched the words only"},
+  {"id": "T39", "step": "A7", "way": null, "needed": true, "kind": "concept", "text": "Email alerts to project owners can be ticked only when the budget covers a single project", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X03", "X11", "X18"], "basis": "Greyed out until a single project is chosen in Scope"},
+  {"id": "T40", "step": "A7", "way": null, "needed": true, "kind": "concept", "text": "Recipients are everyone left ticked: unless the default billing admins and users is unticked, everyone with a billing role on the account gets the email too", "meaning": "", "everyday": "", "common": "none", "altOf": null, "exps": ["X03", "X11", "X16", "X20", "X18"], "basis": "Scoring counts the actual recipients"},
+  {"id": "T41", "step": "A1", "way": null, "needed": true, "kind": "habit", "text": "To set a budget one first goes into the project itself", "meaning": "Version A's budgets are under the billing menu, not inside projects", "everyday": "", "common": "none", "altOf": null, "exps": ["X04"], "basis": "Mikey's plan before starting"},
+  {"id": "T42", "step": "A9", "way": null, "needed": true, "kind": "habit", "text": "A confirmation email arrives when a setup is done", "meaning": "Version A sends no email and shows no success message", "everyday": "", "common": "none", "altOf": null, "exps": ["X09"], "basis": "Mikey's expectation before starting"},
+  {"id": "T43", "step": "A9", "way": null, "needed": false, "kind": "location", "text": "After saving, the new row appears in the list, and clicking its name opens it for checking", "meaning": "Used to confirm the task is done", "everyday": "", "common": "none", "altOf": null, "exps": ["X09", "X19", "X18"], "basis": "How Mikey actually confirmed"}
+]
+}</script>
+
+<script>
+(function(){
+"use strict";
+var FLOW=JSON.parse(document.getElementById("flow").textContent);
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function byId(list,id){for(var i=0;i<(list||[]).length;i++)if(list[i].id===id)return list[i];return null;}
+$("flow-name").textContent=FLOW.name||"";
+
+/* ---------- fixed modules (same ids and option order as tools/questionnaire.html) ---------- */
+var LV=["low","medium","high"];
+var STRENGTH=["never","studied but forgot","studied","done","expert"];
+var VOCAB_BANDS=[
+  {from:1,to:2000,words:["idea","river","fire","brother","drink","honest","prevent","shape"]},
+  {from:2001,to:5000,words:["drama","reasonable","severe","poverty","chamber","experiment","desperate","recover"]},
+  {from:5001,to:10000,words:["hammer","grief","beard","comply","wheat","pledge","likelihood","forehead"]},
+  {from:10001,to:20000,words:["vocational","stitch","rectangular","vapor","depiction","manageable","mixer","prevail"]},
+  {from:20001,to:40000,words:["courteous","copious","assailant","adrift","perforated","crackling","sarcophagus","gemstone"]}
+];
+var VOCAB_FAKES=["brastle","plintery","mornacle","sleptive","fendrous","quantrel","obsprate","trelmish","conflenish","dovicant"];
+/* Two questions per tendency; the one about the last real time wins when they disagree. */
+var TQS=[{id:"R1",dim:"risk",last:true},{id:"R2",dim:"risk"},{id:"P1",dim:"patience",last:true},{id:"P2",dim:"patience"},
+         {id:"D1",dim:"detail"},{id:"D2",dim:"detail"},{id:"D3",dim:"detail_check",last:true},{id:"H",dim:"habit"}];
+var HABITS=["search","menus","depends"];
+var DONE=["action","toast","list","external","test"];
+var DONE_TEXT={action:"Once I click the last button",toast:"A success message",list:"Check the list or details page",external:"Wait for an email or notification",test:"Make it actually trigger once"};
+var MISS=["let_go","check","redo","other"];
+var MISS_TEXT={let_go:"Let it go",check:"Go back and check",redo:"Do it all again",other:"Something else"};
+var TDO={
+  risk:["Never clicks what they are unsure of; reads the whole screen, then takes only a path they understand, else goes back or gives up","Looks for help first and reads on; only after the whole screen clicks the half-understood or the most alike","Acts on half-understood items; with nothing to do, clicks the most alike right away and comes back if wrong"],
+  patience:["Gives up after about 3 wrong turns or backtracks","Gives up after about 6","Keeps trying for about 10"],
+  find:["Reads one glance-sized piece at a time (a menu group, a list, an opened section)","Reads one glance-sized piece at a time (a menu group, a list, an opened section)","Takes in a whole region at once"],
+  check:["Does only what the task literally names; misses defaults they were not asked to change","Fixes values that conflict with the task; does not try unclear options","Checks every field, tries unclear options and puts them back, reopens the saved item to check"]
+};
+var KIND_LABEL={word:"word",icon:"icon",location:"location",concept:"concept",strategy:"strategy",habit:"habit"};
+var RES_LABEL={understands:"understands",vague:"vague",everyday:"everyday meaning only",other:"reads it as something else",none:"doesn't know",misleads:"will mislead",may_mislead:"may mislead",unaffected:"unaffected"};
+var STEP_BADGE=["has unknown items","literal meaning only","has vague items","complete"];
+
+/* ---------- reading an answer file (the questionnaire's, current or earlier format) ---------- */
+var LEGACY_LANG={"英文":"English","中文":"Chinese","西班牙文":"Spanish","其他":"Other"};
+var LEGACY_EN={"母语或流利":"fluent","中等":"intermediate","初级":"beginner"};
+function sourceId(k){var s=(FLOW.sources||[]).filter(function(x){return x.id===k||x.legacy===k;})[0];return s?s.id:k;}
+function groupId(g){if(g==="__other"||g==="__none")return g;var x=(FLOW.groups||[]).filter(function(y){return y.id===g||(y.label&&(y.label.zh===g||y.label.en===g));})[0];return x?x.id:g;}
+function normalize(raw){
+  var a=JSON.parse(JSON.stringify(raw||{})), out={name:a.name||"",background:{},screen:{},screenOther:{},answers:a.answers||{},expNotes:a.expNotes||{},
+    lang:{},vocab:a.vocab||{},tend:a.tend||{},tendStory:a.tendStory||"",tendFollow:a.tendFollow||"",perc:a.perc||{},careText:a.careText||"",
+    done:(a.done||[]).filter(function(k){return DONE.indexOf(k)>=0;}),doneMiss:a.doneMiss==null?null:a.doneMiss,doneMissOther:a.doneMissOther||""};
+  Object.keys(a.background||{}).forEach(function(k){out.background[sourceId(k)]=a.background[k];});
+  Object.keys(a.screen||{}).forEach(function(k){out.screen[sourceId(k)]=(a.screen[k]||[]).map(groupId);});
+  Object.keys(a.screenOther||{}).forEach(function(k){out.screenOther[sourceId(k)]=a.screenOther[k];});
+  var l=a.lang||{}; out.lang={ui:LEGACY_LANG[l.ui]||l.ui||"",english:LEGACY_EN[l.english]||l.english||""};
+  return out;
+}
+function parseAnswers(text){
+  /* A Markdown copy escapes punctuation (\[ \] \- \.) and doubles the backslash of \n. */
+  var cleaned=String(text).replace(/\\\\n/g,"\\n").replace(/\\([\[\]\-.*_#()!+>|{}`~])/g,"$1");
+  var o; try{o=JSON.parse(cleaned);}catch(e){throw new Error("This is not a complete answer file. Copy the whole text, or choose the file the questionnaire saved.");}
+  if(!o||o.kind!=="sue-questionnaire"||!o.answers)throw new Error("This file is not questionnaire answers.");
+  return o;
+}
+
+/* ---------- the rules (engine-design.md 3) ---------- */
+var P=null, CARD_TYPE="normal", META={};
+function exp(id){return byId(FLOW.experiences,id);}
+function group(id){return byId(FLOW.groups,id);}
+function item(id){return byId(FLOW.items,id);}
+function stepOf(id){return byId(FLOW.steps,id);}
+function stepNo(id){for(var i=0;i<FLOW.steps.length;i++)if(FLOW.steps[i].id===id)return i+1;return 0;}
+function screenName(id){var s=byId(FLOW.screens,id);return s?s.name:"";}
+function screenOf(it){var st=stepOf(it.step);return st?st.screen:null;}
+function primary(){return FLOW.items.filter(function(i){return !i.altOf;});}
+function alts(id){return FLOW.items.filter(function(i){return i.altOf===id;});}
+var WORDLIKE={word:1,concept:1};
+
+function strength(e){
+  var g=group(e.group), sel=g?(P.screen||{})[g.source]:null;
+  if(sel&&sel.length&&sel.indexOf(e.group)<0)return 0;
+  return (P.answers||{})[e.id]||0;
+}
+function englishAllows(common){
+  var lv=P.lang.english||"fluent";
+  if(common==="common")return lv!=="beginner";
+  if(common==="rare")return lv==="fluent";
+  return false;
+}
+function rankFrom(it,s){
+  if(WORDLIKE[it.kind]){if(s>=2)return 3;if(s===1)return it.everyday?1:0;return -1;}
+  if(s===4)return 3;if(s===3)return 2;return 0;
+}
+function compute(it){
+  if(CARD_TYPE==="blank")return {rank:0,ev:"Blank card: understands nothing"};
+  if(CARD_TYPE==="full")return {rank:it.kind==="habit"?0:3,ev:"Full card: understands everything, no misleading habits"};
+  var best=-1,bestE=null,bestS=0;
+  (it.exps||[]).forEach(function(eid){var e=exp(eid);if(!e)return;var s=strength(e);if(!s)return;var r=rankFrom(it,s);if(r>best){best=r;bestE=e;bestS=s;}});
+  var res;
+  if(best>=0&&bestE){
+    var why=bestE.text+" ("+STRENGTH[bestS]+")";
+    if(WORDLIKE[it.kind]&&bestS===1&&best===1)why+=", remembers only the everyday meaning";
+    if(it.kind==="habit"){if(bestS===3)why+=", used only a few times, the habit may not have formed";if(bestS<=2&&best===0)why+=", never used hands-on, the habit has not formed";}
+    else if(!WORDLIKE[it.kind]){if(bestS===3)why+=", not practised, counts as vague";if(bestS<=2&&best===0)why+=", never used hands-on, does not count";}
+    res={rank:best,ev:why};
+  }else if(WORDLIKE[it.kind]&&it.everyday&&englishAllows(it.common))res={rank:1,ev:"No related experience; a common English word read in its everyday sense"};
+  else res={rank:0,ev:"No related experience"};
+  var ov=(P.calibration&&P.calibration.overrides)||{};
+  if(CARD_TYPE==="normal"&&ov[it.id]!=null)res={rank:ov[it.id],ev:"Calibration adjustment (set by a researcher after the test)"};
+  return res;
+}
+function display(it){
+  var r=compute(it);
+  if(it.kind==="habit")return {key:r.rank===3?"misleads":(r.rank===2?"may_mislead":"unaffected"),ev:r.ev,rank:r.rank};
+  var out={key:["none","everyday","vague","understands"][r.rank]||"none",ev:r.ev,rank:r.rank};
+  if(r.rank<3&&CARD_TYPE==="normal")alts(it.id).forEach(function(a){var ar=compute(a);if(ar.rank===3)out={key:"other",ev:ar.ev,rank:r.rank,alt:a.meaning};});
+  return out;
+}
+var SEV={understands:3,vague:2,everyday:1,other:0,none:0};
+function needed(st,wid){return primary().filter(function(it){return it.step===st.id&&it.needed!==false&&it.kind!=="habit"&&(!it.way||it.way===wid);});}
+function wayRank(st,wid){var r=3;needed(st,wid).forEach(function(it){var k=display(it).key;r=Math.min(r,SEV[k]!=null?SEV[k]:0);});return r;}
+function stepRank(st){if(st.ways&&st.ways.length){var b=-1;st.ways.forEach(function(w){b=Math.max(b,wayRank(st,w.id));});return b;}return wayRank(st,null);}
+function stepMisled(st){return primary().some(function(it){if(it.step!==st.id||it.kind!=="habit")return false;var k=display(it).key;return k==="misleads"||k==="may_mislead";});}
+function fake(word){
+  var h=2166136261,i,ch;
+  for(i=0;i<word.length;i++){h^=word.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
+  var C="bdfgklmnprstvz",V="aeiou",out="",pos=0;
+  for(i=0;i<word.length;i++){
+    ch=word[i];
+    if(/[A-Za-z]/.test(ch)){h=Math.imul(h^(i+7),2654435761)>>>0;var set=(pos%2===1)?V:C,c=set[h%set.length];if(ch!==ch.toLowerCase())c=c.toUpperCase();out+=c;pos++;}
+    else{out+=ch;if(ch===" "||ch==="/")pos=0;}
+  }
+  return out;
+}
+function vocabResult(){
+  if(CARD_TYPE!=="normal")return {size:null,src:"Self-test card"};
+  var a=P.vocab||{}, all=[].concat.apply([],VOCAB_BANDS.map(function(b){return b.words;})).concat(VOCAB_FAKES);
+  var done=all.filter(function(w){return a[w]!=null;}).length;
+  if(done<all.length)return {size:null,src:done?("Answered "+done+"/"+all.length+"; using the English level"):"Not taken; using the English level"};
+  var fakes=VOCAB_FAKES.filter(function(w){return a[w]===1;}).length, fa=fakes/VOCAB_FAKES.length;
+  if(fa>=1)return {size:null,src:"Every made-up word marked as known; test discarded, using the English level"};
+  var size=0;
+  VOCAB_BANDS.forEach(function(b){var hit=b.words.filter(function(w){return a[w]===1;}).length/b.words.length;size+=Math.max(0,(hit-fa)/(1-fa))*(b.to-b.from+1);});
+  return {size:Math.round(size),src:"Test"+(fakes?("; "+fakes+" of 10 made-up words marked as known, corrected"):"")+(fakes>=5?" (unreliable)":"")};
+}
+function manual(k){var m=(P.calibration&&P.calibration.tendManual)||{};return CARD_TYPE==="normal"&&m[k]!=null&&m[k]!==""?m[k]:null;}
+function tendLevel(dim){
+  if(CARD_TYPE!=="normal")return {lv:1,src:"Self-test card: medium"};
+  var qs=TQS.filter(function(q){return q.dim===dim&&(P.tend||{})[q.id]!=null;}), a=qs.map(function(q){return P.tend[q.id];});
+  var r, last=qs.filter(function(q){return q.last;})[0];
+  if(!a.length)r={lv:1,src:"Not answered: medium"};
+  else if(a.length===1)r={lv:a[0],src:"One answer ("+qs[0].id+")"};
+  else if(a[0]===a[1])r={lv:a[0],src:"Both answers agree ("+qs.map(function(q){return q.id;}).join(", ")+")"};
+  else if(last)r={lv:P.tend[last.id],src:"Answers disagree; the last-time question "+last.id+" wins",flag:true};
+  else r={lv:1,src:"Answers disagree: medium",flag:true};
+  var m=manual(dim); if(m!=null)r={lv:m,src:"Calibration adjustment"+(r.flag?" (answers disagreed)":""),manual:true};
+  return r;
+}
+function situation(){return FLOW.situation||{urgency:"calm",stakes:"low"};}
+function finalLevel(dim){
+  var r=tendLevel(dim),lv=r.lv,s=situation();
+  if(s.urgency==="urgent"&&(dim==="patience"||dim==="detail"))lv--;
+  if(s.stakes==="high"){if(dim==="risk")lv--;if(dim==="detail")lv++;}
+  return {base:r.lv,lv:Math.max(0,Math.min(2,lv)),src:r.src,flag:r.flag};
+}
+function detailPart(part){
+  var whole=finalLevel("detail");
+  if(CARD_TYPE!=="normal")return {lv:whole.lv,base:whole.base,src:whole.src};
+  var qs=part==="find"?["D1"]:["D2","D3"], r;
+  var a=qs.map(function(q){return {q:q,v:(P.tend||{})[q]};}).filter(function(x){return x.v!=null;});
+  var m=manual("detail_"+part), mw=manual("detail");
+  if(m!=null)r={lv:m,src:"Calibration adjustment"};
+  else if(mw!=null)r={lv:mw,src:"Calibration adjustment (detail)"};
+  else if(!a.length)r={lv:whole.base,src:"Not answered: follows detail"};
+  else if(a.length===1)r={lv:a[0].v,src:"One answer ("+a[0].q+")"};
+  else if(a[0].v===a[1].v)r={lv:a[0].v,src:"Both answers agree ("+qs.join(", ")+")"};
+  else r={lv:(P.tend||{}).D3,src:"Answers disagree; the last-time question D3 wins",flag:true};
+  var s=situation(),lv=r.lv; if(s.urgency==="urgent")lv--; if(s.stakes==="high")lv++;
+  return {base:r.lv,lv:Math.max(0,Math.min(2,lv)),src:r.src,flag:r.flag};
+}
+function habitOf(){var v=(P.tend||{}).H;return CARD_TYPE!=="normal"||v==null?"depends":HABITS[v];}
+var PERC={vision:{q:"V",lv:[2,1,0],def:2},motor:{q:"M",lv:[2,1,0],def:2},speed:{q:"S",lv:[2,1,0],def:1}};
+function percLevel(k){var d=PERC[k],a=(P.perc||{})[d.q];if(CARD_TYPE!=="normal")return {lv:d.def,src:"Self-test card"};if(a==null)return {lv:d.def,src:"Not answered"};return {lv:d.lv[a],src:"Questionnaire"};}
+function careIds(){return (P.care||[]).filter(function(id){return byId(FLOW.keySettings,id);});}
+function goal(){
+  var done=CARD_TYPE==="normal"&&P.done.length?P.done:["list"];
+  var miss=CARD_TYPE==="normal"&&P.doneMiss!=null?MISS[P.doneMiss]:"check";
+  return {task:FLOW.task,successChecks:FLOW.checks||[],careText:CARD_TYPE==="normal"?P.careText:"",
+    care:careIds().map(function(id){var k=byId(FLOW.keySettings,id);return {id:k.id,name:k.name,field:k.field};}),
+    confirmBy:done,productSignals:FLOW.signals||{},ifConfirmMissing:miss,ifConfirmMissingText:miss==="other"?(P.doneMissOther||""):"",
+    situation:situation(),org:FLOW.org||""};
+}
+function buildCard(){
+  var vr=vocabResult(), calib=CARD_TYPE==="normal"&&P.calibration?P.calibration:null;
+  var t={};
+  ["risk","patience","detail"].forEach(function(d){var r=finalLevel(d);t[d]={level:LV[r.lv],usual:LV[r.base],source:r.src};});
+  [["find","detailFind"],["check","detailCheck"]].forEach(function(x){var r=detailPart(x[0]);t[x[1]]={level:LV[r.lv],usual:LV[r.base],source:r.src};});
+  t.habit=habitOf();
+  var perc={};Object.keys(PERC).forEach(function(k){var r=percLevel(k);perc[k]={level:LV[r.lv],source:r.src};});
+  perc.colorWeak=CARD_TYPE==="normal"&&(P.perc||{}).C===1; perc.screen=FLOW.screenSize||"";
+  return {format:"sue-persona",version:2,flow:FLOW.name,builtAt:new Date().toISOString(),answersFilledAt:META.filledAt||null,
+    persona:{id:slug(P.name||CARD_TYPE),name:P.name||"",cardType:CARD_TYPE,
+      lang:{ui:P.lang.ui||"",english:P.lang.english||"fluent",vocabSize:vr.size,vocabSource:vr.src},
+      calibrated:!!calib,calibration:calib||undefined},
+    tendency:t,perception:perc,goal:goal(),
+    screens:FLOW.screens.map(function(s){
+      var rs=primary().filter(function(it){return screenOf(it)===s.id;}).map(function(it){return {it:it,d:display(it)};});
+      return {screen:s.name,
+        words:rs.filter(function(r){return r.it.kind==="word";}).map(function(r){return {id:r.it.id,original:r.it.text,shown:r.d.key==="none"?fake(r.it.text):r.it.text,level:r.d.key,gloss:r.d.key==="everyday"?r.it.everyday:(r.d.key==="other"?r.d.alt:"")};}),
+        knowledge:rs.filter(function(r){return r.it.kind!=="word"&&["understands","vague","misleads","may_mislead"].indexOf(r.d.key)>=0;}).map(function(r){return {id:r.it.id,kind:r.it.kind,text:r.it.text,level:r.d.key};})};
+    }),
+    steps:FLOW.steps.map(function(st,i){return {step:i+1,screen:screenName(st.screen),action:st.action,risky:!!st.risky,mustChangeDefaults:st.defaults||"",
+      ways:(st.ways||[]).map(function(w){return {text:w.text,knowledge:STEP_BADGE[wayRank(st,w.id)]};}),knowledge:STEP_BADGE[stepRank(st)],misleadingHabit:stepMisled(st)};}),
+    items:primary().map(function(it){var d=display(it);return {id:it.id,step:stepNo(it.step),screen:screenName(screenOf(it)),needed:it.needed!==false,kind:it.kind,text:it.text,result:d.key,evidence:d.ev};})};
+}
+function slug(s){return String(s||"persona").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")||"persona";}
+
+/* ---------- page ---------- */
+function setStatus(id,msg,cls){$(id).innerHTML=msg?'<div class="status'+(cls?" "+cls:"")+'">'+esc(msg)+'</div>':"";}
+function load(o,type){
+  CARD_TYPE=type;
+  META=o?{filledAt:o.filledAt,flow:o.flow,pageLanguage:o.pageLanguage}:{};
+  P=o?normalize(o.answers):normalize({name:type==="blank"?"Blank card":"Full card"});
+  /* A researcher block saved beside the answers: the worry mapped to key settings, and
+     calibration adjustments made after the person's test (never part of a blind run). */
+  var r=(o&&o.researcher)||{};
+  P.care=(r.care||[]).filter(function(id){return byId(FLOW.keySettings,id);}).slice(0,2);
+  P.calibration=r.calibration||null;
+  $("name").value=P.name;
+  $("fname").value=(type==="blank"?"blank-card":type==="full"?"full-card":slug(P.name))+".json";
+  var warn=o&&o.flow&&o.flow.split(" · ")[0]!==FLOW.name.split(" · ")[0]?" These answers were collected for "+o.flow+"; check that the workflow matches.":"";
+  setStatus("load-status",type==="normal"?("Loaded answers from "+(P.name||"an unnamed participant")+"."+warn):("Built the "+type+" self-test card."),warn?"warn":"ok");
+  render();
+}
+function render(){
+  ["s-person","s-care","s-review","s-export"].forEach(function(id){$(id).hidden=!P;});
+  if(!P)return;
+  $("s-care").hidden=CARD_TYPE!=="normal";
+  $("person-facts").textContent=CARD_TYPE!=="normal"?"Self-test card: no answers.":["Filled "+String(META.filledAt||"").slice(0,10),META.pageLanguage?"page in "+(META.pageLanguage==="zh"?"Chinese":"English"):"","UI language "+(P.lang.ui||"not given"),"English "+(P.lang.english||"not given")].filter(Boolean).join(" · ");
+  var c=P.calibration;
+  $("calib").innerHTML=CARD_TYPE==="normal"&&c?'<div class="status warn">This answer file carries calibration adjustments ('+Object.keys(c.overrides||{}).length+' items, '+Object.keys(c.tendManual||{}).length+' tendencies) made after the person\'s test. The card is marked calibrated: use it for calibration, not for a blind comparison.'+(c.note?'<br>'+esc(c.note):'')+'</div>':"";
+  $("care-text").textContent=P.careText||"(no answer)";
+  var ks=FLOW.keySettings||[];
+  $("care").innerHTML=ks.map(function(k){var on=P.care.indexOf(k.id)>=0;return '<button type="button" class="choice" role="checkbox" aria-checked="'+on+'" data-act="care" data-v="'+esc(k.id)+'"><span class="mark"></span><span><b>'+esc(k.name)+'</b><span class="d">'+esc(k.field)+'</span></span></button>';}).join("");
+  var card=buildCard(), t=card.tendency, vr=card.persona.lang;
+  var tile=function(k,v,s,d,flag){return '<div class="tile"><span class="k">'+esc(k)+'</span><span class="v">'+esc(v)+'</span><span class="s'+(flag?" flag":"")+'">'+esc(s)+'</span>'+(d?'<span class="d">'+esc(d)+'</span>':'')+'</div>';};
+  var lvi=function(l){return LV.indexOf(l);}, cap=function(s){return s.charAt(0).toUpperCase()+s.slice(1);};
+  $("tiles").innerHTML=[
+    tile("Vocabulary",vr.vocabSize!=null?vr.vocabSize.toLocaleString("en-US")+" words":cap(vr.english||"fluent"),vr.vocabSource,"Screen words outside the knowledge list stay readable up to this rank",/unreliable|discarded/.test(vr.vocabSource)),
+    tile("Risk tolerance",cap(t.risk.level),t.risk.source,TDO.risk[lvi(t.risk.level)],/disagree/.test(t.risk.source)),
+    tile("Patience",cap(t.patience.level),t.patience.source,TDO.patience[lvi(t.patience.level)],/disagree/.test(t.patience.source)),
+    tile("Detail when finding",cap(t.detailFind.level),t.detailFind.source,TDO.find[lvi(t.detailFind.level)]),
+    tile("Detail when checking a form",cap(t.detailCheck.level),t.detailCheck.source,TDO.check[lvi(t.detailCheck.level)],/disagree/.test(t.detailCheck.source)),
+    tile("Habit",cap(t.habit),"When search and menus both work","")
+  ].join("");
+  var g=card.goal, sig=g.productSignals, works=g.confirmBy.filter(function(k){return k==="action"||sig[k];});
+  $("goal").innerHTML='<div><span class="k">Confirms done by</span><span>'+esc(g.confirmBy.map(function(k){return DONE_TEXT[k];}).join("; "))+'</span></div>'+
+    '<div><span class="k">In this product</span><span>'+(works.length?esc("Available: "+works.map(function(k){return DONE_TEXT[k];}).join("; ")):'<b>Expectation missed</b>: none of these exists here. The engine looks around for a few steps (their patience), then finishes.')+'</span></div>'+
+    '<div><span class="k">If it never comes</span><span>'+esc(MISS_TEXT[g.ifConfirmMissing]+(g.ifConfirmMissingText?": "+g.ifConfirmMissingText:""))+' <span class="hint">(recorded; the engine follows behaviour, see the design doc)</span></span></div>'+
+    '<div><span class="k">Key settings</span><span>'+(g.care.length?esc(g.care.map(function(k){return k.name;}).join(", ")):'<span class="hint">none mapped yet</span>')+'</span></div>';
+  var counts={};card.items.forEach(function(i){counts[i.result]=(counts[i.result]||0)+1;});
+  $("counts").innerHTML=Object.keys(RES_LABEL).filter(function(k){return counts[k];}).map(function(k){return '<span class="pill r-'+k+'"><b>'+counts[k]+'</b> '+esc(RES_LABEL[k])+'</span>';}).join("");
+  $("items").innerHTML='<table><thead><tr><th>ID</th><th>Kind</th><th>Item</th><th>Result</th><th>Why</th></tr></thead><tbody>'+card.items.map(function(i){return '<tr><td class="id">'+esc(i.id)+'</td><td>'+esc(KIND_LABEL[i.kind]||i.kind)+'</td><td>'+esc(i.text)+'</td><td><span class="pill r-'+esc(i.result)+'">'+esc(RES_LABEL[i.result]||i.result)+'</span></td><td class="hint">'+esc(i.evidence)+'</td></tr>';}).join("")+'</tbody></table>';
+  var base=$("fname").value.replace(/\.json$/,"");
+  $("next-step").innerHTML='Save it as <code>data/personas/'+esc(base)+'.json</code>, then run <code>python -m sue.run --card '+esc(base)+' --like-session &lt;their session id&gt;</code> in <code>engine/</code>.';
+}
+function exportText(){return JSON.stringify(buildCard(),null,2);}
+
+/* ---------- events ---------- */
+document.addEventListener("click",function(ev){
+  var b=ev.target.closest("[data-act]");if(!b)return;
+  var act=b.getAttribute("data-act");
+  if(act==="blank"||act==="full"){load(null,act);return;}
+  if(act==="paste"){try{load(parseAnswers($("paste").value),"normal");}catch(e){setStatus("load-status",e.message,"bad");}return;}
+  if(act==="care"){var v=b.getAttribute("data-v"),i=P.care.indexOf(v);if(i>=0)P.care.splice(i,1);else{if(P.care.length>=2){setStatus("export-status","Pick at most two key settings; untick one first.","warn");return;}P.care.push(v);}setStatus("export-status","");render();return;}
+  if(act==="download"){download();return;}
+  if(act==="copy"){var data=exportText();try{navigator.clipboard.writeText(data).then(function(){setStatus("export-status","Copied the persona JSON.","ok");},function(){setStatus("export-status","Could not copy; use Download instead.","warn");});}catch(e){setStatus("export-status","Could not copy; use Download instead.","warn");}return;}
+});
+document.addEventListener("input",function(ev){
+  if(ev.target.id==="name"&&P){P.name=ev.target.value;render();}
+  if(ev.target.id==="fname"&&P)render();
+});
+function readFile(f){var r=new FileReader();r.onload=function(){try{load(parseAnswers(r.result),"normal");}catch(e){setStatus("load-status",e.message,"bad");}};r.readAsText(f);}
+$("file").addEventListener("change",function(){if(this.files&&this.files[0])readFile(this.files[0]);});
+var drop=$("drop");
+["dragenter","dragover"].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();drop.classList.add("over");});});
+["dragleave","drop"].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();drop.classList.remove("over");});});
+drop.addEventListener("drop",function(e){var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)readFile(f);});
+
+var downloads=null, inViewer=!!(window.claude&&typeof window.claude.use==="function");
+if(inViewer)window.claude.use("downloads").then(function(d){downloads=d||false;},function(){downloads=false;});
+function download(){
+  var name=$("fname").value.trim()||"persona.json"; if(!/\.json$/.test(name))name+=".json";
+  var data=exportText();
+  if(inViewer){
+    if(!downloads){setStatus("export-status","Saving files is not available here; use Copy JSON.","warn");return;}
+    downloads.save({filename:name,data:data}).then(function(){setStatus("export-status","Saved "+name+".","ok");},function(err){if(err&&err.code==="declined")return;setStatus("export-status","Saving failed; use Copy JSON.","warn");});
+    return;
+  }
+  var url=URL.createObjectURL(new Blob([data],{type:"application/json"})),a=document.createElement("a");
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},2000);
+  setStatus("export-status","Downloaded "+name+".","ok");
+}
+window.__sueBuilder={load:load,parseAnswers:parseAnswers,buildCard:buildCard,setCare:function(ids){P.care=ids.slice();render();}}; // for scripted checks
+})();
+</script>
