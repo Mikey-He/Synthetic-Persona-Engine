@@ -4,6 +4,9 @@
 [paths]
 personas = "../data/personas"   # cards built by tools/persona-builder.html
 runs = "runs"                   # screenshots and logs of each run
+# The workflow: its flow.json holds everything that belongs to one workflow (the "engine" block: routes, buttons,
+# entry, help and review items, data words, field names for comparing). --flow or SUE_FLOW picks another one.
+flow = "../data/version-a/flow.json"
 
 [platform]
 base_url = "http://localhost:3000"
@@ -14,14 +17,16 @@ settle_ms = 400                 # placeholder: wait for page animations to stop 
 # The task bar belongs to the test itself; its words are never swapped. Found by its mark, or by the I'm finished button.
 harness_selector = "[data-kl-harness]"
 harness_button_text = "I'm finished"
+# The platform's URLs carry the session as /s/<token>/...; routes are compared without it.
+session_path = "^/s/[^/]+"
 
 [words]
 # Words outside the knowledge list (engine-design.md 4.1): the top N of the English frequency list (wordfreq) by English
 # level. Used only when the person did not take the vocabulary test; otherwise their own vocabulary size is used. Placeholder.
 # fluent was raised from 5000 to 20000 on 2026-10-04: 5000 swapped words such as Cancel (rank 5300) and Overview (rank 5991).
 top_n = { "fluent" = 20000, "intermediate" = 2000, "beginner" = 500 }
-# Words that happen to be on the list but are industry jargon here are always swapped. Placeholder; add as needed.
-force_fake = ["FinOps", "CUD"]
+# Industry jargon that is always swapped, and the data words always shown as they are (names, ids, months in the
+# simulated data), belong to the workflow: flow.json engine.words.forceFake and engine.words.dataTerms.
 # Interface words: rare in ordinary text but known to anyone who uses a computer (Deselect ranks past 80,000).
 # Known on every card except the blank one, whatever the vocabulary. Placeholder. Words with a special meaning belong in items.
 ui_words = [
@@ -30,17 +35,6 @@ ui_words = [
   "sort", "refresh", "reset", "undo", "redo", "edit", "delete", "submit", "cancel", "ok", "menu",
   "tab", "tabs", "upload", "download", "save", "apply", "close", "back", "next", "previous",
   "search", "help", "profile", "required", "optional", "default", "enable", "disable", "enabled", "disabled",
-]
-# Data is not knowledge and is shown as it is (names, ids and months in the simulated data).
-data_terms = [
-  "Cloud Console (prototype)", "Northstar Research", "billing-demo-001",
-  "Atlas", "Beacon", "atlas-demo", "beacon-demo",
-  "Alex Kim", "Jordan Lee", "Sam Rivera", "Priya Shah",
-  "Compute Engine", "Cloud Storage", "BigQuery", "Cloud Run",
-  "January", "February", "March", "April", "May", "June", "July", "August",
-  "September", "October", "November", "December",
-  "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec",
-  "USD",
 ]
 # After swapping, check that every original word is really gone; at most this many rounds (React may render them back).
 max_rewrite_rounds = 3
@@ -74,28 +68,11 @@ move_ms = 650         # time for the pointer to reach its target before clicking
 [run]
 max_steps = 80
 loop_repeats = 6      # the same action chosen this many times in a row counts as looping and stops the run (platform build plan)
-# Placeholder: consequential actions, recognised by their text until the platform marks them. Not clicked without
-# understood evidence (high risk tolerance clicks on half-understood), and done last when several are possible.
-# Cancel throws away the whole form, so it counts too (added 2026-10-04: Mikey's card once chose Cancel over Finish).
-consequential_labels = ["Finish", "Save", "Cancel"]
+# Consequential actions (Finish, Save, Cancel in Version A) are named per workflow: flow.json engine.labels.consequential.
+# They are not clicked without understood evidence (high risk tolerance clicks on half-understood) and are done last.
 
-[goal]
-# Completion check (engine-design.md 4.6): "checking the list" counts only on these pages. Version A's budget list.
-list_routes = ["/billing/budgets"]
-# Pages on the success path (the flow's screens). Any other page counts as one wrong turn (engine-design.md 4.5).
-path_routes = ["/billing", "/billing/budgets", "/billing/budgets/create", "/billing/budgets/create?edit"]
-# The item that says "a question-mark icon opens help": people who know it open help first when unsure (4.3).
-help_items = ["T25"]
-# Buttons that move on, such as Next: a form checker finishes the section before clicking them.
-advancing_labels = ["Next"]
-# The item used to open and check a saved budget (Version A: the budget's name link in the list, T43). A careful
-# checker (detail when checking high) who confirms by the list or details page and knows this item opens it and checks
-# it once before declaring done (engine-design.md 4.6).
-review_items = ["T43"]
-# The items that say where the entry is (Version A: budget settings are under Cost control, T04). Someone who
-# understands none of them and whose risk tolerance is not low opens the items of a menu group whose heading
-# matches the task, one by one (engine-design.md 4.3, added 2026-10-04).
-entry_items = ["T04"]
+# [goal] moved to the workflow (2026-10-19): flow.json engine.routes (list, path), engine.labels.advancing and
+# engine.items (entry, help, review). sue/workflow.py puts them back into config["goal"] when the engine starts.
 
 [patience]
 # Wrong turns plus backs above this number means giving up (engine-design.md 4.5). Placeholder.
@@ -123,7 +100,6 @@ reading_effort = { "fast" = 0.7, "average" = 1.0, "slow" = 1.5 }  # effort per p
 
 [compare]
 # Comparing an engine run with the person's session (python -m sue.compare). In the platform log a dropdown's name is
-# followed by its current value; cut it off first. Version A's field names.
-field_labels = ["Billing account", "Projects", "Services", "Labels", "Time range", "Budget type", "Trigger on"]
+# followed by its current value; cut it off first. The field names belong to the workflow: flow.json engine.compare.fieldLabels.
 # Not counted as moves: the start page, clicking Start task, and closing a help popover (people close it differently)
 ignore = ["page /", "click Start task", "click Close"]

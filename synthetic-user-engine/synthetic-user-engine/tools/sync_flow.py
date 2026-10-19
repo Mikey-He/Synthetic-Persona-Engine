@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "engine"))
+from sue.workflow import problems as engine_problems  # noqa: E402  the engine block (sue/workflow.py)
 FLOW = ROOT / "data" / "version-a" / "flow.json"
 QUESTIONNAIRE = ROOT / "tools" / "questionnaire.html"
 BUILDER = ROOT / "tools" / "persona-builder.html"
@@ -60,6 +62,7 @@ def problems(flow: dict) -> list[str]:
         if i.get("kind") == "word" and i.get("common") not in ("common", "rare", "none"):
             out.append(f"item {i['id']}: common must be common, rare or none")
     out += knowledge_group_problems(flow)
+    out += engine_problems(flow)
     return out
 
 

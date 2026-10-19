@@ -68,10 +68,11 @@ def stops_after_last_action(persona: Persona) -> bool:
 
 
 def check_list(persona: Persona, observations: dict[str, Any], route: str, hits, visible_text: str,
-               list_routes: list[str]) -> Check:
+               list_routes: list[str], key: str) -> Check:
+    """key: the observation the model answered in (prompt.list_key of what the workflow makes)."""
     if not asks_list(persona):
         return Check(False, False, "they do not confirm by the list")
-    seen = observations.get("list_has_new_budget") or {}
+    seen = observations.get(key) or {}
     answer, quote = seen.get("answer"), str(seen.get("quote") or "").strip()
     if route not in list_routes:
         return Check(True, False, "not on the list page", answer, quote)

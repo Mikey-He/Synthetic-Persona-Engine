@@ -23,6 +23,28 @@ Playwright is 1.63.0, the same version as the platform, so both share the instal
 
 Both pages read the workflow definition `data/version-a/flow.json`. After changing it, run `python tools/sync_flow.py` and rebuild the cards.
 
+## A new workflow
+
+Nothing in the engine's code or `config.toml` names Version A. A new workflow needs two things.
+
+**1. Its own `flow.json`** (copy `data/version-a/flow.json` as a template):
+
+| Part | What it says |
+|---|---|
+| task, screens, steps, items, experiences, groups | The workflow itself, as before: what the person must know at each step |
+| `knowledgeGroups` | How Persona Studio sets knowledge (see below) |
+| `engine.created` | What the task makes, as the list shows it (Version A: `budget`); the model is asked whether the list has one. `engine.createdArticle` when the first letter misleads (`a user`) |
+| `engine.routes.path` / `.list` | The pages on the success path (any other page is a wrong turn), and the page that lists what was made |
+| `engine.labels.consequential` / `.advancing` | Buttons that commit (Finish, Save, Cancel) and buttons that move on (Next) |
+| `engine.items.entry` / `.help` / `.review` | The items that say where the entry is, that a help icon explains, and that open a saved item to check it |
+| `engine.words.dataTerms` / `.forceFake` | Data always shown as it is (names, ids), and jargon always swapped |
+| `engine.compare.fieldLabels` | Field names, cut off the platform log for comparing |
+| `engine.plumbing` | The success path for `sue.plumbing` (optional) |
+
+Then `python tools/sync_flow.py path/to/flow.json`: it refuses a flow the engine or Persona Studio cannot use, and copies it into the questionnaire and the Persona Builder. Every command takes `--flow path/to/flow.json` (or set `SUE_FLOW`); a card built for another workflow is refused.
+
+**2. A platform that keeps the engine's contract** (a fork of the UAT platform keeps it): elements the task depends on carry `data-kl="<item id>"`, help text carries `data-kl-explains`, the test's own bar carries `data-kl-harness` with an "I'm finished" button, session URLs start `/s/<token>` (`platform.session_path`), and the researcher API (`/api/admin/login`, `sessions`, `agent-steps`, `result`, `end`, `exports/events.json`) returns what was saved under `saved` (or `budgets`) with its evaluation.
+
 ## Persona Studio: personas without a participant
 
 `tools/persona-studio/` (built by Joy, merged 2026-10-19) makes persona cards per role instead of per participant: pick a role, set the traits as 0-10 scores, the states (fatigue, distraction, time pressure) and perception, or let AI propose varied personas from participant references. It saves sue-persona v3 cards into `data/personas/studio-*.json` and **Save & run 5 times** runs a card with five seeds through `sue.batch`, then shows what the runs add up to.

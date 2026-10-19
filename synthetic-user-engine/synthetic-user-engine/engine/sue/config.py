@@ -1,4 +1,5 @@
-"""Loads config.toml and engine/.env. Every number the rules use lives in config.toml."""
+"""Loads config.toml and engine/.env, and the workflow. Every number the rules use lives in
+config.toml; what belongs to one workflow lives in its flow.json (sue/workflow.py)."""
 
 from __future__ import annotations
 
@@ -10,12 +11,16 @@ from typing import Any
 ENGINE_DIR = Path(__file__).resolve().parent.parent
 
 
-def load_config(path: Path | None = None) -> dict[str, Any]:
+def load_config(path: Path | None = None, flow: Path | str | None = None) -> dict[str, Any]:
+    """flow: the workflow's flow.json; default paths.flow in config.toml, or SUE_FLOW when set."""
+    from .workflow import apply
+
     path = path or ENGINE_DIR / "config.toml"
     with path.open("rb") as f:
         config = tomllib.load(f)
     config["paths"] = {k: (ENGINE_DIR / v).resolve() for k, v in config["paths"].items()}
-    return config
+    chosen = flow or os.environ.get("SUE_FLOW") or config["paths"]["flow"]
+    return apply(config, Path(chosen))
 
 
 def load_env(path: Path | None = None) -> None:

@@ -8,6 +8,7 @@ done. The model lists candidates with evidence; code decides."""
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from .completion import ways_text
@@ -49,18 +50,30 @@ The actions:
 
 element is the element id, such as el_12; scroll and back need none. List at most {max_candidates}. Output JSON only."""
 
-LIST_QUESTION = (
-    "Also answer one question, in observations.list_has_new_budget: is there a list on this screen with a budget in it? "
-    "answer is true or false. If true, quote copies that row's text exactly as they see it. Only what is on screen; do not guess."
-)
+# The completion question names what the workflow makes (flow.json engine.created; Version A: budget).
+# For Version A the text and the schema are exactly what they were, so PROMPT_VERSION stays.
 
-RESPONSE_SCHEMA: dict[str, Any] = {
+
+def list_key(created: str) -> str:
+    """The observation the model answers in, e.g. list_has_new_budget."""
+    return "list_has_new_" + re.sub(r"[^a-z0-9]+", "_", created.lower()).strip("_")
+
+
+def list_question(created: str, article: str | None = None) -> str:
+    """article: from flow.json engine.createdArticle when the first letter misleads (a user, an hour)."""
+    article = article or ("an" if created[:1].lower() in "aeiou" else "a")
+    return (f"Also answer one question, in observations.{list_key(created)}: is there a list on this screen with {article} {created} in it? "
+            "answer is true or false. If true, quote copies that row's text exactly as they see it. Only what is on screen; do not guess.")
+
+
+def response_schema(created: str) -> dict[str, Any]:
+    return {
     "type": "object",
     "properties": {
         "observations": {
             "type": "object",
             "properties": {
-                "list_has_new_budget": {
+                list_key(created): {
                     "type": "object",
                     "properties": {"answer": {"type": "boolean"}, "quote": {"type": "string"}},
                     "required": ["answer"],
@@ -94,7 +107,7 @@ RESPONSE_SCHEMA: dict[str, Any] = {
         },
     },
     "required": ["candidates"],
-}
+    }
 
 
 def _kind(e: dict[str, Any]) -> str:
@@ -128,7 +141,11 @@ def element_lines(elements: list[dict[str, Any]]) -> list[str]:
 
 
 def build_turn(persona: Persona, elements: list[dict[str, Any]], scroll: dict[str, int], ask_list: bool = False,
-               history: list[str] | None = None, looking_at: str | None = None, situation: str | None = None) -> str:
+               history: list[str] | None = None, looking_at: str | None = None, situation: str | None = None,
+               created: str = "", article: str | None = None) -> str:
+    """created: what the workflow makes (config["workflow"]["created"]); needed when ask_list."""
+    if ask_list and not created:
+        raise ValueError("ask_list needs created: what the workflow makes, from flow.json engine.created")
     known, vague = persona.knowledge_lines()
     done = ways_text(persona.goal.get("confirmBy") or []) or "not given"
     parts = [
@@ -154,7 +171,7 @@ def build_turn(persona: Persona, elements: list[dict[str, Any]], scroll: dict[st
         f"More content below: {'yes' if scroll.get('y', 0) < scroll.get('max', 0) else 'no'}",
     ]
     if ask_list:
-        parts += ["", LIST_QUESTION]
+        parts += ["", list_question(created, article)]
     return "\n".join(parts)
 
 

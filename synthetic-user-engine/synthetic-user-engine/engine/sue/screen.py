@@ -70,10 +70,14 @@ class Observation:
         return self.focus.elements if self.focus else [e for e in self.elements if not e["harness"]]
 
 
+# How the platform puts the session into its URLs (config.toml platform.session_path); Screen sets it.
+SESSION_PATH = r"^/s/[^/]+"
+
+
 def route_of(url: str) -> str:
     """The page's route without the session token, e.g. /billing/budgets/create?edit."""
     parsed = urlparse(url)
-    path = re.sub(r"^/s/[^/]+", "", parsed.path) or "/"
+    path = re.sub(SESSION_PATH, "", parsed.path) or "/"
     query = sorted(parse_qs(parsed.query).keys())
     return path + ("?" + "&".join(query) if query else "")
 
@@ -120,6 +124,8 @@ class Screen:
         self.vocab = vocabulary
         platform = config["platform"]
         self.harness = [platform["harness_selector"], platform["harness_button_text"]]
+        global SESSION_PATH
+        SESSION_PATH = platform.get("session_path", SESSION_PATH)
         self.settle_ms = platform["settle_ms"]
         self.max_rounds = config["words"]["max_rewrite_rounds"]
         self._cache: dict[str, Any] = {}

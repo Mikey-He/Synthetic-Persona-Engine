@@ -5,7 +5,9 @@ from __future__ import annotations
 import time
 from typing import Protocol
 
-from .prompt import RESPONSE_SCHEMA
+import re
+
+from .prompt import response_schema
 
 
 class ModelError(Exception):
@@ -25,12 +27,14 @@ class Model(Protocol):
 
 
 class GeminiModel:
-    def __init__(self, api_key: str, model_id: str, temperature: float, timeout_s: int):
+    def __init__(self, api_key: str, model_id: str, temperature: float, timeout_s: int, created: str):
+        """created: what the workflow makes (flow.json engine.created), for the reply schema."""
         from google import genai  # imported here so tests run without the SDK configured
 
         self.model_id = model_id
         self.temperature = temperature
         self.timeout_ms = timeout_s * 1000
+        self.schema = response_schema(created)
         self.client = genai.Client(api_key=api_key)
 
     def propose(self, system: str, turn: str, screenshot: bytes) -> str:
@@ -39,7 +43,7 @@ class GeminiModel:
         config = types.GenerateContentConfig(
             system_instruction=system,
             response_mime_type="application/json",
-            response_json_schema=RESPONSE_SCHEMA,
+            response_json_schema=self.schema,
             temperature=self.temperature,
             http_options=types.HttpOptions(timeout=self.timeout_ms),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
@@ -88,8 +92,10 @@ class LabelScriptModel:
         step = self.script[0]
         if "observe" in step:  # answer the list question with this quote, and offer nothing to do
             self.script.pop(0)
+            asked = re.search(r"observations\.(\w+):", turn)  # the key the turn's list question names
+            key = asked.group(1) if asked else "list_has_new_item"
             return json.dumps({"candidates": [], "observations": {
-                "list_has_new_budget": {"answer": True, "quote": step["observe"]}}}, ensure_ascii=False)
+                key: {"answer": True, "quote": step["observe"]}}}, ensure_ascii=False)
         candidate = {k: v for k, v in step.items() if k != "label"}
         candidate.setdefault("why", "script")
         label = step.get("label")

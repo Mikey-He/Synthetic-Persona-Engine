@@ -55,7 +55,7 @@ def moves(events: Iterable[dict[str, Any]], field_labels: list[str], ignore: lis
                     label = name
                     break
             if named and label == named:
-                label = "(the budget name they typed)"
+                label = "(the name they typed)"
             move = "click " + label
         elif kind == "field_changed":
             move = "change " + re.sub(r"\.\d+(?=\.|$)", "", payload.get("field") or target)
@@ -84,8 +84,9 @@ def flatten(value: Any, path: str = "") -> dict[str, Any]:
 
 
 def last_saved(result: dict[str, Any]) -> dict[str, Any] | None:
-    budgets = result.get("budgets") or []
-    scored = (result.get("scored") or {}).get("budgetId")
+    # What the platform saved: "saved" on a platform built for another workflow, "budgets" on Version A's.
+    budgets = result.get("saved") or result.get("budgets") or []
+    scored = (result.get("scored") or {}).get("id") or (result.get("scored") or {}).get("budgetId")
     pick = next((b for b in budgets if b.get("id") == scored), budgets[-1] if budgets else None)
     return (pick or {}).get("config")
 
@@ -208,9 +209,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--person", required=True, help="the person's session id")
     parser.add_argument("--engine", required=True, help="the engine's session id, or a run folder under runs/")
     parser.add_argument("--quiet", action="store_true", help="do not print the side-by-side moves")
+    parser.add_argument("--flow", help="the workflow's flow.json (default paths.flow in config.toml)")
     args = parser.parse_args(argv)
 
-    config = load_config()
+    config = load_config(flow=args.flow)
     load_env()
     engine_id, run_dir = args.engine, None
     if (Path(args.engine) / "summary.json").exists() or (ENGINE / "runs" / args.engine / "summary.json").exists():

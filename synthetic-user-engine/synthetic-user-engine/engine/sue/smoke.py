@@ -39,9 +39,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cards", nargs="+", default=["blank", "full", "mikey"])
     parser.add_argument("--path", nargs="*", default=[], help="original labels to click, in order")
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument("--flow", help="the workflow's flow.json (default paths.flow in config.toml)")
     args = parser.parse_args(argv)
 
-    config = load_config()
+    config = load_config(flow=args.flow)
     load_env()
     console = ResearchConsole(platform_url(config), require_env("ADMIN_PASSWORD"))
     log = RunLog(config["paths"]["runs"], "smoke")

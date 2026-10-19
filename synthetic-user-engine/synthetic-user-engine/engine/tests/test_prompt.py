@@ -66,15 +66,15 @@ def test_list_check_confirms_only_a_quote_he_can_read_on_the_list(cards, vocab):
     routes = ["/billing/budgets"]
     hits, text = _obs_parts(vocab, "full", ROW)
     seen = {"list_has_new_budget": {"answer": True, "quote": "Atlas monthly Monthly Alerts only Atlas 80%"}}
-    assert check_list(cards["full"], seen, "/billing/budgets", hits, text, routes).done
-    assert not check_list(cards["full"], seen, "/billing/budgets/create", hits, text, routes).done  # not the list
+    assert check_list(cards["full"], seen, "/billing/budgets", hits, text, routes, "list_has_new_budget").done
+    assert not check_list(cards["full"], seen, "/billing/budgets/create", hits, text, routes, "list_has_new_budget").done  # not the list
     made_up = {"list_has_new_budget": {"answer": True, "quote": "Atlas budget $1,000 monthly"}}
-    assert check_list(cards["full"], made_up, "/billing/budgets", hits, text, routes).why == "the quote is not on screen"
+    assert check_list(cards["full"], made_up, "/billing/budgets", hits, text, routes, "list_has_new_budget").why == "the quote is not on screen"
     # The blank card sees fake words in the row, so it cannot recognise its own budget.
     bhits, btext = _obs_parts(vocab, "blank", ROW)
     bquote = "\n".join(vocab("blank").rewrite(t).text for t in ROW[:3]).replace("\n", " ")
     blank = {"list_has_new_budget": {"answer": True, "quote": bquote}}
-    assert not check_list(cards["blank"], blank, "/billing/budgets", bhits, btext, routes).done
+    assert not check_list(cards["blank"], blank, "/billing/budgets", bhits, btext, routes, "list_has_new_budget").done
 
 
 def test_label_script_prefers_an_exact_match_and_scrolls_when_missing():

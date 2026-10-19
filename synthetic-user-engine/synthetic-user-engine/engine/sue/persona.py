@@ -69,6 +69,7 @@ class Persona:
     source: Path
     version: int = CARD_VERSION
     state: dict[str, Any] | None = None  # v3 only
+    flow: str = ""  # the name of the workflow the card was built for (the flow's name)
 
     def item(self, item_id: str) -> Item | None:
         return self.items.get(item_id)
@@ -128,6 +129,7 @@ def persona_from_card(card: dict[str, Any], path: Path) -> Persona:
         source=path,
         version=card["version"],
         state=card.get("state") if card["version"] >= 3 else None,
+        flow=card.get("flow") or "",
     )
 
 

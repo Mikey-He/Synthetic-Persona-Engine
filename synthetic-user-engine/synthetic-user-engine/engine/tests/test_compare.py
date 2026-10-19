@@ -24,7 +24,7 @@ def test_events_become_moves_the_same_way_for_both_sides():
     ]
     assert moves(events, LABELS, IGNORE) == [
         "page /billing", "click Projects", "change amount.target", "change thresholds.percent", "change name",
-        "click (the budget name they typed)",
+        "click (the name they typed)",
     ]
 
 

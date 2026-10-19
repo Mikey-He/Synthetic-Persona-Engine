@@ -142,5 +142,258 @@
     {"key": "navigation", "title": "Navigation & entry points", "word": false, "default": 1, "hidden": true, "description": "Where budgets live, Create new, the form's sections, opening a saved budget", "examples": "Where budgets live, Create new, form sections, opening a saved budget", "items": ["T04", "T10", "T15", "T43"]},
     {"key": "operations", "title": "Save & dropdown rules", "word": false, "default": 2, "hidden": true, "description": "Finish applies changes; OK applies a multi-select dropdown", "examples": "Finish applies changes; OK applies a multi-select dropdown", "items": ["T24", "T31"]},
     {"key": "icons", "title": "Help icon knowledge", "word": false, "default": 2, "hidden": true, "description": "The question-mark icon opens an explanation", "examples": "The question-mark icon opens an explanation", "items": ["T25"]}
-  ]
+  ],
+  "engine": {
+    "note": "Settings the engine needs for this workflow (engine-design.md 6). config.toml holds only what is the same for every workflow.",
+    "created": "budget",
+    "routes": {
+      "list": [
+        "/billing/budgets"
+      ],
+      "path": [
+        "/billing",
+        "/billing/budgets",
+        "/billing/budgets/create",
+        "/billing/budgets/create?edit"
+      ]
+    },
+    "labels": {
+      "consequential": [
+        "Finish",
+        "Save",
+        "Cancel"
+      ],
+      "advancing": [
+        "Next"
+      ]
+    },
+    "items": {
+      "entry": [
+        "T04"
+      ],
+      "help": [
+        "T25"
+      ],
+      "review": [
+        "T43"
+      ]
+    },
+    "words": {
+      "dataTerms": [
+        "Cloud Console (prototype)",
+        "Northstar Research",
+        "billing-demo-001",
+        "Atlas",
+        "Beacon",
+        "atlas-demo",
+        "beacon-demo",
+        "Alex Kim",
+        "Jordan Lee",
+        "Sam Rivera",
+        "Priya Shah",
+        "Compute Engine",
+        "Cloud Storage",
+        "BigQuery",
+        "Cloud Run",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Sept",
+        "Oct",
+        "Nov",
+        "Dec",
+        "USD"
+      ],
+      "forceFake": [
+        "FinOps",
+        "CUD"
+      ]
+    },
+    "compare": {
+      "fieldLabels": [
+        "Billing account",
+        "Projects",
+        "Services",
+        "Labels",
+        "Time range",
+        "Budget type",
+        "Trigger on"
+      ]
+    },
+    "plumbing": [
+      {
+        "action": "click",
+        "label": "Budgets & caps",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Budgets & caps"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Create new",
+        "evidence": [
+          {
+            "type": "item",
+            "ref": "T10"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Alerts only",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Alerts only"
+          }
+        ]
+      },
+      {
+        "action": "type",
+        "label": "Name",
+        "value": "Atlas monthly",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Name"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Next",
+        "evidence": [
+          {
+            "type": "item",
+            "ref": "T15"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Projects",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Projects"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Atlas",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Atlas"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "OK",
+        "evidence": [
+          {
+            "type": "item",
+            "ref": "T31"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Next",
+        "evidence": [
+          {
+            "type": "item",
+            "ref": "T15"
+          }
+        ]
+      },
+      {
+        "action": "type",
+        "label": "Target amount",
+        "value": "1000",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Target amount"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Next",
+        "evidence": [
+          {
+            "type": "item",
+            "ref": "T15"
+          }
+        ]
+      },
+      {
+        "action": "type",
+        "label": "Percent of budget 1",
+        "value": "80",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Percent"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "billing admins and users",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "billing admins and users"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "project owners",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "project owners"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Finish",
+        "evidence": [
+          {
+            "type": "item",
+            "ref": "T24"
+          }
+        ]
+      },
+      {
+        "observe": "Atlas monthly"
+      }
+    ]
+  }
 }

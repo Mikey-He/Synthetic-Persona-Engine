@@ -30,7 +30,7 @@ from .memory import SessionMemory
 from .model import GeminiModel, Model, ModelError, timed
 from .persona import ICON, KNOW, NONE, WORD, Persona, load_card
 from .platform import ResearchConsole
-from .prompt import CHECK, FIX, PROMPT_VERSION, SYSTEM, TASK, ReplyError, build_turn, parse_reply
+from .prompt import CHECK, FIX, PROMPT_VERSION, SYSTEM, TASK, ReplyError, build_turn, list_key, parse_reply
 from .runlog import RunLog
 from .screen import RewriteError, Screen, open_browser
 from .similarity import similarity, task_values, task_words
@@ -113,6 +113,11 @@ def _candidate_rows(scored) -> list[dict[str, Any]]:
 def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Model, *, headed: bool = False,
         watch: bool = False, max_steps: int | None = None, seed: int = 0) -> dict[str, Any]:
     persona = load_card(config["paths"]["personas"], card)
+    workflow = config["workflow"]
+    if persona.flow and persona.flow != workflow["name"]:
+        raise ValueError(f"{card} was built for the workflow \"{persona.flow}\", but the engine is set to "
+                         f"\"{workflow['name']}\" ({workflow['file']}). Pass --flow with that workflow's flow.json.")
+    created, answer_key = workflow["created"], list_key(workflow["created"])
     vocab = build_vocabulary(persona, config)
     platform, rules, goal = config["platform"], config["run"], config["goal"]
     max_steps = max_steps or rules["max_steps"]
@@ -336,7 +341,8 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                 situation = ("They have saved, but the confirmation they wait for (" + ways_text(missed)
                              + ") has not appeared; they look around the page for it" if confirming else None)
                 turn = build_turn(persona, seen, obs.scroll, ask_list=asks_list(persona),
-                                  history=history[-history_n:], looking_at=looking_at, situation=situation)
+                                  history=history[-history_n:], looking_at=looking_at, situation=situation, created=created,
+                                  article=workflow.get("article"))
                 say(f"Step {step}: waiting for the model's candidates (looking at {looking_at or 'the whole screen'})")
                 candidates, observations, error, latency, attempts = None, {}, None, None, 0
                 detail = None  # the API's own message, so a credit or quota stop is not read as a timeout
@@ -368,7 +374,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                     break
 
                 # Step 9 first: does what he sees confirm he is done, by his own way of confirming?
-                check = check_list(persona, observations, obs.route, obs.hits, obs.visible_text, goal["list_routes"])
+                check = check_list(persona, observations, obs.route, obs.hits, obs.visible_text, goal["list_routes"], answer_key)
                 completion = {"asked": check.asked, "answer": check.answer, "quote": check.quote, "done": check.done,
                               "why": check.why}
                 knows = lambda i: memory.knows(i) or bool(persona.item(i) and persona.item(i).result == KNOW)  # noqa: E731
@@ -545,7 +551,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
             "stop": {"reason": reason, "why": why},
             "evaluation": result.get("evaluation"),
             "saves": result.get("saves"),
-            "budgets": len(result.get("budgets") or []),
+            "saved_items": len(result.get("saved") or result.get("budgets") or []),
             "rules": dict(rules_used),
             "learned": dict(memory.learned),
             "missed_defaults": missed_defaults,
@@ -601,9 +607,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--viewport", help="window size, e.g. 1920x955; default from config.toml")
     parser.add_argument("--like-session", help="the person's session id: use the window size their session was taken in")
     parser.add_argument("--seed", type=int, default=0, help="seed for every slip and level drawn (engine-design.md 4.9)")
+    parser.add_argument("--flow", help="the workflow's flow.json (default paths.flow in config.toml)")
     args = parser.parse_args(argv)
 
-    config = load_config()
+    config = load_config(flow=args.flow)
     load_env()
     console = ResearchConsole(platform_url(config), require_env("ADMIN_PASSWORD"))
     # Each person takes the test in his own browser window; the engine looks through a
@@ -621,7 +628,7 @@ def main(argv: list[str] | None = None) -> int:
         w, h = (int(x) for x in size.lower().split("x"))
         config["platform"]["viewport_width"], config["platform"]["viewport_height"] = w, h
     m = config["model"]
-    model = GeminiModel(require_env("GEMINI_API_KEY"), m["id"], m["temperature"], m["timeout_s"])
+    model = GeminiModel(require_env("GEMINI_API_KEY"), m["id"], m["temperature"], m["timeout_s"], config["workflow"]["created"])
     run(args.card, config, console, model, headed=args.headed, watch=args.watch, max_steps=args.max_steps, seed=args.seed)
     return 0
 

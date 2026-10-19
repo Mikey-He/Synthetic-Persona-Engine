@@ -106,9 +106,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--like-session", help="the person's session id: their window size, and compare every run with it")
     parser.add_argument("--viewport", help="window size, e.g. 1920x955; default from config.toml")
     parser.add_argument("--max-steps", type=int)
+    parser.add_argument("--flow", help="the workflow's flow.json (default paths.flow in config.toml)")
     args = parser.parse_args(argv)
 
-    config = load_config()
+    config = load_config(flow=args.flow)
     load_env()
     console = ResearchConsole(platform_url(config), require_env("ADMIN_PASSWORD"))
     size = args.viewport
@@ -122,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         w, h = (int(x) for x in size.lower().split("x"))
         config["platform"]["viewport_width"], config["platform"]["viewport_height"] = w, h
     m = config["model"]
-    model = GeminiModel(require_env("GEMINI_API_KEY"), m["id"], m["temperature"], m["timeout_s"])
+    model = GeminiModel(require_env("GEMINI_API_KEY"), m["id"], m["temperature"], m["timeout_s"], config["workflow"]["created"])
 
     out_dir = Path(config["paths"]["runs"]) / f"batch-{datetime.now():%Y%m%d-%H%M%S}"
     out_dir.mkdir(parents=True, exist_ok=True)
