@@ -1,0 +1,76 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T05:02:31+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P2-1 · UX and product management graduate student, new to cloud (Linfei - The Methodical Note-Taker)",
+    "background": {
+      "product": "I use a Mac laptop daily along with Figma, Notion, Google Docs, and Google Sheets for school and project planning. I also use Vercel and Supabase occasionally when building small website prototypes with AI coding assistants.",
+      "work": "I am currently working as a UX and product management intern on an unpaid startup incubator project. Previously, I completed UX research and design internships during my undergraduate studies.",
+      "study": "I am a graduate student in UX design and product management, taking courses in user research, usability evaluation, product metrics, and introductory statistics. I self-study web development using online guides and AI tools.",
+      "life": "I track my monthly living expenses and tuition budget closely in Google Sheets to make sure I do not overspend, categorizing groceries, rent, and software subscriptions."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "admin-panels"
+      ],
+      "work": [
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X09": 3,
+      "X12": 2,
+      "X19": 1,
+      "X20": 1,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "intermediate"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 0,
+      "R2": 0,
+      "P1": 1,
+      "P2": 1,
+      "D1": 2,
+      "D2": 2,
+      "D3": 1,
+      "H": 0
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 2
+    },
+    "careText": "I would be most worried about accidentally applying the budget across all projects instead of just Atlas, or misunderstanding an unfamiliar billing term that leads to unexpected charges.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p2-1 (from data/roles/role-p2.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

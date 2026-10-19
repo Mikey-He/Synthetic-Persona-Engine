@@ -1,0 +1,93 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T04:47:42+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P3 · Software and AI/ML engineer who builds on cloud platforms",
+    "background": {
+      "product": "I use macOS and Linux daily, spending most of my time in VS Code, terminal, Docker, and Chrome. I interact frequently with the AWS and Google Cloud web consoles to inspect running workloads, check logs, and monitor cloud resources.",
+      "work": "I work as a software and AI/ML engineer at a growth-stage tech company, deploying containerized microservices and machine learning models. I am also a graduate student, where I build research prototypes and help manage shared cloud computing resources for our lab projects.",
+      "study": "I hold a bachelor's in Computer Science and am pursuing my master's degree. I have completed AWS certifications (including Solutions Architect Associate) and done substantial self-study on cloud architectures and ML infrastructure.",
+      "life": "I keep track of personal expenses through basic monthly spreadsheets and my banking app, mostly just checking totals to ensure I stay under a rough spending threshold each month."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "gcp-console",
+        "aws-console",
+        "other-cloud",
+        "admin-panels"
+      ],
+      "work": [
+        "it-admin",
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "cloud-courses",
+        "gcp-docs",
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X02": 3,
+      "X03": 3,
+      "X04": 4,
+      "X05": 3,
+      "X06": 3,
+      "X07": 4,
+      "X08": 1,
+      "X17": 3,
+      "X09": 4,
+      "X10": 3,
+      "X11": 2,
+      "X12": 4,
+      "X16": 2,
+      "X19": 4,
+      "X20": 3,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 1,
+      "R2": 1,
+      "P1": 1,
+      "P2": 1,
+      "D1": 1,
+      "D2": 1,
+      "D3": 1,
+      "H": 0
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 0
+    },
+    "careText": "I would mainly worry about accidentally applying the budget across the entire billing account instead of scoping it strictly to the Atlas project, or misconfiguring the alert recipient so someone else gets spammed.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p3 (data/roles/role-p3.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

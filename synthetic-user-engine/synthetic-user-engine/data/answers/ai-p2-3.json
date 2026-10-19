@@ -1,0 +1,87 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T05:03:17+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P2-3 · UX and product management graduate student, new to cloud (Meng - The Anxious Rule-Follower)",
+    "background": {
+      "product": "I use a MacBook for my daily coursework, along with Google Docs, Google Sheets, Figma, and AI coding assistants like Claude and Cursor to help build simple web prototypes. I also occasionally log into cloud dashboards like AWS Educate or Google Cloud for class assignments, but I find their interfaces pretty overwhelming.",
+      "work": "I am currently a graduate student in human-computer interaction and product management, and I also work on side projects with a small seed startup team. My responsibilities focus on user research, wireframing, usability testing, and coordinating product requirements rather than backend infrastructure.",
+      "study": "I have taken courses in UX design, product management, user research methods, and introductory statistics and data analysis. I have also followed introductory cloud tutorials for coursework, but I have not completed any formal cloud certifications.",
+      "life": "I track my personal monthly expenses using a spreadsheet and mobile banking apps, carefully setting category limits for rent, groceries, and dining out to make sure I don't go over budget."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "gcp-console",
+        "aws-console",
+        "admin-panels"
+      ],
+      "work": [
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "cloud-courses",
+        "gcp-docs",
+        "statistics",
+        "accounting-courses"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X02": 1,
+      "X04": 2,
+      "X06": 3,
+      "X09": 3,
+      "X10": 2,
+      "X11": 1,
+      "X12": 3,
+      "X14": 2,
+      "X19": 2,
+      "X20": 1,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "intermediate"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 0,
+      "R2": 0,
+      "P1": 1,
+      "P2": 1,
+      "D1": 2,
+      "D2": 2,
+      "D3": 1,
+      "H": 1
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 2
+    },
+    "careText": "I would be terrified of setting the scope incorrectly so that it accidentally tracks other projects, or picking the wrong recipient so the alert goes to the entire team or fails to notify the owner before surprise charges occur.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p2-3 (from data/roles/role-p2.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

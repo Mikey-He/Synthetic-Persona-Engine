@@ -1,0 +1,93 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T04:59:50+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P3-1 · Software and AI/ML engineer who builds on cloud platforms (Devon Vance - The Hurry-Up Builder)",
+    "background": {
+      "product": "I use macOS and Linux machines daily running VS Code, Docker, terminal utilities, AWS and Google Cloud web consoles, and LLM coding tools.",
+      "work": "I work as an AI/ML and software engineer at a startup building PyTorch training pipelines and deploying services, while also doing graduate research in computer science.",
+      "study": "I have a BS in Computer Science, am finishing my MS in CS, hold AWS cloud certifications, and frequently self-study ML frameworks and cloud systems.",
+      "life": "I check my bank and credit card apps periodically to monitor monthly expenses, keeping general mental track of spending rather than using rigid spreadsheets."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "gcp-console",
+        "aws-console",
+        "other-cloud",
+        "admin-panels"
+      ],
+      "work": [
+        "it-admin",
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "cloud-courses",
+        "gcp-docs",
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X02": 3,
+      "X03": 3,
+      "X04": 4,
+      "X05": 3,
+      "X06": 3,
+      "X07": 4,
+      "X08": 2,
+      "X17": 3,
+      "X09": 4,
+      "X10": 3,
+      "X11": 2,
+      "X12": 4,
+      "X16": 3,
+      "X19": 3,
+      "X20": 3,
+      "X15": 2
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 2,
+      "R2": 2,
+      "P1": 0,
+      "P2": 1,
+      "D1": 1,
+      "D2": 0,
+      "D3": 0,
+      "H": 0
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 0
+    },
+    "careText": "I'd mainly worry about misconfiguring the scope so that other projects trigger the alert, or missing the exact recipient setting for the project owner.",
+    "done": [
+      "action",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p3-1 (from data/roles/role-p3.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "sue-role",
+  "version": 1,
+  "id": "role-p3",
+  "title": "Software and AI/ML engineer who builds on cloud platforms",
+  "note": "Written to the Google persona fields from what a recruiter would know about P3 (role, work history, cloud tenure, certifications, language). Risk tolerance and decision driver follow the fixed rules in tools/ai_fill.py, not P3's questionnaire answers.",
+  "segment": "Customer",
+  "jobTitle": "Software engineer and AI/ML engineer, also a graduate student",
+  "organization": "Digital Native / SMB (around $600K a year in cloud spend)",
+  "yearsInCloud": "2 to 4 years (practitioner)",
+  "sophistication": "Level 3 of 5, Reports: uses the cloud console and its built-in reports; does not analyse billing exports",
+  "domainExpertise": "Full-stack web and mobile development, then AI/ML engineering. Deploys applications on AWS and Google Cloud. Holds AWS cloud certifications.",
+  "dailyTools": "VS Code, Docker, Linux terminal, the Google Cloud and AWS consoles, AI assistants",
+  "region": "Works in the United States",
+  "language": "Fluent English; works in English every day",
+  "riskTolerance": "Moderate (rule: 1 to 4 years in cloud)",
+  "decisionDriver": "Speed and quota unblocking: wants things set up quickly so work can continue",
+  "workflowGoal": "Set up a monthly budget with an email alert for one project, as described in the task"
+}

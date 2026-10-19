@@ -1,0 +1,76 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T05:04:02+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P2-5 · UX and product management graduate student, new to cloud (Zihao - The Pragmatic PM Prioritizer)",
+    "background": {
+      "product": "I use a Mac laptop daily along with Google Docs, Google Sheets, Miro, and Airtable for graduate coursework and team projects. I also frequently use AI coding assistants to help write code when building prototypes and small websites.",
+      "work": "Before coming to the US, I worked briefly as an associate product manager at a tech company in Beijing, coordinating requirements across design and development teams. In grad school, I work on UX research and product management course projects.",
+      "study": "I have taken coursework in UX design, UX research, product management, and foundational statistics. I have not taken formal cloud computing or finance classes, mostly learning technical tools on my own or with AI.",
+      "life": "I keep track of my monthly living expenses and tuition budgeting using spreadsheets, making sure I don't exceed my planned monthly allowance."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "admin-panels"
+      ],
+      "work": [
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X09": 4,
+      "X12": 2,
+      "X19": 3,
+      "X20": 3,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 2,
+      "R2": 0,
+      "P1": 2,
+      "P2": 1,
+      "D1": 1,
+      "D2": 1,
+      "D3": 2,
+      "H": 0
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 1
+    },
+    "careText": "I'd worry most about accidentally setting the scope workspace-wide instead of just the Atlas project, or spamming team members because alert recipients were bundled with general permissions.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p2-5 (from data/roles/role-p2.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

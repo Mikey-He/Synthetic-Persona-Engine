@@ -1,0 +1,76 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T05:02:56+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P2-2 · UX and product management graduate student, new to cloud (Bowen - The Impatient IA Skimmer)",
+    "background": {
+      "product": "I use a MacBook Pro daily for design, schoolwork, and web projects. My main apps are Figma, Google Docs and Sheets, Notion, and VS Code paired with Claude and ChatGPT to build small web prototypes. I also use Render and GitHub to host student projects.",
+      "work": "I am a full-time graduate student in UX design and product management. Before this, I did an industrial design internship in Shanghai working on consumer hardware interfaces, and right now I lead UX and product scoping in team-based academic design projects.",
+      "study": "I have a bachelor's degree in industrial design from Shanghai and am currently completing my master's coursework in UX and product management in the US, which included an applied statistics module. I haven't taken any formal cloud computing or finance courses.",
+      "life": "I track my monthly rent, utilities, and daily spending in a personal Google Sheet to stay within my student budget and monitor foreign exchange transfers from home."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "admin-panels"
+      ],
+      "work": [
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X09": 3,
+      "X12": 2,
+      "X19": 1,
+      "X20": 1,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 0,
+      "R2": 0,
+      "P1": 0,
+      "P2": 1,
+      "D1": 1,
+      "D2": 0,
+      "D3": 0,
+      "H": 0
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 0
+    },
+    "careText": "I would worry about accidentally applying the budget to all projects instead of just Atlas, or entering a setting that immediately triggers unexpected billing charges.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p2-2 (from data/roles/role-p2.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "sue-role",
+  "version": 1,
+  "id": "role-p2",
+  "title": "UX and product management graduate student, new to cloud",
+  "note": "Written to the Google persona fields from what a recruiter would know about P2 (role, studies, cloud tenure, language). Risk tolerance and decision driver follow the fixed rules in tools/ai_fill.py, not P2's questionnaire answers.",
+  "segment": "Customer",
+  "jobTitle": "Graduate student in UX design and product management",
+  "organization": "Startup / Seed (under $50K a year in cloud spend): small class and side projects",
+  "yearsInCloud": "Less than 1 year (cloud novice)",
+  "sophistication": "Level 1 of 5, Crawl: has not worked with cloud billing; would rely on the console's own screens",
+  "domainExpertise": "UX research and design, product management coursework, some statistics. Builds small websites with help from AI coding assistants.",
+  "dailyTools": "Google Docs and Sheets, AI coding assistants, a Mac laptop",
+  "region": "Born and raised in China, now studying in the United States",
+  "language": "Chinese is the first language; studies and works in English as a second language",
+  "riskTolerance": "Cautious with settings that involve money (rule: under 1 year in cloud)",
+  "decisionDriver": "Cost and operational efficiency: wants to avoid overspending",
+  "workflowGoal": "Set up a monthly budget with an email alert for one project, as described in the task"
+}

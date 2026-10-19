@@ -1,0 +1,74 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T05:03:35+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P2-4 · UX and product management graduate student, new to cloud (Yuxin - The AI-First Copilot Relier)",
+    "background": {
+      "product": "I use a MacBook for daily schoolwork, along with Google Docs, Google Sheets, Figma, and Notion. For web development class projects, I use VS Code paired with AI assistants like ChatGPT and Claude to write HTML, CSS, and basic JavaScript.",
+      "work": "I have worked as a UX research intern at an edtech startup, where I ran usability tests and synthesized interview feedback. Currently, I am a graduate student working on team capstone projects acting as a student product manager and UI designer.",
+      "study": "My coursework includes user research methods, interaction design, product management, and an introductory course in statistics and data analysis. I have not taken formal cloud computing or finance courses, learning website deployment mainly through online tutorials and AI prompts.",
+      "life": "As an international student on a budget, I track my monthly living expenses and rent using a custom Google Sheets template, and I regularly check my bank mobile app to make sure I do not overspend."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "admin-panels"
+      ],
+      "work": [
+        "build-admin"
+      ],
+      "study": [
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X09": 3,
+      "X12": 2,
+      "X19": 1,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "intermediate"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 0,
+      "R2": 0,
+      "P1": 0,
+      "P2": 1,
+      "D1": 1,
+      "D2": 1,
+      "D3": 1,
+      "H": 1
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 2
+    },
+    "careText": "I would be most worried about accidentally selecting the wrong project or setting a rule that triggers unexpected charges without me noticing.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p2-4 (from data/roles/role-p2.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

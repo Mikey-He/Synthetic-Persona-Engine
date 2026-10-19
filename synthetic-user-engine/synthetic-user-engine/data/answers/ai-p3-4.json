@@ -1,0 +1,91 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T05:01:12+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P3-4 · Software and AI/ML engineer who builds on cloud platforms (Elena Rostova - The Cautious Finisher)",
+    "background": {
+      "product": "I daily drive a MacBook Pro and Linux workstations for full-stack and AI development. I use VS Code, Docker, terminal utilities, and spend substantial time inside both the AWS Management Console and Google Cloud console deploying services and monitoring workloads.",
+      "work": "I work as a software and AI/ML engineer at a digital native company where I build web applications and fine-tune open-source models. Alongside my job, I am completing graduate coursework in computer science.",
+      "study": "I hold AWS cloud certifications and have completed extensive university coursework in computer science, machine learning, and data structures. I also continuously follow official cloud documentation and technical whitepapers.",
+      "life": "I track personal expenses using spreadsheet templates and banking app budgets, making sure savings and recurring subscription costs stay within fixed monthly targets."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "gcp-console",
+        "aws-console",
+        "admin-panels"
+      ],
+      "work": [
+        "it-admin",
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "cloud-courses",
+        "gcp-docs",
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X02": 3,
+      "X03": 3,
+      "X04": 4,
+      "X05": 3,
+      "X06": 4,
+      "X07": 4,
+      "X08": 2,
+      "X09": 4,
+      "X10": 3,
+      "X11": 3,
+      "X12": 3,
+      "X16": 1,
+      "X19": 4,
+      "X20": 3,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 0,
+      "R2": 0,
+      "P1": 0,
+      "P2": 1,
+      "D1": 1,
+      "D2": 2,
+      "D3": 1,
+      "H": 1
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 1
+    },
+    "careText": "I would worry about accidentally scoping the budget to all projects instead of just Atlas, or setting up alert thresholds that spam other team members instead of solely the project owner.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p3-4 (from data/roles/role-p3.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

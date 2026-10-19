@@ -1,0 +1,50 @@
+{
+  "roleTraits": "In this cohort of Chinese graduate students studying UX and PM in the US, high caution around financial fields is almost universal due to tight student budgets and fear of accidental cloud charges. Most rely on second-language reading strategies such as pausing on domain jargon, consulting AI translation tools, and critiquing the software's information architecture through a design student lens. Where they differ widely is their exploratory tolerance: some methodically audit every dropdown and tooltip before clicking, others skim aggressively like consumer-app users until a scary financial keyword stops them, and several default to asking ChatGPT rather than navigating complex menus.",
+  "people": [
+    {
+      "label": "Linfei - The Methodical Note-Taker",
+      "portrait": "Linfei is a second-semester master's student balancing coursework with an unpaid startup incubator project. She treats every software interface like a usability case study, keeping a Notion doc open alongside her Mac screen to record steps and unfamiliar terms. Because English is her second language, she reads form labels deliberately, often translating specialized billing terminology into Chinese using DeepL before proceeding. Her fear of incurring surprise personal charges makes her double-check every pre-filled selection.",
+      "episodes": [
+        "When setting up a database on Supabase last month, she encountered a button labeled 'Pause Project' with a warning modal; she stopped, translated the modal text into Chinese to ensure pausing wouldn't delete her mock user data, and verified the project state twice before moving forward.",
+        "While trying to view cost breakdowns by environment in Vercel, she searched the project-level dashboard for ten minutes without success, eventually opening Google to search 'Vercel where to see team usage' instead of clicking random sidebar items.",
+        "When presented with an unchecked box labeled 'Enforce soft delete' in an admin template form, she left it at its default state after hovering over the empty help icon, deciding that touching unfamiliar toggles was riskier than accepting the system recommendation."
+      ]
+    },
+    {
+      "label": "Bowen - The Impatient IA Skimmer",
+      "portrait": "Bowen came from an industrial design background in Shanghai and focuses heavily on product management frameworks. He works fast, prefers keyboard shortcuts, and gets visibly annoyed when enterprise software deviates from modern consumer web design standards. He trusts his intuition and skims long forms quickly, assuming modern apps protect users from catastrophic errors, though he still halts abruptly whenever an input field asks for a credit card, billing cap, or bank routing number.",
+      "episodes": [
+        "While configuring a deployment pipeline on Render, he saw a primary button labeled 'Promote to Production'; unsure whether it meant immediate billing or code release, he inspected the button's hover state, decided it looked like a trigger, and canceled out to check his git branch status first.",
+        "When searching for member permission toggles inside a collaborative Figma team space, he typed 'roles' into the Mac app search menu rather than exploring the nested settings tab, giving up after ninety seconds and asking his group partner on WeChat.",
+        "Encountering a multi-select dropdown titled 'Aggregation Granularity' while setting up a Google Analytics 4 event stream, he guessed its meaning from class statistics notes, picked 'Hourly' without checking the documentation, and moved to the next step."
+      ]
+    },
+    {
+      "label": "Meng - The Anxious Rule-Follower",
+      "portrait": "Meng is in her first year of human-computer interaction studies and feels constant imposter syndrome regarding the technical side of product management. She is extremely risk-averse with shared cloud workspaces, terrified of breaking an environment or generating a charge her seed startup teammates will notice. She reads every single line of instructional microcopy, keeps browser zoom at 100% to avoid missing fine print, and rarely relies on intuition when unfamiliar terms appear.",
+      "episodes": [
+        "When prompted with a button labeled 'Revoke Grant' in a Google Cloud IAM tutorial screen, she froze, took a screenshot with CleanShot X, and pasted it into Claude asking 'Will clicking this break my student project access?' before taking action.",
+        "While trying to locate the billing notification threshold in an AWS student lab account, she clicked through four different left-hand navigation submenus, re-reading every page title carefully, and spent nearly fifteen minutes before discovering it was located inside an external account management console.",
+        "Faced with a radio button choice between 'Credit-based amortization' and 'Cash basis' in an accounting SaaS trial, she refused to select either until she found a definition in a class slide deck, worried that picking the wrong option would irreversibly alter the trial period."
+      ]
+    },
+    {
+      "label": "Yuxin - The AI-First Copilot Relier",
+      "portrait": "Yuxin sees herself as an AI-native product designer. Rather than reading lengthy documentation or hunting through dense enterprise interfaces, she relies on dual windows: the application on the left and ChatGPT on the right. When interface copy in English feels ambiguous, she captures a screenshot, feeds it to the AI model, and asks for the exact sequence of clicks needed. She is pragmatic and moves moderately fast, but delegates all critical verification decisions to AI explanations.",
+      "episodes": [
+        "Encountering a mysterious button marked 'Sync Webhook State' on Stripe's test dashboard, she copied the element text into ChatGPT, asked 'Does clicking this cost money or send real notifications?', and clicked it only after the AI confirmed it was a dry-run test trigger.",
+        "When she could not locate the export button for a user research dataset in Mixpanel, she bypassed the product help center entirely, asked Claude for a step-by-step visual path, and followed the exact breadcrumb string provided.",
+        "On an onboarding screen for an analytics tool offering a pre-checked box for 'Include speculative forecast modeling', she hesitated at the word 'speculative', pasted the tooltip into a translator, and unchecked it because she didn't want unexpected synthetic data polluting her team's research charts."
+      ]
+    },
+    {
+      "label": "Zihao - The Pragmatic PM Prioritizer",
+      "portrait": "Zihao worked briefly as an associate product manager in Beijing before starting his US graduate program. He thinks in terms of business requirements, scopes, and target outcomes rather than UI aesthetics. He is comfortable skimming technical setup screens as long as the inputs match his clear objective, but he becomes deeply skeptical whenever user notification controls are bundled with administrative permissions. He is cautious about money, yet confident enough to test settings if there is a clear confirmation dialog.",
+      "episodes": [
+        "Faced with an unfamiliar button labeled 'Override Scope' in a collaborative Miro workspace, he clicked it intentionally to inspect whether a warning prompt would explain what scope was being overridden, then calmly clicked 'Cancel' once he saw the scope was workspace-wide.",
+        "When he could not find the monthly spending report in an Airtable workspace, he used the global search bar with the keyword 'invoice', discovered the buried billing menu within two minutes, and bookmarked the URL for later.",
+        "Encountering a form dropdown titled 'Billing Tier Allocation' with options 'Distributed Pro-rata' and 'Direct Attribution', he paused, reasoned that 'Direct' mapped better to tracking an isolated project's expenses, selected it, and made a mental note to verify the first monthly summary."
+      ]
+    }
+  ]
+}

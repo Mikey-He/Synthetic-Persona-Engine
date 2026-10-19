@@ -1,0 +1,97 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T05:00:09+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P3-2 · Software and AI/ML engineer who builds on cloud platforms (Priya Raman - The Methodical Verifier)",
+    "background": {
+      "product": "I develop daily using VS Code, Docker, Linux, and both AWS and Google Cloud web consoles. I frequently interact with dashboard UIs, API monitors, and cloud resource management panels on my MacBook.",
+      "work": "I work as a software and AI/ML engineer at a digital native company, deploying full-stack microservices and ML inference endpoints. I also handle basic cloud resource setup and monitor runtime spending for our services.",
+      "study": "I am currently a graduate student in computer science. I hold two AWS Associate certifications and actively read cloud architecture and operations documentation.",
+      "life": "I use personal banking apps and spreadsheets to track my monthly living expenses and student budget, and I always check transaction notifications to prevent unexpected charges."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "gcp-console",
+        "aws-console",
+        "other-cloud",
+        "admin-panels"
+      ],
+      "work": [
+        "finance-work",
+        "it-admin",
+        "build-admin",
+        "manage-members"
+      ],
+      "study": [
+        "cloud-courses",
+        "gcp-docs",
+        "statistics",
+        "accounting-courses"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X02": 3,
+      "X03": 3,
+      "X04": 4,
+      "X05": 3,
+      "X06": 4,
+      "X07": 4,
+      "X08": 2,
+      "X17": 3,
+      "X09": 4,
+      "X10": 3,
+      "X11": 3,
+      "X12": 4,
+      "X14": 1,
+      "X13": 1,
+      "X16": 2,
+      "X19": 4,
+      "X20": 3,
+      "X15": 4
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 0,
+      "R2": 0,
+      "P1": 2,
+      "P2": 2,
+      "D1": 2,
+      "D2": 2,
+      "D3": 1,
+      "H": 1
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 0
+    },
+    "careText": "I would worry about accidentally applying the budget across all projects instead of scoping it strictly to Atlas, or sending the alert to the entire billing account team instead of only the project owner.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p3-2 (from data/roles/role-p3.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}

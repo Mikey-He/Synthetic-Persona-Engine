@@ -1,0 +1,55 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": null,
+  "pageLanguage": "en",
+  "answers": {
+    "name": "Shared L1 Crawl",
+    "background": {},
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "admin-panels"
+      ],
+      "work": [],
+      "study": [],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X09": 3,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 1,
+      "R2": 1,
+      "P1": 1,
+      "P2": 1,
+      "D1": 1,
+      "D2": 1,
+      "D3": 1,
+      "H": 2
+    },
+    "perc": {},
+    "careText": "",
+    "done": [],
+    "doneMiss": null,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Shared card for user type L1 (Crawl), from tools/shared_answers.py. Built from the type label only; no participant's answers were used."
+}

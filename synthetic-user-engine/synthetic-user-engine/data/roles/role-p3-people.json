@@ -1,0 +1,50 @@
+{
+  "roleTraits": "Practitioners in this hybrid engineer-grad student bracket usually lean toward rapid prototyping and pragmatic speed over deep administrative rigor. Because they juggle coursework and sprint deadlines, high speed and skimming defaults are common, while meticulous verification of billing IAM policies is rarer. Patience under UI ambiguity is typically moderate to low—they expect cloud consoles to behave like developer dashboards. Risk-taking with buttons is moderate: they will click around freely if an action looks non-destructive, but freeze or double-check when terms like 'deprovision' or 'billing account disablement' appear.",
+  "people": [
+    {
+      "label": "Devon Vance - The Hurry-Up Builder",
+      "portrait": "Devon splits 50 hours a week between writing PyTorch training pipelines at a Series A startup and finishing an MS thesis in Computer Science. Constantly context-switching, he optimizes for unblocking builds immediately and rarely reads instructional microcopy. He accepts default toggles unless an explicit red warning pops up, relying on git rollbacks or console history if something breaks.",
+      "episodes": [
+        "Met a button he didn't understand: While setting up a vector database UI on a new SaaS tool, he saw a button marked 'Hydrate Snapshot'. He didn't search docs or hover over the tooltip; he immediately clicked it to see if it populated his sample index, assuming he could simply delete the index if it did something unexpected.",
+        "Couldn't find a feature: When searching for custom metric alerts in a monitoring platform, he typed keywords into the search bar for about forty seconds, found nothing matching his exact phrasing, and promptly asked an LLM assistant in another browser tab for the exact click path instead of browsing navigation menus.",
+        "Met a form option he didn't understand: During a deployment setup, he encountered a dropdown offering 'Strict Isolation Tenancy'. Unsure of the cost and architectural implications, he kept the default selection ('Standard Multi-Tenant'), skimmed past the info bubble without reading it, and clicked 'Next'."
+      ]
+    },
+    {
+      "label": "Priya Raman - The Methodical Verifier",
+      "portrait": "Priya holds two AWS associate certs and approaches cloud infrastructure with structured care, even when rushed. While her daily priority is shipping web microservices and ML inference endpoints quickly, she has seen surprise AWS bills before and treats cost-management screens with suspicion. She reads field labels thoroughly, though she avoids editing advanced JSON policies unless necessary.",
+      "episodes": [
+        "Met a button he didn't understand: When testing a new model serving dashboard, she encountered an unfamiliar icon labeled 'Quarantine Endpoint'. Instead of clicking, she hovered for a tooltip, waited for an explanation, and when none appeared, right-clicked to inspect the element and read the URL target before touching it.",
+        "Couldn't find a feature: When she could not locate the IAM role binding screen in a newly updated cloud console, she methodically collapsed and re-expanded every section in the left sidebar, cross-checking the official release notes until she discovered the UI had moved under 'Service Accounts'.",
+        "Met a form option he didn't understand: Configuring a data pipeline sync, she met a checkbox labeled 'Enable tombstone garbage collection'. She paused, opened a separate browser tab to search the specific terminology in the vendor docs, confirmed it didn't purge live data, and only then checked it."
+      ]
+    },
+    {
+      "label": "Marcus Chen - The Trial-and-Error Skimmer",
+      "portrait": "Marcus is an AI engineer who loves fast feedback loops in terminal environments but treats web consoles as a minor obstacle. He skims headers, ignores long explanatory paragraphs, and clicks through forms rapidly. However, he is cautious about team-level permissions and avoids making global changes that could interrupt other developers' experiments.",
+      "episodes": [
+        "Met a button he didn't understand: On a cloud monitoring platform, he saw a toggle labeled 'Synthesize Topology'. He clicked it on, waited ten seconds to see if the network graph changed, and when nothing immediate happened, toggled it right back off to avoid leaving mystery background jobs running.",
+        "Couldn't find a feature: Looking for project-specific budget alerts, he scrolled up and down the billing landing page twice. Missing it both times, he opened the browser's native 'Find in page' tool (Cmd+F) and searched 'Alert', jumping directly through matched terms until he found the link.",
+        "Met a form option he didn't understand: When deploying an API container, he came across a radio button for 'Graceful Drain Period' defaulted to 300 seconds. Not knowing if it applied to idle sessions or active sockets, he left it untouched at 300, reasoned it was a safe baseline, and moved to the next step."
+      ]
+    },
+    {
+      "label": "Elena Rostova - The Cautious Finisher",
+      "portrait": "Elena balances full-stack frontend development with fine-tuning open-source LLMs. She is comfortable with rapid coding, but configuration forms that touch financial thresholds make her distinctly anxious. She works at a steady, deliberate pace, re-reading fields twice and always seeking a visible confirmation toast or status badge before considering any task done.",
+      "episodes": [
+        "Met a button he didn't understand: On a serverless orchestration console, she saw a button labeled 'Rebase Trigger Schema'. She refused to click it, worried it might reset active webhook listeners, and instead took a screenshot to consult a teammate in Slack later that afternoon.",
+        "Couldn't find a feature: Unable to locate the export button for API usage logs, she clicked through three different top-level menus, gave up after two minutes, and used the console's built-in global search bar, typing 'audit log download' until direct deep-links appeared.",
+        "Met a form option he didn't understand: While setting up an alerting rule, she encountered an option named 'Rolling Window Aggregation' alongside 'Cumulative'. Because she wasn't certain which matched her monthly reporting logic, she clicked the inline tooltip icon and read the three-sentence explainer twice before making her pick."
+      ]
+    },
+    {
+      "label": "Jordan Taylor - The Pragmatic Shortcutter",
+      "portrait": "Jordan manages cloud services for several internal analytics tools while taking evening graduate courses in data engineering. He sits right in the middle on most behaviors: he moves quickly through familiar sections, skims boilerplate text, but slows down significantly whenever selecting target projects or recipient emails, double-checking values to avoid sending noise to teammates.",
+      "episodes": [
+        "Met a button he didn't understand: While configuring a cloud bucket lifecycle rule, he saw a button titled 'Simulate Transition'. He clicked it without hesitation, recognized it was a non-destructive dry-run tool, reviewed the printed summary, and proceeded with confidence.",
+        "Couldn't find a feature: When trying to locate billing notification settings, he checked the Billing tab, didn't spot notifications, went to User Profile, then back to Billing. Instead of reading through everything, he bookmarked the direct URL once he finally stumbled on the nested subtab.",
+        "Met a form option he didn't understand: In a container management form, he encountered an unlabelled checkbox labeled 'Inherit Parent Pod Affinity'. He left it unchecked because it was disabled by default, reasoning that modifying default networking behavior in a shared dev environment without a clear reason was poor hygiene."
+      ]
+    }
+  ]
+}

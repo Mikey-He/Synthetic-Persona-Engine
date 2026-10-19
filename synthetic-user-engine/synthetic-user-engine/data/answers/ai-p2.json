@@ -1,0 +1,74 @@
+{
+  "kind": "sue-questionnaire",
+  "version": 2,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "filledAt": "2026-10-08T04:47:08+00:00",
+  "pageLanguage": "en",
+  "answers": {
+    "name": "AI P2 · UX and product management graduate student, new to cloud",
+    "background": {
+      "product": "I use a MacBook every day along with Google Docs, Sheets, and Figma for design work. When building prototype websites for class or side projects, I use VS Code and lean heavily on AI tools like ChatGPT and Claude to help me write code.",
+      "work": "I'm a graduate student in UX design and product management, so most of my experience is in design sprints, user research projects, and university group work. In my internships, I helped map out user journeys and run usability tests, but I haven't worked with company infrastructure or production cloud setups.",
+      "study": "I have taken courses in UX design, interaction design, product management, and introductory statistics for user research. I've watched a few high-level YouTube videos explaining what cloud computing is, but I've never taken formal cloud courses or studied cloud billing.",
+      "life": "I keep track of my monthly living expenses and tuition using a personal Google Sheet and checking my bank app regularly. I like to set personal spending caps each month so I don't go over budget."
+    },
+    "screen": {
+      "product": [
+        "gmail-docs",
+        "admin-panels"
+      ],
+      "work": [
+        "build-admin"
+      ],
+      "study": [
+        "statistics"
+      ],
+      "life": [
+        "personal-budget"
+      ]
+    },
+    "screenOther": {},
+    "answers": {
+      "X01": 4,
+      "X09": 3,
+      "X12": 2,
+      "X19": 2,
+      "X15": 3
+    },
+    "expNotes": {},
+    "lang": {
+      "ui": "English",
+      "english": "fluent"
+    },
+    "vocab": {},
+    "tendStory": "",
+    "tendFollow": "",
+    "tend": {
+      "R1": 1,
+      "R2": 0,
+      "P1": 1,
+      "P2": 1,
+      "D1": 1,
+      "D2": 1,
+      "D3": 1,
+      "H": 1
+    },
+    "perc": {
+      "V": 0,
+      "C": 0,
+      "M": 0,
+      "S": 1
+    },
+    "careText": "I'd worry about accidentally setting the budget to include other projects by mistake, or misconfiguring the alert so an unexpected huge charge happens without anyone being notified.",
+    "done": [
+      "toast",
+      "list"
+    ],
+    "doneMiss": 1,
+    "doneMissOther": ""
+  },
+  "researcher": {
+    "care": []
+  },
+  "note": "Filled by gemini-3.8-flash role-playing role-p2 (data/roles/role-p2.json) with tools/ai_fill.py. No participant's answers were shown to the model."
+}
