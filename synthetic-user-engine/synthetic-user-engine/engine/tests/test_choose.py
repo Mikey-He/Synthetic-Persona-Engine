@@ -315,6 +315,21 @@ def test_a_rough_checker_fills_an_empty_required_box():
     assert d.kind == ACT and d.chosen.element["id"] == "n"
 
 
+def test_a_half_understood_box_gets_the_value_the_task_names_before_next():
+    # Shared L1 card: "Target amount" known only in its everyday sense; a sure Next used to
+    # win every time and the amount was never filled in.
+    amount, nxt = el("t", "Target amount *"), el("n", "Next")
+    cands = [cand(amount, HALF, action="type", value="1000", order=0), cand(nxt, SURE, order=1)]
+    d = decide(cands, SessionMemory(), policy("medium", "medium"), context=CTX, whole_screen=False,
+               piece=[amount, nxt], sim=lambda e: 0, task_values={"1000", "80"})
+    assert d.kind == ACT and d.chosen.element["id"] == "t" and "names the value" in d.rule
+    # A value the task does not name is still not typed into a box he half understands.
+    other = [cand(amount, HALF, action="type", value="500", order=0), cand(nxt, SURE, order=1)]
+    d = decide(other, SessionMemory(), policy("medium", "medium"), context=CTX, whole_screen=False,
+               piece=[amount, nxt], sim=lambda e: 0, task_values={"1000", "80"})
+    assert d.chosen.element["id"] == "n"
+
+
 def test_code_does_not_refollow_a_link_already_clicked_here():
     # Mikey's card, English prompt: after Finish, back on the list, code's "most alike"
     # clicked + Create new again; he had already created the budget from there.

@@ -308,13 +308,14 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                                   history=history[-history_n:], looking_at=looking_at, situation=situation)
                 say(f"Step {step}: waiting for the model's candidates (looking at {looking_at or 'the whole screen'})")
                 candidates, observations, error, latency, attempts = None, {}, None, None, 0
+                detail = None  # the API's own message, so a credit or quota stop is not read as a timeout
                 for attempts in range(1, config["model"]["retries"] + 2):
                     try:
                         text, latency = timed(model, system, turn, obs.screenshot)
                         candidates, observations = parse_reply(text)
                         break
                     except ModelError as e:
-                        error = e.label
+                        error, detail = e.label, str(e)[:300]
                     except ReplyError:
                         error = "invalid_json"
                 record: dict[str, Any] = {
@@ -322,7 +323,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                     "at": datetime.now().strftime("%H:%M:%S"), "elapsed_s": round(step_start - started, 1),
                     "rewrite_rounds": obs.rewrite_rounds, "gray_icons": obs.gray_icons,
                     "looking_at": looking_at, "focus_rect": obs.focus.rect if obs.focus else None,
-                    "model": {"latency_ms": latency, "attempts": attempts, "error": error},
+                    "model": {"latency_ms": latency, "attempts": attempts, "error": error, "detail": detail if candidates is None else None},
                     "state": {"learned_now": learned_now, "learned": dict(memory.learned), "tried": len(memory.tried),
                               "wrong": wrong, "backs": backs},
                     "prompt": turn, "looks": looks,
@@ -332,7 +333,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                                   step_s=round(time.monotonic() - step_start, 1))
                     log.step(record)
                     post(step, shot, {"action": "none"}, None, False, error, latency)
-                    stop = ("technical_error", f"The model gave no usable reply {attempts} times in a row ({error})")
+                    stop = ("technical_error", f"The model gave no usable reply {attempts} times in a row ({error}" + (f": {detail}" if detail else "") + ")")
                     break
 
                 # Step 9 first: does what he sees confirm he is done, by his own way of confirming?

@@ -19,3 +19,6 @@ __pycache__/
 .pytest_cache/
 synthetic-user-engine/synthetic-user-engine/engine/runs/
 node_modules/
+
+# Client documents (Google persona research): never commit
+*.pdf

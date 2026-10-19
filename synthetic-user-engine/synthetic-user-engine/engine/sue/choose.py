@@ -191,6 +191,10 @@ def decide(
     # Typing a number the task names (1,000, 80) matches the task literally (2026-10-04).
     from .similarity import number
     names_value = lambda s: s.candidate.get("value") is not None and number(s.candidate.get("value")) in (task_values or set())  # noqa: E731
+    # Typing the value the task names into a box he half understands (2026-10-08): the task
+    # gives the value and the label's everyday meaning fits, so he types it. Before this, a
+    # sure Next always beat it and the shared L1 card never filled in the amount.
+    fills_named = lambda s: s.candidate.get("action") == "type" and s.level == HALF and names_value(s)  # noqa: E731
 
     # 1. Drop what he cannot or would not do.
     for s in scored:
@@ -236,7 +240,7 @@ def decide(
 
     # 2. What he would do right here.
     here = [s for s in alive
-            if (s.purpose in (TASK, FIX) and (s.level in dares or s.undo))
+            if (s.purpose in (TASK, FIX) and (s.level in dares or s.undo or fills_named(s)))
             or (s.purpose == CHECK and policy.check == "high")
             or (s.purpose == RETREAT and s.level == SURE and in_popup(s.element))]
     if here:
@@ -254,6 +258,8 @@ def decide(
             rule = "Puts back what they just tried (remembers touching it; no need to understand it)"
         elif best.purpose == RETREAT:
             rule = "Done looking; closes what they just opened"
+        elif fills_named(best) and best.level not in dares:
+            rule = "Half-understood box, but the task names the value; types it"
         elif best.level != SURE:
             rule = "Only half-understood evidence; high risk tolerance clicks anyway"
         else:
