@@ -7,16 +7,40 @@ for the model is the processed screenshot and the list of visible elements."""
 from __future__ import annotations
 
 import hashlib
+import io
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from .persona import EVERYDAY, KNOW, OTHER
-from .words import Hit, Vocabulary
+from .persona import EVERYDAY, KNOW, NONE, OTHER
+from .words import Hit, Vocabulary, fake
 
 PAGE_SCRIPT = Path(__file__).with_name("page_script.js")
+
+# Colour vision (engine-design.md 4.9): the screenshot the model gets is filtered. Reduced is
+# deuteranopia (Machado et al. 2009, severity 1); no colour cues is plain luminance.
+COLOR_MATRICES = {
+    "reduced": (0.367322, 0.860646, -0.227968, 0, 0.280085, 0.672501, 0.047413, 0, -0.011820, 0.042940, 0.968881, 0),
+    "no_color_cues": (0.299, 0.587, 0.114, 0, 0.299, 0.587, 0.114, 0, 0.299, 0.587, 0.114, 0),
+}
+
+
+def color_filter(png: bytes, kind: str) -> bytes:
+    matrix = COLOR_MATRICES.get(kind)
+    if not matrix:
+        return png
+    from PIL import Image  # only cards with reduced colour vision need it
+
+    out = io.BytesIO()
+    Image.open(io.BytesIO(png)).convert("RGB").convert("RGB", matrix).save(out, format="PNG")
+    return out.getvalue()
+
+
+def unreadable(text: str) -> str:
+    """Text too small for him to read: every word becomes a made-up word, digits blur to #."""
+    return re.sub(r"\d", "#", re.sub(r"[A-Za-z]+", lambda m: fake(m.group(0)), text))
 
 
 class RewriteError(RuntimeError):
@@ -38,6 +62,7 @@ class Observation:
     rewrite_rounds: int
     gray_icons: list[str] = field(default_factory=list)
     focus: Any = None  # the piece of the screen he is looking at (attention.Chunk), or None for all of it
+    unnoticed: list[str] = field(default_factory=list)  # warning text hidden this step: he did not notice it
 
     @property
     def seen(self) -> list[dict[str, Any]]:
@@ -102,11 +127,18 @@ class Screen:
         self._gray: list[str] = []
         self.watch_pause_ms = config["watch"]["pause_ms"]
         self.watch_move_ms = config["watch"]["move_ms"]
+        # Perception and states set by the run (engine-design.md 4.9); the defaults change nothing.
+        self.vision_px = 0.0  # text smaller than this he cannot read
+        self.color = "typical"
+        self.hide_warnings = False  # this step he does not notice warning text
 
     def _rewrite(self, text: str):
         if text not in self._cache:
             self._cache[text] = self.vocab.rewrite(text)
         return self._cache[text]
+
+    def _too_small(self, size: float | None) -> bool:
+        return bool(self.vision_px) and (size or 0) > 0 and size < self.vision_px
 
     def settle(self) -> None:
         try:
@@ -119,7 +151,11 @@ class Screen:
         return self.page.evaluate("([s, b]) => window.__sue.collect(s, b)", self.harness)
 
     def _expected(self, node: dict[str, Any]) -> str:
-        return node["orig"] if node["harness"] else self._rewrite(node["orig"]).text
+        if node["harness"]:
+            return node["orig"]
+        if self._too_small(node.get("size")):
+            return unreadable(node["orig"])
+        return self._rewrite(node["orig"]).text
 
     def _expanded(self) -> list[str]:
         return self.page.evaluate("([s, b]) => window.__sue.expanded(s, b)", self.harness)
@@ -132,7 +168,8 @@ class Screen:
             e["filled"] = _filled(e.pop("background"))
             if e["icon"] and not e["harness"]:  # an icon is read like a word: its name in his vocabulary
                 e["original"], e["text"] = e["icon"], self._rewrite(e["icon"]).text
-            e["understanding"] = [] if e["harness"] else understanding(self._rewrite(e["original"]).hits)
+            small = self._too_small((e.get("font") or {}).get("size"))
+            e["understanding"] = [] if e["harness"] or small else understanding(self._rewrite(e["original"]).hits)
         return elements
 
     def observe(self, step: int, gray_icons: list[str], focus=None) -> Observation:
@@ -145,6 +182,7 @@ class Screen:
         self.page.evaluate("r => window.__sue.focus(r)", None)
         self.settle()
         for rounds in range(1, self.max_rounds + 1):
+            unnoticed = self.page.evaluate("h => window.__sue.hideWarnings(h)", self.hide_warnings)
             nodes = self._collect()
             self.page.evaluate("v => window.__sue.apply(v)", [None if n["harness"] else self._expected(n) for n in nodes])
             self.page.evaluate("ids => window.__sue.grayIcons(ids)", gray_icons)
@@ -162,7 +200,9 @@ class Screen:
             shot = self.page.screenshot()
             after = self._collect()
             if all(n["cur"] == self._expected(n) for n in after):
-                return self._build(step, shot, after, rounds, gray_icons, elements, piece)
+                obs = self._build(step, color_filter(shot, self.color), after, rounds, gray_icons, elements, piece)
+                obs.unnoticed = unnoticed
+                return obs
             self.page.wait_for_timeout(self.settle_ms)
         raise RewriteError(f"step {step}: original words came back {self.max_rounds} times in a row")
 
@@ -172,6 +212,8 @@ class Screen:
         for n in visible:
             if n["harness"]:
                 hits.append(Hit(n["orig"].strip(), n["orig"].strip(), KNOW, "harness"))
+            elif self._too_small(n.get("size")):
+                hits += [Hit(w, fake(w), NONE, "vision") for w in re.findall(r"[A-Za-z]+", n["orig"])]
             else:
                 hits += self._rewrite(n["orig"]).hits
         for e in elements:  # icons have no text on the page; what they show counts like words
@@ -199,9 +241,11 @@ class Screen:
 
     # ---- step 7: act ----------------------------------------------------------
 
-    def perform(self, action: str, element: dict[str, Any] | None, value: Any) -> str:
+    def perform(self, action: str, element: dict[str, Any] | None, value: Any,
+                miss: tuple[float, float] | None = None) -> str:
         """Carries out one action with the mouse and keyboard, as a person would.
-        Returns a short note for the log. Misclicks come in phase 3."""
+        Returns a short note for the log. miss: a near miss on a small target (engine-design.md
+        4.9), how far from the element's centre the click lands."""
         page = self.page
         # Watch mode: after a click the page first renders its original words; the
         # dashboard keeps the last frame until they are rewritten (it never affected the
@@ -210,6 +254,8 @@ class Screen:
         if action in ("click", "open_help", "select", "type") and element:
             box = element["box"]
             x, y = box["x"] + box["w"] / 2, box["y"] + box["h"] / 2
+            if miss and action in ("click", "select"):
+                x, y = x + miss[0], y + miss[1]
             if self.show:
                 self.show.move(x, y)  # the dashboard glides its pointer there
                 page.wait_for_timeout(self.watch_move_ms)
@@ -223,7 +269,9 @@ class Screen:
                 page.evaluate("() => window.__sue.clearLabelForLog()")
             except Exception:  # noqa: BLE001 - the click may have replaced the page
                 pass
-        if action in ("click", "open_help", "select") and element:
+        if action in ("click", "select") and element and miss:
+            note = f"aimed at {element['id']} but the click landed {abs(round(miss[0] or miss[1]))}px off centre"
+        elif action in ("click", "open_help", "select") and element:
             note = f"clicked {element['id']}"
         elif action == "type" and element:
             page.keyboard.press("Control+A")

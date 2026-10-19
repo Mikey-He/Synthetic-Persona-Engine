@@ -1,0 +1,294 @@
+{
+  "format": "sue-interview-extraction-template",
+  "version": 1,
+  "input": "Any UX interview transcript or participant narrative; no named-person preset.",
+  "fieldPaths": [
+    "risk",
+    "patience",
+    "detailFind",
+    "detailCheck",
+    "fatigue",
+    "distraction",
+    "timePressure",
+    "english",
+    "vocabSize",
+    "confirmBy",
+    "ifConfirmMissing",
+    "knowledge.billing",
+    "knowledge.scope",
+    "knowledge.budget",
+    "knowledge.alerts",
+    "knowledge.concepts",
+    "humanFactors.vision",
+    "humanFactors.colorVision",
+    "humanFactors.clickPrecision",
+    "humanFactors.readingSpeed",
+    "humanFactors.warningAttention",
+    "humanFactors.care",
+    "humanFactors.financialRiskJudgment",
+    "humanFactors.financialCaution",
+    "humanFactors.stressTolerance",
+    "humanFactors.pressureChange"
+  ],
+  "knowledgeGroups": {
+    "billing": "Billing, billing accounts and budgets terminology",
+    "scope": "Projects, time range, services, credits, read-only, savings and labels terminology",
+    "budget": "Fixed amount, last-month spend, alert-only versus spend-cap terminology",
+    "alerts": "Thresholds, actual versus forecast spend, Pub/Sub, monitoring, recipient roles terminology",
+    "concepts": "Cloud billing account/project relationships, budget scope defaults, alerts versus caps, recipient eligibility"
+  },
+  "evidencePolicy": {
+    "quoteRequired": true,
+    "inferredRequiresReview": true,
+    "unknownIsNotZero": true,
+    "occupationDoesNotGrantKnowledge": true,
+    "numericVocabularyRequiresExplicitEstimate": true
+  },
+  "output": "Summary, supported field proposals with source quotes, and unresolved fields. Final card is a sue-persona v3 card: traits and states as 0-10 scores.",
+  "humanFactors": [
+    {
+      "key": "vision",
+      "title": "Vision / text clarity",
+      "group": "Perception & interaction",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "normal",
+          "Normal / corrected"
+        ],
+        [
+          "mild",
+          "Mild difficulty"
+        ],
+        [
+          "reduced",
+          "Noticeable difficulty"
+        ]
+      ],
+      "help": "Ability to read small or low-contrast text. Scenario setting, not a clinical assessment."
+    },
+    {
+      "key": "colorVision",
+      "title": "Color discrimination",
+      "group": "Perception & interaction",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "typical",
+          "No reported difficulty"
+        ],
+        [
+          "reduced",
+          "Reduced color discrimination"
+        ],
+        [
+          "no_color_cues",
+          "Cannot rely on color cues"
+        ]
+      ],
+      "help": "Keep color cues separate from text clarity."
+    },
+    {
+      "key": "clickPrecision",
+      "title": "Click precision",
+      "group": "Perception & interaction",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "high",
+          "High"
+        ],
+        [
+          "medium",
+          "Medium"
+        ],
+        [
+          "low",
+          "Low"
+        ]
+      ],
+      "help": "Intended to distinguish motor slips from misunderstanding a control."
+    },
+    {
+      "key": "readingSpeed",
+      "title": "Reading speed",
+      "group": "Perception & interaction",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "slow",
+          "Slow"
+        ],
+        [
+          "average",
+          "Average"
+        ],
+        [
+          "fast",
+          "Fast"
+        ]
+      ],
+      "help": "Reading pace, separate from hesitation, English proficiency and patience."
+    },
+    {
+      "key": "warningAttention",
+      "title": "Attention to warnings",
+      "group": "Attention & decision-making",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "low",
+          "Low"
+        ],
+        [
+          "medium",
+          "Medium"
+        ],
+        [
+          "high",
+          "High"
+        ]
+      ],
+      "help": "How readily warnings attract attention, independently of general detail."
+    },
+    {
+      "key": "care",
+      "title": "Primary personal priority",
+      "group": "Attention & decision-making",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "cost",
+          "Avoid unexpected cost"
+        ],
+        [
+          "accuracy",
+          "Correct configuration"
+        ],
+        [
+          "speed",
+          "Finish quickly"
+        ],
+        [
+          "security",
+          "Permissions & security"
+        ]
+      ],
+      "help": "What this person prioritizes when competing information appears."
+    },
+    {
+      "key": "financialRiskJudgment",
+      "title": "Financial risk judgment",
+      "group": "Attention & decision-making",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "limited",
+          "Limited"
+        ],
+        [
+          "working",
+          "Working understanding"
+        ],
+        [
+          "strong",
+          "Strong"
+        ]
+      ],
+      "help": "Ability to recognize financial consequences; not willingness to click unfamiliar controls."
+    },
+    {
+      "key": "financialCaution",
+      "title": "Financial caution",
+      "group": "Attention & decision-making",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "low",
+          "Low"
+        ],
+        [
+          "medium",
+          "Medium"
+        ],
+        [
+          "high",
+          "High"
+        ]
+      ],
+      "help": "Willingness to accept financial exposure, separately from recognizing the risk."
+    },
+    {
+      "key": "stressTolerance",
+      "title": "Task stress tolerance",
+      "group": "Pressure during the task",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "low",
+          "Low"
+        ],
+        [
+          "medium",
+          "Medium"
+        ],
+        [
+          "high",
+          "High"
+        ]
+      ],
+      "help": "How readily setbacks affect this person, separate from the static deadline setting."
+    },
+    {
+      "key": "pressureChange",
+      "title": "Pressure over the task",
+      "group": "Pressure during the task",
+      "choices": [
+        [
+          "unspecified",
+          "Not established"
+        ],
+        [
+          "steady",
+          "Stays steady"
+        ],
+        [
+          "rises_after_setbacks",
+          "Rises after setbacks"
+        ],
+        [
+          "rises_over_time",
+          "Rises over time"
+        ]
+      ],
+      "help": "Desired pressure pattern. The current engine has no dynamic pressure model."
+    }
+  ]
+}

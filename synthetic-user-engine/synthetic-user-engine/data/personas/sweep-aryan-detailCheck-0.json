@@ -1,0 +1,879 @@
+{
+  "format": "sue-persona",
+  "version": 3,
+  "flow": "Version A · Cloud Console (prototype) budget setup",
+  "builtAt": "2026-10-05T02:03:09.890Z",
+  "answersFilledAt": "2026-10-05T00:34:56.716Z",
+  "persona": {
+    "id": "sweep-aryan-detailCheck-0",
+    "name": "Aryan · detailCheck 0.0",
+    "cardType": "normal",
+    "lang": {
+      "ui": "English",
+      "english": "fluent",
+      "vocabSize": 36429,
+      "vocabSource": "Test; 3 of 10 made-up words marked as known, corrected"
+    },
+    "calibrated": false
+  },
+  "tendency": {
+    "risk": {
+      "level": "medium",
+      "usual": "medium",
+      "source": "Answers disagree; the last-time question R1 wins",
+      "score": 5
+    },
+    "patience": {
+      "level": "high",
+      "usual": "high",
+      "source": "Both answers agree (P1, P2)",
+      "score": 10
+    },
+    "detail": {
+      "level": "medium",
+      "usual": "medium",
+      "source": "Answers disagree: medium",
+      "score": 5
+    },
+    "detailFind": {
+      "level": "high",
+      "usual": "high",
+      "source": "One answer (D1)",
+      "score": 10
+    },
+    "detailCheck": {
+      "level": "low",
+      "usual": "low",
+      "source": "Sweep: detailCheck set to 0.0",
+      "score": 0.0
+    },
+    "habit": "depends"
+  },
+  "perception": {
+    "vision": "normal",
+    "colorVision": "typical",
+    "clickPrecision": "high",
+    "readingSpeed": "average"
+  },
+  "goal": {
+    "task": "You manage your team's cloud spending. Create a fixed monthly budget of $1,000 for the Atlas project. The budget should reset at the start of each calendar month. Include all Atlas project costs and exclude costs from other projects.\n\nConfigure an email alert for when the project's actual spending during the month exceeds 80% of the budget. Only the Atlas project owner should receive this alert.\n\nSave your settings and indicate when you have finished.",
+    "successChecks": [
+      "The scope is the Atlas project only",
+      "The period is monthly",
+      "The amount is a specified amount of $1,000",
+      "At least one rule fires at 80% on actual spend",
+      "The only person who actually gets the email is Sam Rivera, the Atlas project owner",
+      "The settings are saved"
+    ],
+    "careText": "For this task, I would say I might get— I'll worry the most about getting the budgets wrong or getting, or setting up the email part of it, of me not receiving the over-budgeting limit, or getting the budgets wrong for multiple projects. Yeah, these would be my two most concerns about the email and the missing budget part.",
+    "care": [
+      {
+        "id": "K1",
+        "name": "Amount",
+        "field": "Target amount, Amount section"
+      },
+      {
+        "id": "K3",
+        "name": "Who gets the alert",
+        "field": "The two email options under Manage notifications, Actions section"
+      }
+    ],
+    "confirmBy": [
+      "test",
+      "external",
+      "list",
+      "toast"
+    ],
+    "productSignals": {
+      "toast": false,
+      "list": true,
+      "external": false,
+      "test": false
+    },
+    "ifConfirmMissing": "check",
+    "ifConfirmMissingText": "",
+    "situation": {
+      "urgency": "calm",
+      "stakes": "low"
+    },
+    "org": "He is Alex Kim, Billing Account Administrator: he may manage budgets for the whole account and needs no approval."
+  },
+  "screens": [
+    {
+      "screen": "Billing Overview",
+      "words": [
+        {
+          "id": "T06",
+          "original": "Billing",
+          "shown": "Billing",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T07",
+          "original": "Billing account",
+          "shown": "Billing account",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T09",
+          "original": "Budgets & caps",
+          "shown": "Budgets & caps",
+          "level": "understands",
+          "gloss": ""
+        }
+      ],
+      "knowledge": [
+        {
+          "id": "T04",
+          "kind": "location",
+          "text": "Budget settings are under the Cost control group of the left billing menu",
+          "level": "understands"
+        },
+        {
+          "id": "T41",
+          "kind": "habit",
+          "text": "To set a budget one first goes into the project itself",
+          "level": "misleads"
+        }
+      ]
+    },
+    {
+      "screen": "Budget list (Budgets & caps)",
+      "words": [],
+      "knowledge": [
+        {
+          "id": "T10",
+          "kind": "location",
+          "text": "The + Create new link next to the list title starts a new budget",
+          "level": "understands"
+        },
+        {
+          "id": "T43",
+          "kind": "location",
+          "text": "After saving, the new row appears in the list, and clicking its name opens it for checking",
+          "level": "understands"
+        }
+      ]
+    },
+    {
+      "screen": "Create page · Define",
+      "words": [
+        {
+          "id": "T28",
+          "original": "Alerts only",
+          "shown": "Alerts only",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T29",
+          "original": "Spend cap enforcement",
+          "shown": "Spend cap enforcement",
+          "level": "understands",
+          "gloss": ""
+        }
+      ],
+      "knowledge": [
+        {
+          "id": "T15",
+          "kind": "location",
+          "text": "The create page has four sections, Define, Scope, Amount and Actions; Next opens the next one and a section name jumps back to it",
+          "level": "understands"
+        },
+        {
+          "id": "T18",
+          "kind": "concept",
+          "text": "Alerts only sends alerts and never stops services; Spend cap enforcement pauses services",
+          "level": "understands"
+        },
+        {
+          "id": "T25",
+          "kind": "icon",
+          "text": "The question-mark icon opens an explanation",
+          "level": "understands"
+        }
+      ]
+    },
+    {
+      "screen": "Create page · Scope",
+      "words": [
+        {
+          "id": "T05",
+          "original": "Projects",
+          "shown": "Projects",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T11",
+          "original": "Time range",
+          "shown": "Time range",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T12",
+          "original": "Services",
+          "shown": "Services",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T13",
+          "original": "Credits",
+          "shown": "Credits",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T32",
+          "original": "Read-only for project users",
+          "shown": "Read-only for project users",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T34",
+          "original": "Savings",
+          "shown": "Savings",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T35",
+          "original": "Labels",
+          "shown": "Labels",
+          "level": "understands",
+          "gloss": ""
+        }
+      ],
+      "knowledge": [
+        {
+          "id": "T08",
+          "kind": "concept",
+          "text": "One billing account holds several projects, and a budget can cover just one of them",
+          "level": "understands"
+        },
+        {
+          "id": "T30",
+          "kind": "concept",
+          "text": "When Projects shows All projects (2), nothing is ticked, which counts as every project",
+          "level": "understands"
+        },
+        {
+          "id": "T31",
+          "kind": "location",
+          "text": "A multi-select dropdown applies only after clicking OK; clicking outside it cancels",
+          "level": "understands"
+        }
+      ]
+    },
+    {
+      "screen": "Create page · Amount",
+      "words": [
+        {
+          "id": "T16",
+          "original": "Specified amount",
+          "shown": "Specified amount",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T17",
+          "original": "Last month's spend",
+          "shown": "Last month's spend",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T36",
+          "original": "Target amount",
+          "shown": "Target amount",
+          "level": "understands",
+          "gloss": ""
+        }
+      ],
+      "knowledge": []
+    },
+    {
+      "screen": "Create page · Actions",
+      "words": [
+        {
+          "id": "T19",
+          "original": "Threshold",
+          "shown": "Threshold",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T20",
+          "original": "Forecasted",
+          "shown": "Forecasted",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T21",
+          "original": "Pub/Sub topic",
+          "shown": "Pub/Sub topic",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T22",
+          "original": "Monitoring email notification channels",
+          "shown": "Monitoring email notification channels",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T23",
+          "original": "Billing admins and users",
+          "shown": "Billing admins and users",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T37",
+          "original": "Actual",
+          "shown": "Actual",
+          "level": "understands",
+          "gloss": ""
+        },
+        {
+          "id": "T38",
+          "original": "Project owners",
+          "shown": "Project owners",
+          "level": "understands",
+          "gloss": ""
+        }
+      ],
+      "knowledge": [
+        {
+          "id": "T24",
+          "kind": "location",
+          "text": "Changes take effect only after clicking Finish (Save when editing)",
+          "level": "understands"
+        },
+        {
+          "id": "T26",
+          "kind": "habit",
+          "text": "Google Docs saves changes automatically, so one may think no Save is needed here either",
+          "level": "misleads"
+        },
+        {
+          "id": "T39",
+          "kind": "concept",
+          "text": "Email alerts to project owners can be ticked only when the budget covers a single project",
+          "level": "understands"
+        },
+        {
+          "id": "T40",
+          "kind": "concept",
+          "text": "Recipients are everyone left ticked: unless the default billing admins and users is unticked, everyone with a billing role on the account gets the email too",
+          "level": "understands"
+        }
+      ]
+    },
+    {
+      "screen": "Edit Budget (checking after saving)",
+      "words": [],
+      "knowledge": []
+    }
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "screen": "Billing Overview",
+      "action": "In the left menu, under Cost control, click Budgets & caps",
+      "risky": false,
+      "mustChangeDefaults": "",
+      "ways": [],
+      "knowledge": "complete",
+      "misleadingHabit": true
+    },
+    {
+      "step": 2,
+      "screen": "Budget list (Budgets & caps)",
+      "action": "Click + Create new",
+      "risky": false,
+      "mustChangeDefaults": "",
+      "ways": [],
+      "knowledge": "complete",
+      "misleadingHabit": false
+    },
+    {
+      "step": 3,
+      "screen": "Create page · Define",
+      "action": "Choose Alerts only, enter a Name, click Next",
+      "risky": false,
+      "mustChangeDefaults": "Neither budget type is selected at first",
+      "ways": [],
+      "knowledge": "complete",
+      "misleadingHabit": false
+    },
+    {
+      "step": 4,
+      "screen": "Create page · Scope",
+      "action": "Keep Time range at Monthly; in the Projects dropdown tick only Atlas and click OK; leave the rest; click Next",
+      "risky": false,
+      "mustChangeDefaults": "Projects defaults to All projects (2), which means every project; change it to Atlas only",
+      "ways": [],
+      "knowledge": "complete",
+      "misleadingHabit": false
+    },
+    {
+      "step": 5,
+      "screen": "Create page · Amount",
+      "action": "Keep Budget type at Specified amount, enter 1000 as Target amount, click Next",
+      "risky": false,
+      "mustChangeDefaults": "Target amount starts empty",
+      "ways": [],
+      "knowledge": "complete",
+      "misleadingHabit": false
+    },
+    {
+      "step": 6,
+      "screen": "Create page · Actions",
+      "action": "Make at least one rule 80% with Trigger on set to Actual",
+      "risky": false,
+      "mustChangeDefaults": "The three default rules are 50, 90 and 100; none is 80",
+      "ways": [
+        {
+          "text": "Change one of the existing rules to 80",
+          "knowledge": "complete"
+        },
+        {
+          "text": "Add a rule at 80 with + Add threshold",
+          "knowledge": "complete"
+        }
+      ],
+      "knowledge": "complete",
+      "misleadingHabit": false
+    },
+    {
+      "step": 7,
+      "screen": "Create page · Actions",
+      "action": "Untick Email alerts to billing admins and users; tick Email alerts to project owners",
+      "risky": false,
+      "mustChangeDefaults": "Billing admins and users is ticked by default and must be unticked",
+      "ways": [],
+      "knowledge": "complete",
+      "misleadingHabit": false
+    },
+    {
+      "step": 8,
+      "screen": "Create page · Actions",
+      "action": "Click Finish",
+      "risky": true,
+      "mustChangeDefaults": "",
+      "ways": [],
+      "knowledge": "complete",
+      "misleadingHabit": true
+    },
+    {
+      "step": 9,
+      "screen": "Budget list (Budgets & caps)",
+      "action": "Click I'm finished in the task bar",
+      "risky": true,
+      "mustChangeDefaults": "",
+      "ways": [],
+      "knowledge": "complete",
+      "misleadingHabit": false
+    }
+  ],
+  "items": [
+    {
+      "id": "T04",
+      "step": 1,
+      "screen": "Billing Overview",
+      "needed": true,
+      "kind": "location",
+      "text": "Budget settings are under the Cost control group of the left billing menu",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T05",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": true,
+      "kind": "word",
+      "text": "Projects",
+      "result": "understands",
+      "evidence": "Has opened the billing pages in the Google Cloud console (done)"
+    },
+    {
+      "id": "T06",
+      "step": 1,
+      "screen": "Billing Overview",
+      "needed": false,
+      "kind": "word",
+      "text": "Billing",
+      "result": "understands",
+      "evidence": "Has opened the billing pages in the Google Cloud console (done)"
+    },
+    {
+      "id": "T07",
+      "step": 1,
+      "screen": "Billing Overview",
+      "needed": false,
+      "kind": "word",
+      "text": "Billing account",
+      "result": "understands",
+      "evidence": "Has opened the billing pages in the Google Cloud console (done)"
+    },
+    {
+      "id": "T08",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": true,
+      "kind": "concept",
+      "text": "One billing account holds several projects, and a budget can cover just one of them",
+      "result": "understands",
+      "evidence": "Has opened the billing pages in the Google Cloud console (done)"
+    },
+    {
+      "id": "T09",
+      "step": 1,
+      "screen": "Billing Overview",
+      "needed": true,
+      "kind": "word",
+      "text": "Budgets & caps",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T10",
+      "step": 2,
+      "screen": "Budget list (Budgets & caps)",
+      "needed": true,
+      "kind": "location",
+      "text": "The + Create new link next to the list title starts a new budget",
+      "result": "understands",
+      "evidence": "Uses Gmail, Google Docs or Sheets day to day (expert)"
+    },
+    {
+      "id": "T11",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": true,
+      "kind": "word",
+      "text": "Time range",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T12",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": false,
+      "kind": "word",
+      "text": "Services",
+      "result": "understands",
+      "evidence": "Has created resources or turned on APIs in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T13",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": false,
+      "kind": "word",
+      "text": "Credits",
+      "result": "understands",
+      "evidence": "Has opened the billing pages in the Google Cloud console (done)"
+    },
+    {
+      "id": "T15",
+      "step": 3,
+      "screen": "Create page · Define",
+      "needed": true,
+      "kind": "location",
+      "text": "The create page has four sections, Define, Scope, Amount and Actions; Next opens the next one and a section name jumps back to it",
+      "result": "understands",
+      "evidence": "Uses Gmail, Google Docs or Sheets day to day (expert)"
+    },
+    {
+      "id": "T16",
+      "step": 5,
+      "screen": "Create page · Amount",
+      "needed": true,
+      "kind": "word",
+      "text": "Specified amount",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T17",
+      "step": 5,
+      "screen": "Create page · Amount",
+      "needed": false,
+      "kind": "word",
+      "text": "Last month's spend",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T18",
+      "step": 3,
+      "screen": "Create page · Define",
+      "needed": true,
+      "kind": "concept",
+      "text": "Alerts only sends alerts and never stops services; Spend cap enforcement pauses services",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T19",
+      "step": 6,
+      "screen": "Create page · Actions",
+      "needed": true,
+      "kind": "word",
+      "text": "Threshold",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T20",
+      "step": 6,
+      "screen": "Create page · Actions",
+      "needed": false,
+      "kind": "word",
+      "text": "Forecasted",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T21",
+      "step": 7,
+      "screen": "Create page · Actions",
+      "needed": false,
+      "kind": "word",
+      "text": "Pub/Sub topic",
+      "result": "understands",
+      "evidence": "Has used Google Cloud Pub/Sub or Cloud Monitoring (done)"
+    },
+    {
+      "id": "T22",
+      "step": 7,
+      "screen": "Create page · Actions",
+      "needed": false,
+      "kind": "word",
+      "text": "Monitoring email notification channels",
+      "result": "understands",
+      "evidence": "Has used Google Cloud Pub/Sub or Cloud Monitoring (done)"
+    },
+    {
+      "id": "T23",
+      "step": 7,
+      "screen": "Create page · Actions",
+      "needed": true,
+      "kind": "word",
+      "text": "Billing admins and users",
+      "result": "understands",
+      "evidence": "Has opened the billing pages in the Google Cloud console (done)"
+    },
+    {
+      "id": "T24",
+      "step": 8,
+      "screen": "Create page · Actions",
+      "needed": true,
+      "kind": "location",
+      "text": "Changes take effect only after clicking Finish (Save when editing)",
+      "result": "understands",
+      "evidence": "Has created resources or turned on APIs in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T25",
+      "step": 3,
+      "screen": "Create page · Define",
+      "needed": false,
+      "kind": "icon",
+      "text": "The question-mark icon opens an explanation",
+      "result": "understands",
+      "evidence": "Uses Gmail, Google Docs or Sheets day to day (expert)"
+    },
+    {
+      "id": "T26",
+      "step": 8,
+      "screen": "Create page · Actions",
+      "needed": true,
+      "kind": "habit",
+      "text": "Google Docs saves changes automatically, so one may think no Save is needed here either",
+      "result": "misleads",
+      "evidence": "Uses Gmail, Google Docs or Sheets day to day (expert)"
+    },
+    {
+      "id": "T27",
+      "step": 3,
+      "screen": "Create page · Define",
+      "needed": true,
+      "kind": "habit",
+      "text": "AWS budgets can run actions that cap spending, so one may expect this budget to cap spending too",
+      "result": "unaffected",
+      "evidence": "Has set up AWS Budgets actions that run automatically when overspending (studied but forgot), never used hands-on, the habit has not formed"
+    },
+    {
+      "id": "T28",
+      "step": 3,
+      "screen": "Create page · Define",
+      "needed": true,
+      "kind": "word",
+      "text": "Alerts only",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T29",
+      "step": 3,
+      "screen": "Create page · Define",
+      "needed": false,
+      "kind": "word",
+      "text": "Spend cap enforcement",
+      "result": "understands",
+      "evidence": "Has studied a cloud certificate or course that covered billing and budgets (done)"
+    },
+    {
+      "id": "T30",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": true,
+      "kind": "concept",
+      "text": "When Projects shows All projects (2), nothing is ticked, which counts as every project",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T31",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": true,
+      "kind": "location",
+      "text": "A multi-select dropdown applies only after clicking OK; clicking outside it cancels",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T32",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": false,
+      "kind": "word",
+      "text": "Read-only for project users",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T34",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": false,
+      "kind": "word",
+      "text": "Savings",
+      "result": "understands",
+      "evidence": "Has opened the billing pages in the Google Cloud console (done)"
+    },
+    {
+      "id": "T35",
+      "step": 4,
+      "screen": "Create page · Scope",
+      "needed": false,
+      "kind": "word",
+      "text": "Labels",
+      "result": "understands",
+      "evidence": "Has created resources or turned on APIs in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T36",
+      "step": 5,
+      "screen": "Create page · Amount",
+      "needed": true,
+      "kind": "word",
+      "text": "Target amount",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T37",
+      "step": 6,
+      "screen": "Create page · Actions",
+      "needed": true,
+      "kind": "word",
+      "text": "Actual",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T38",
+      "step": 7,
+      "screen": "Create page · Actions",
+      "needed": true,
+      "kind": "word",
+      "text": "Project owners",
+      "result": "understands",
+      "evidence": "Has worked as an IT administrator, creating accounts and giving permissions (expert)"
+    },
+    {
+      "id": "T39",
+      "step": 7,
+      "screen": "Create page · Actions",
+      "needed": true,
+      "kind": "concept",
+      "text": "Email alerts to project owners can be ticked only when the budget covers a single project",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T40",
+      "step": 7,
+      "screen": "Create page · Actions",
+      "needed": true,
+      "kind": "concept",
+      "text": "Recipients are everyone left ticked: unless the default billing admins and users is unticked, everyone with a billing role on the account gets the email too",
+      "result": "understands",
+      "evidence": "Has set up a budget or alert in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T41",
+      "step": 1,
+      "screen": "Billing Overview",
+      "needed": true,
+      "kind": "habit",
+      "text": "To set a budget one first goes into the project itself",
+      "result": "misleads",
+      "evidence": "Has created resources or turned on APIs in the Google Cloud console (expert)"
+    },
+    {
+      "id": "T42",
+      "step": 9,
+      "screen": "Budget list (Budgets & caps)",
+      "needed": true,
+      "kind": "habit",
+      "text": "A confirmation email arrives when a setup is done",
+      "result": "unaffected",
+      "evidence": "Has used admin panels or dashboards where you fill in forms and click Save (studied), never used hands-on, the habit has not formed"
+    },
+    {
+      "id": "T43",
+      "step": 9,
+      "screen": "Budget list (Budgets & caps)",
+      "needed": false,
+      "kind": "location",
+      "text": "After saving, the new row appears in the list, and clicking its name opens it for checking",
+      "result": "understands",
+      "evidence": "Has built a website admin panel or dashboard (expert)"
+    }
+  ],
+  "state": {
+    "fatigue": 0,
+    "distraction": 0,
+    "timePressure": {
+      "score": 0,
+      "pattern": "steady"
+    },
+    "stressTolerance": 5,
+    "warningAttention": 10
+  }
+}

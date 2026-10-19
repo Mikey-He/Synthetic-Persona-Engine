@@ -1,0 +1,270 @@
+[
+  {
+    "key": "vision",
+    "title": "Vision / text clarity",
+    "group": "Perception & interaction",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "normal",
+        "Normal / corrected"
+      ],
+      [
+        "mild",
+        "Mild difficulty"
+      ],
+      [
+        "reduced",
+        "Noticeable difficulty"
+      ]
+    ],
+    "help": "Ability to read small or low-contrast text. Scenario setting, not a clinical assessment."
+  },
+  {
+    "key": "colorVision",
+    "title": "Color discrimination",
+    "group": "Perception & interaction",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "typical",
+        "No reported difficulty"
+      ],
+      [
+        "reduced",
+        "Reduced color discrimination"
+      ],
+      [
+        "no_color_cues",
+        "Cannot rely on color cues"
+      ]
+    ],
+    "help": "Keep color cues separate from text clarity."
+  },
+  {
+    "key": "clickPrecision",
+    "title": "Click precision",
+    "group": "Perception & interaction",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "high",
+        "High"
+      ],
+      [
+        "medium",
+        "Medium"
+      ],
+      [
+        "low",
+        "Low"
+      ]
+    ],
+    "help": "Intended to distinguish motor slips from misunderstanding a control."
+  },
+  {
+    "key": "readingSpeed",
+    "title": "Reading speed",
+    "group": "Perception & interaction",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "slow",
+        "Slow"
+      ],
+      [
+        "average",
+        "Average"
+      ],
+      [
+        "fast",
+        "Fast"
+      ]
+    ],
+    "help": "Reading pace, separate from hesitation, English proficiency and patience."
+  },
+  {
+    "key": "searchPreference",
+    "title": "Navigation preference",
+    "group": "Attention & decision-making",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "search",
+        "Search first"
+      ],
+      [
+        "menus",
+        "Menus first"
+      ],
+      [
+        "browse",
+        "Browse step by step"
+      ]
+    ],
+    "help": "Preferred way to find a destination; does not imply knowing its location."
+  },
+  {
+    "key": "warningAttention",
+    "title": "Attention to warnings",
+    "group": "Attention & decision-making",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "low",
+        "Low"
+      ],
+      [
+        "medium",
+        "Medium"
+      ],
+      [
+        "high",
+        "High"
+      ]
+    ],
+    "help": "How readily warnings attract attention, independently of general detail."
+  },
+  {
+    "key": "care",
+    "title": "Primary personal priority",
+    "group": "Attention & decision-making",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "cost",
+        "Avoid unexpected cost"
+      ],
+      [
+        "accuracy",
+        "Correct configuration"
+      ],
+      [
+        "speed",
+        "Finish quickly"
+      ],
+      [
+        "security",
+        "Permissions & security"
+      ]
+    ],
+    "help": "What this person prioritizes when competing information appears."
+  },
+  {
+    "key": "financialRiskJudgment",
+    "title": "Financial risk judgment",
+    "group": "Attention & decision-making",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "limited",
+        "Limited"
+      ],
+      [
+        "working",
+        "Working understanding"
+      ],
+      [
+        "strong",
+        "Strong"
+      ]
+    ],
+    "help": "Ability to recognize financial consequences; not willingness to click unfamiliar controls."
+  },
+  {
+    "key": "financialCaution",
+    "title": "Financial caution",
+    "group": "Attention & decision-making",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "low",
+        "Low"
+      ],
+      [
+        "medium",
+        "Medium"
+      ],
+      [
+        "high",
+        "High"
+      ]
+    ],
+    "help": "Willingness to accept financial exposure, separately from recognizing the risk."
+  },
+  {
+    "key": "stressTolerance",
+    "title": "Task stress tolerance",
+    "group": "Pressure during the task",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "low",
+        "Low"
+      ],
+      [
+        "medium",
+        "Medium"
+      ],
+      [
+        "high",
+        "High"
+      ]
+    ],
+    "help": "How readily setbacks affect this person, separate from the static deadline setting."
+  },
+  {
+    "key": "pressureChange",
+    "title": "Pressure over the task",
+    "group": "Pressure during the task",
+    "choices": [
+      [
+        "unspecified",
+        "Not established"
+      ],
+      [
+        "steady",
+        "Stays steady"
+      ],
+      [
+        "rises_after_setbacks",
+        "Rises after setbacks"
+      ],
+      [
+        "rises_over_time",
+        "Rises over time"
+      ]
+    ],
+    "help": "Desired pressure pattern. The current engine has no dynamic pressure model."
+  }
+]

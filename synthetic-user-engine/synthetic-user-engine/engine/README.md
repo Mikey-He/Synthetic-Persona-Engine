@@ -23,6 +23,16 @@ Playwright is 1.63.0, the same version as the platform, so both share the instal
 
 Both pages read the workflow definition `data/version-a/flow.json`. After changing it, run `python tools/sync_flow.py` and rebuild the cards.
 
+## Persona Studio: personas without a participant
+
+`tools/persona-studio/` (built by Joy, merged 2026-10-19) makes persona cards per role instead of per participant: pick a role, set the traits as 0-10 scores, the states (fatigue, distraction, time pressure) and perception, or let AI propose varied personas from participant references. It saves sue-persona v3 cards into `data/personas/studio-*.json` and **Save & run 5 times** runs a card with five seeds through `sue.batch`, then shows what the runs add up to.
+
+```sh
+.venv/Scripts/python ../tools/persona-studio/server.py    # opens http://127.0.0.1:8765/; needs the platform running for Save & run
+```
+
+It uses the keys in `engine/.env` (GEMINI_API_KEY, ADMIN_PASSWORD). Its AI features call Gemini through its OpenAI-compatible endpoint unless `AI_*` settings say otherwise.
+
 ## Running
 
 ```sh
@@ -31,6 +41,8 @@ Both pages read the workflow definition `data/version-a/flow.json`. After changi
 .venv/Scripts/python -m sue.plumbing --card full --watch
 .venv/Scripts/python -m sue.smoke --cards blank full mikey --path "Budgets & caps" "Create new"
 .venv/Scripts/python -m sue.compare --person <the person's session id> --engine <folder under runs>
+.venv/Scripts/python -m sue.run --card <card> --seed 3           # slips and in-between scores drawn from seed 3 (v3 cards)
+.venv/Scripts/python -m sue.batch --card <card> --runs 5 --like-session <session id>   # seeds 1-5, counted together
 ```
 
 **Watch mode `--watch`.** One window with two columns. The left column streams the engine's browser live (the engine's own browser has no window), with a line above it saying what the engine is doing (reading the screen and swapping words, waiting for the model, checking evidence and choosing, acting). The pointer is drawn in this column, moves to its target and then clicks, leaving an orange ripple. The right column is the live log: each step's time, page, the model's candidates and reasons, how code rated each piece of evidence (sure, half or void), which rule decided, and what was done. Click any step on the right to see the screenshot they saw at that step; "Back to live" returns. When the run ends, the bottom of the right column shows why it stopped, the platform's grading, the missed defaults and where the files are; close the window to finish. The pointer is only ever drawn in the watch window, never in the screenshots the model gets. Without `--watch` there is no window and the files are the same.
@@ -66,8 +78,10 @@ The last three commands need the local platform running (`npm run open:a` in the
 | `sue/run.py` | The main loop that ties the steps together, and the stopping rules | 4 |
 | `sue/platform.py` | The platform's researcher API, including the final result | 7 |
 | `sue/runlog.py` | One log line per step | 5 |
+| `sue/variability.py` | Traits as 0-10 scores, fatigue, time pressure, distraction, unnoticed warnings, perception; all seeded | 4.9 |
+| `sue/batch.py` | Several seeded runs of the same cards, counted together | 4.9 |
 
-Phase 1 wired the knowledge list and session memory. Phase 2 wired the tendencies (risk, detail split into finding and checking a form, patience), "most alike", the field of view, reviewing after saving, the expectation missed and missed defaults. Perception is phase 3.
+Phase 1 wired the knowledge list and session memory. Phase 2 wired the tendencies (risk, detail split into finding and checking a form, patience), "most alike", the field of view, reviewing after saving, the expectation missed and missed defaults. Phase 3 (2026-10-19) made the tendencies scores and added the states, slips and perception, seeded; questionnaire (v2) cards run exactly as before.
 
 ## Never
 

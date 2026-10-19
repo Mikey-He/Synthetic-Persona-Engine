@@ -101,6 +101,26 @@ entry_items = ["T04"]
 # Wrong turns plus backs above this number means giving up (engine-design.md 4.5). Placeholder.
 limit = { "low" = 3, "medium" = 6, "high" = 10 }
 
+[variability]
+# Human variability (engine-design.md 4.9, sue/variability.py). Only cards of format v3 (Persona Studio) use the
+# states and perception below; a v2 card's levels become scores 0, 5 and 10 and it runs exactly as before.
+# Every number here is a placeholder until calibrated against people. The aim for a first setting: a typical
+# persona slips on roughly 5 to 10% of steps (Google feedback, 2026-10-09).
+fatigue_horizon = 30          # reading effort (pieces read, weighted by reading speed) at which fatigue has fully set in
+fatigue_max_drop = 4.0        # points taken off carefulness and patience at fatigue 10, fully set in
+pressure_find_drop = 3.0      # points off detail when finding, at time pressure 10
+pressure_check_drop = 3.0     # points off detail when checking, at time pressure 10
+pressure_risk_gain = 3.0      # points added to risk, at time pressure 10
+pressure_patience_cut = 0.4   # share of the patience limit lost at time pressure 10
+pressure_setback_gain = 1.5   # pressure added per wrong turn or back ("rises after setbacks"), at stress tolerance 0
+pressure_time_gain = 0.15     # pressure added per unit of reading effort ("rises over time")
+distraction_max_lapse = 0.2   # chance per piece read, at distraction 10, of missing one of its less prominent elements
+small_target_px = 24          # a target this small or smaller can be missed
+miss_gap_px = 4               # how far past the edge a near miss lands
+click_miss = { "high" = 0.0, "medium" = 0.05, "low" = 0.15 }  # chance of a near miss on a small target, by click precision
+vision_px = { "normal" = 0, "mild" = 12, "reduced" = 14 }      # text smaller than this (px) he cannot read
+reading_effort = { "fast" = 0.7, "average" = 1.0, "slow" = 1.5 }  # effort per piece read
+
 [compare]
 # Comparing an engine run with the person's session (python -m sue.compare). In the platform log a dropdown's name is
 # followed by its current value; cut it off first. Version A's field names.

@@ -3,7 +3,8 @@
 Each step: he looks at the screen piece by piece (4.8) until there is something he would
 do; code checks the model's candidates against his card and his tendencies (4.3) and
 acts; session memory, patience (4.5) and the completion check (4.6) decide when he stops.
-Perception (blur, misclicks, timing) comes in phase 3.
+Trait scores, fatigue, time pressure, distraction, unnoticed warnings, small text and near-miss
+clicks come from sue/variability.py (4.9), drawn from --seed; a v2 card runs as it always did.
 
     python -m sue.run --card full --watch     # one window: his screen live on the left, the log on the right
     python -m sue.run --card blank            # no window, same files
@@ -21,7 +22,7 @@ from typing import Any
 from playwright.sync_api import sync_playwright
 
 from .attention import Attention
-from .choose import ABANDON, ACT, BACK, LOOK, MISSED_DEFAULT, Decision, Policy, decide, is_consequential, is_toggle, score
+from .choose import ABANDON, ACT, BACK, LOOK, MISSED_DEFAULT, Decision, Policy, decide, is_consequential, is_toggle, prominence, score
 from .completion import asks_list, check_list, missing_confirmation, review_link, stops_after_last_action, ways_text
 from .config import load_config, load_env, platform_url, require_env
 from .evidence import check_evidence, own_words
@@ -33,8 +34,11 @@ from .prompt import CHECK, FIX, PROMPT_VERSION, SYSTEM, TASK, ReplyError, build_
 from .runlog import RunLog
 from .screen import RewriteError, Screen, open_browser
 from .similarity import similarity, task_values, task_words
+from .variability import make, traits_of
 from .viewer import Dashboard, write_report
 from .words import Vocabulary, build_vocabulary
+
+DISTRACTED = "Distracted for a moment; did not notice this element"
 
 
 def gray_icon_ids(persona: Persona, memory: SessionMemory) -> list[str]:
@@ -107,25 +111,31 @@ def _candidate_rows(scored) -> list[dict[str, Any]]:
 
 
 def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Model, *, headed: bool = False,
-        watch: bool = False, max_steps: int | None = None) -> dict[str, Any]:
+        watch: bool = False, max_steps: int | None = None, seed: int = 0) -> dict[str, Any]:
     persona = load_card(config["paths"]["personas"], card)
     vocab = build_vocabulary(persona, config)
     platform, rules, goal = config["platform"], config["run"], config["goal"]
     max_steps = max_steps or rules["max_steps"]
     viewport = (platform["viewport_width"], platform["viewport_height"])
 
-    # His tendencies, as the rules use them (engine-design.md 3.2).
+    # His tendencies as 0-10 scores, the states that change during the task, and the seed for
+    # every slip (engine-design.md 4.9). A v2 card's levels are scores 0, 5 and 10 with every
+    # state off, so it decides exactly as before; each step the scores pick the levels the
+    # rules use (engine-design.md 3.2).
+    traits = traits_of(persona.version, persona.tendency, persona.state, persona.perception)
+    var = make(traits, config, seed)
     policy = Policy(
-        risk=level_of(persona, "risk"),
-        check=level_of(persona, "detailCheck", "detail"),
+        risk=var.level("risk"),
+        check=var.level("detailCheck"),
         consequential=rules["consequential_labels"],
         advancing=goal["advancing_labels"],
         weights=config["prominence"],
         viewport=viewport,
     )
-    find = level_of(persona, "detailFind", "detail")
+    find = var.level("detailFind")
     patience = level_of(persona, "patience")
-    patience_limit = config["patience"]["limit"].get(patience, 6)
+    patience_limit = var.patience_limit()
+    start_levels = var.take_log()
     attention = Attention(config["attention"]["order"], viewport, by_group=find != "high")
     task_set = task_words(persona.task)
     task_nums = task_values(persona.task)
@@ -152,6 +162,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
         "prompt_version": PROMPT_VERSION, "word_limit": vocab.common.limit,
         "tendency": {"risk": policy.risk, "detail_find": find, "detail_check": policy.check,
                      "patience": patience, "patience_limit": patience_limit},
+        "card_version": persona.version, "seed": seed, "traits": traits.as_dict(), "start": start_levels,
         "started_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "config": config,
     })
     system = SYSTEM.format(max_candidates=config["model"]["max_candidates"])
@@ -174,13 +185,17 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
     stop: tuple[str, str] = ("step_limit", f"Reached {max_steps} actions")
     print(f"=== {card} ({persona.name}) session {session.id}, log in {log.dir}")
     print(f"    risk {policy.risk}, detail when finding {find}, detail when checking {policy.check}, "
-          f"patience {patience} (limit {patience_limit})")
+          f"patience {patience} (limit {patience_limit})"
+          + (f"; seed {seed}, card v{persona.version}" if persona.version >= 3 or seed else ""))
+    slips: Counter[str] = Counter()  # lapses, near misses and unnoticed warnings over the run (4.9)
+    last_context: str | None = None  # the screen part he last looked at; levels are held per part
 
     with sync_playwright() as pw:
         # In watch mode the engine's own browser has no window: the dashboard streams it.
         browser, page = open_browser(pw, config, headless=not headed or watch)
         show = Dashboard(log.dir, pw, page, viewport) if watch else None
         screen = Screen(page, vocab, config, show=show, reveal_hover=policy.check in ("medium", "high"))
+        screen.vision_px, screen.color = var.vision_px(), traits.color
         say = show.phase if show else (lambda text: None)
         say("Opening the platform")
         page.goto(session.link)
@@ -216,6 +231,15 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
             step += 1
             if actions >= max_steps or step > max_steps * 2:
                 break
+            # This step's levels, from scores that fatigue and time pressure move (4.9).
+            var.setbacks = wrong + backs
+            patience_limit = var.patience_limit()
+            if step > 1:
+                # Risk is drawn every step; how carefully he reads and checks is held for the
+                # screen part (route and open sections) once he has looked at it.
+                policy.risk = var.level("risk")
+                attention.by_group = var.level("detailFind", held_for=last_context) != "high"
+            screen.hide_warnings = not var.notices_warnings()
             if wrong + backs > patience_limit and not confirming:
                 stop = ("abandoned", f"Out of patience: {wrong} wrong turns and {backs} backs, over their limit of {patience_limit}")
                 break
@@ -301,6 +325,13 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                         break
 
                 seen = obs.seen
+                last_context = obs.context
+                policy.check = var.level("detailCheck", held_for=obs.context)
+                screen.reveal_hover = policy.check in ("medium", "high")  # from his next look on
+                missed_now = var.lapse(seen, lambda e: prominence(e, policy.weights, policy.viewport))
+                if missed_now:
+                    seen = [e for e in seen if e is not missed_now]
+                    slips["lapses"] += 1
                 looking_at = obs.focus.describe() if obs.focus else None
                 situation = ("They have saved, but the confirmation they wait for (" + ways_text(missed)
                              + ") has not appeared; they look around the page for it" if confirming else None)
@@ -372,7 +403,9 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                         if own and not any(v.ref == own.ref and v.level == own.level for v in verdicts):
                             verdicts.append(own)
                     s = score(c, element, verdicts, obs.signature, order=i, place=obs.context)
-                    if element and element["id"] not in seen_ids and not element["harness"]:
+                    if element and missed_now and element["id"] == missed_now["id"]:
+                        s.dropped = DISTRACTED
+                    elif element and element["id"] not in seen_ids and not element["harness"]:
                         s.dropped = "They have not looked at this element yet (it is elsewhere)"
                     scored.append(s)
                 known_help = {i for i in help_items if memory.knows(i) or (persona.item(i) and persona.item(i).result == KNOW)}
@@ -411,17 +444,27 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
 
             if stop[0] in ("technical_error", "completion_declared"):
                 break
+            var.read(len(looks) + 1)  # reading builds up fatigue and, rising over time, pressure
+            if obs.unnoticed:
+                slips["unnoticed_warnings"] += 1
             if decision.kind == LOOK:  # looked everywhere he could; nothing left to look at
                 decision.kind, decision.rule = ABANDON, "Looked everywhere; nothing to do"
             rules_used[decision.rule] += 1
 
+            def variability_log() -> dict[str, Any]:
+                out = var.take_log()
+                if obs.unnoticed:
+                    out["unnoticed_warnings"] = obs.unnoticed
+                return out
+
             if decision.kind == ABANDON:
-                record.update(action=None, step_s=round(time.monotonic() - step_start, 1))
+                record.update(action=None, step_s=round(time.monotonic() - step_start, 1), variability=variability_log())
                 log.step(record)
                 stop = ("abandoned", decision.rule)
                 print(f"  {step:>3} {obs.route}  {decision.rule}; stops")
                 break
 
+            miss = None
             if decision.kind == "scroll":
                 action, element, value, why = "scroll", None, "down", decision.rule
             elif decision.kind == BACK:
@@ -430,6 +473,12 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                 chosen = decision.chosen
                 element, action, value = chosen.element, chosen.candidate["action"], chosen.candidate.get("value")
                 why = chosen.candidate.get("why")
+                # A near miss on a small target (4.9): he believes he clicked it, but nothing is
+                # remembered as tried or touched, so he can try it again.
+                miss = var.miss_offset(element) if action in ("click", "select") else None
+                if miss:
+                    slips["misclicks"] += 1
+            if decision.kind not in ("scroll", BACK) and not miss:
                 memory.record(chosen.key, step)
                 if element and action == "click":
                     memory.touch(obs.context, element.get("original"))
@@ -442,7 +491,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
             target = f' "{(element or {}).get("text", "")[:40]}"' if element else ""
             say(f"Step {step}: {decision.rule}; {action}{target}")
             try:
-                note = screen.perform(action, element, value)
+                note = screen.perform(action, element, value, miss=miss)
                 executed, error = True, None
             except Exception as e:  # noqa: BLE001 - any browser failure ends the run as a technical error
                 note, executed, error = f"Failed: {e}", False, "browser_error"
@@ -458,10 +507,11 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                 confirm_used += 1
             record["action"] = {
                 "type": action, "element": (element or {}).get("id"), "text": (element or {}).get("text"),
-                "original": (element or {}).get("original"), "value": value, "note": note, "misclick": False,
+                "original": (element or {}).get("original"), "value": value, "note": note, "misclick": bool(miss),
                 "box": (element or {}).get("box"),
             }
             record["step_s"] = round(time.monotonic() - step_start, 1)
+            record["variability"] = variability_log()
             log.step(record)
             post(step, record["screenshot"], {"action": action, "element": record["action"]["element"], "value": value,
                                               "box": (element or {}).get("box"), "rule": decision.rule},
@@ -499,6 +549,8 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
             "rules": dict(rules_used),
             "learned": dict(memory.learned),
             "missed_defaults": missed_defaults,
+            "seed": seed,
+            "slips": dict(slips),  # lapses, near misses, steps with unnoticed warnings (4.9)
             # words and icons on clickable elements that carried no data-kl mark: fix the platform marks
             "unmarked_items": sorted((seen_items & word_items) - marks),
             "seconds": round(time.monotonic() - started, 1),
@@ -523,6 +575,8 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
         print(f"Rules used: {summary['rules']}")
         if missed_defaults:
             print("Missed defaults: " + "; ".join(f"step {m['step']} {m['original']}" for m in missed_defaults))
+        if slips:
+            print(f"Slips: {dict(slips)}")
         if summary["unmarked_items"]:
             print(f"Items seen on screen that the platform did not mark: {summary['unmarked_items']}")
         print(f"Files are in {log.dir}")
@@ -546,6 +600,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-steps", type=int, help="most actions before stopping (looking around is not counted)")
     parser.add_argument("--viewport", help="window size, e.g. 1920x955; default from config.toml")
     parser.add_argument("--like-session", help="the person's session id: use the window size their session was taken in")
+    parser.add_argument("--seed", type=int, default=0, help="seed for every slip and level drawn (engine-design.md 4.9)")
     args = parser.parse_args(argv)
 
     config = load_config()
@@ -567,7 +622,7 @@ def main(argv: list[str] | None = None) -> int:
         config["platform"]["viewport_width"], config["platform"]["viewport_height"] = w, h
     m = config["model"]
     model = GeminiModel(require_env("GEMINI_API_KEY"), m["id"], m["temperature"], m["timeout_s"])
-    run(args.card, config, console, model, headed=args.headed, watch=args.watch, max_steps=args.max_steps)
+    run(args.card, config, console, model, headed=args.headed, watch=args.watch, max_steps=args.max_steps, seed=args.seed)
     return 0
 
 

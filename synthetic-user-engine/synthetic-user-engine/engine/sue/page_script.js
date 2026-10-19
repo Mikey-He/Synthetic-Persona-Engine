@@ -59,7 +59,7 @@
       range.selectNodeContents(n);
       const style = getComputedStyle(n.parentElement);
       const visible = style.visibility !== "hidden" && inViewport(range.getClientRects());
-      return { orig: original(n), cur: n.nodeValue, visible, harness: !!(root && root.contains(n)) };
+      return { orig: original(n), cur: n.nodeValue, visible, harness: !!(root && root.contains(n)), size: parseFloat(style.fontSize) || 0 };
     });
   }
 
@@ -308,9 +308,46 @@
     });
   }
 
+  // Warning and error text he did not notice this step (engine-design.md 4.9): hidden for the
+  // screenshot. A warning is text in an alert, in an element styled as an error or warning, or
+  // in a strong red. Labels and controls are never hidden, even when styled as errors (an
+  // invalid field's label turns red), and neither is anything that holds a control.
+  function isWarning(n) {
+    if (n.matches("[role=alert], [aria-live=assertive]")) return true;
+    const cls = (n.getAttribute("class") || "").toLowerCase();
+    if (/(^|[\s:_-])(error|warning|alert|danger|invalid)([\s_-]|$)/.test(cls)) return true;
+    const rgb = (getComputedStyle(n).color.match(/\d+/g) || []).map(Number);
+    return rgb.length >= 3 && rgb[0] >= 170 && rgb[1] <= 100 && rgb[2] <= 100;
+  }
+  function warningRoot(el) {
+    for (let n = el, i = 0; n && n !== document.body && i < 3; n = n.parentElement, i++) {
+      if (n.tagName === "LABEL" || n.matches(CLICKABLE) || n.querySelector(CLICKABLE)) return null;
+      if (isWarning(n)) return n;
+    }
+    return null;
+  }
+  function hideWarnings(on) {
+    document.querySelectorAll("[data-sue-unnoticed]").forEach((el) => {
+      el.style.removeProperty("visibility");
+      el.removeAttribute("data-sue-unnoticed");
+    });
+    if (!on) return [];
+    const hidden = [];
+    for (const n of textNodes()) {
+      const el = n.parentElement;
+      if (!el || el.closest("label") || el.closest(CLICKABLE)) continue;
+      const w = warningRoot(el);
+      if (!w || w.hasAttribute("data-sue-unnoticed")) continue;
+      w.style.setProperty("visibility", "hidden", "important");
+      w.setAttribute("data-sue-unnoticed", "");
+      hidden.push(originalText(w));
+    }
+    return hidden;
+  }
+
   window.__sue = {
     collect, apply, grayIcons, elements, openExplanations, scrollState, marks, formState, expanded, labelForLog,
     clearLabelForLog,
-    focus, reveal,
+    focus, reveal, hideWarnings,
   };
 })();

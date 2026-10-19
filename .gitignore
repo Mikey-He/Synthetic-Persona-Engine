@@ -22,3 +22,8 @@ node_modules/
 
 # Client documents (Google persona research): never commit
 *.pdf
+
+# Persona Studio output (2026-10-19): generated cards and their source records stay local
+synthetic-user-engine/synthetic-user-engine/data/personas/studio-*.json
+synthetic-user-engine/synthetic-user-engine/data/studio-configurations/
+synthetic-user-engine/synthetic-user-engine/tools/persona-studio/.extraction-cache/

@@ -25,6 +25,10 @@ ICON = "icon"
 HABIT = "habit"
 
 CARD_FORMAT, CARD_VERSION = "sue-persona", 2
+# v3 (Persona Studio, 2026-10-19) adds a 0-10 score to each tendency, the states (fatigue,
+# distraction, time pressure, attention to warnings) and perception the engine uses
+# (sue/variability.py). v2 cards from the questionnaire still run exactly as before.
+CARD_VERSIONS = (2, 3)
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,8 @@ class Persona:
     goal: dict[str, Any]
     steps: tuple[dict[str, Any], ...]
     source: Path
+    version: int = CARD_VERSION
+    state: dict[str, Any] | None = None  # v3 only
 
     def item(self, item_id: str) -> Item | None:
         return self.items.get(item_id)
@@ -87,10 +93,15 @@ class CardError(ValueError):
 
 
 def load_persona(path: Path) -> Persona:
-    card = json.loads(path.read_text(encoding="utf-8"))
-    if card.get("format") != CARD_FORMAT or card.get("version") != CARD_VERSION:
-        raise CardError(f"{path.name} is not a {CARD_FORMAT} v{CARD_VERSION} card; "
-                        "build it again in tools/persona-builder.html")
+    return persona_from_card(json.loads(path.read_text(encoding="utf-8")), path)
+
+
+def persona_from_card(card: dict[str, Any], path: Path) -> Persona:
+    """A card already read, e.g. one Persona Studio has not saved yet; path is for messages."""
+    if card.get("format") != CARD_FORMAT or card.get("version") not in CARD_VERSIONS:
+        raise CardError(f"{path.name} is not a {CARD_FORMAT} card of version "
+                        + " or ".join(f"v{v}" for v in CARD_VERSIONS)
+                        + "; build it again in tools/persona-builder.html or Persona Studio")
     words: dict[str, Word] = {}
     for screen in card["screens"]:
         for w in screen["words"]:
@@ -115,6 +126,8 @@ def load_persona(path: Path) -> Persona:
         goal=card["goal"],
         steps=tuple(card["steps"]),
         source=path,
+        version=card["version"],
+        state=card.get("state") if card["version"] >= 3 else None,
     )
 
 

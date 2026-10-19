@@ -181,6 +181,28 @@ def side_by_side(human: list[str], engine: list[str], pairs: list[tuple[int, int
     return rows
 
 
+def compare_sessions(console: ResearchConsole, config: dict[str, Any], person: str,
+                     engine_id: str) -> tuple[dict[str, Any], list[str], list[str]] | None:
+    """The comparison of two sessions on the platform, with both move lists; None when either
+    session is missing. Used by main below and by sue.batch."""
+    logs = console.events(person, engine_id)
+    if person not in logs or engine_id not in logs:
+        return None
+    c = config["compare"]
+    human = moves(logs[person], c["field_labels"], c["ignore"])
+    engine = moves(logs[engine_id], c["field_labels"], c["ignore"])
+    result = compare(human, engine)
+    result["settings"] = settings(last_saved(console.result(person)), last_saved(console.result(engine_id)))
+    result["windows"] = {"person": window(logs[person]), "engine": window(logs[engine_id])}
+    return result, human, engine
+
+
+def save_compare(run_dir: Path, person: str, result: dict[str, Any], human: list[str], engine: list[str]) -> dict[str, Any]:
+    out = {k: v for k, v in result.items() if k != "pairs"} | {"person_session": person, "person_moves": human, "engine_moves": engine}
+    (run_dir / "compare.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Compare an engine run with the person's own session, from the platform logs")
     parser.add_argument("--person", required=True, help="the person's session id")
@@ -195,17 +217,11 @@ def main(argv: list[str] | None = None) -> int:
         run_dir = Path(args.engine) if (Path(args.engine) / "summary.json").exists() else ENGINE / "runs" / args.engine
         engine_id = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))["session"]
     console = ResearchConsole(platform_url(config), require_env("ADMIN_PASSWORD"))
-    logs = console.events(args.person, engine_id)
-    for sid in (args.person, engine_id):
-        if sid not in logs:
-            print(f"No session {sid} on the platform", file=sys.stderr)
-            return 1
-    c = config["compare"]
-    human = moves(logs[args.person], c["field_labels"], c["ignore"])
-    engine = moves(logs[engine_id], c["field_labels"], c["ignore"])
-    result = compare(human, engine)
-    result["settings"] = settings(last_saved(console.result(args.person)), last_saved(console.result(engine_id)))
-    result["windows"] = {"person": window(logs[args.person]), "engine": window(logs[engine_id])}
+    found = compare_sessions(console, config, args.person, engine_id)
+    if found is None:
+        print(f"Session {args.person} or {engine_id} is not on the platform", file=sys.stderr)
+        return 1
+    result, human, engine = found
     if not args.quiet:
         print(f"{'Person':<46} | Engine")
         print("\n".join(side_by_side(human, engine, result["pairs"])))
@@ -230,8 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     print("Only the person: " + "; ".join(content["person_only"]))
     print("Only the engine: " + "; ".join(content["engine_only"]))
     if run_dir:
-        out = {k: v for k, v in result.items() if k != "pairs"} | {"person_session": args.person, "person_moves": human, "engine_moves": engine}
-        (run_dir / "compare.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+        save_compare(run_dir, args.person, result, human, engine)
         print(f"Saved to {run_dir / 'compare.json'}")
     return 0
 
