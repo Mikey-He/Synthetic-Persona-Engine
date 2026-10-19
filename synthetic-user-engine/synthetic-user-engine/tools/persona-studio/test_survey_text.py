@@ -63,11 +63,24 @@ def test_generic_interview_json_works_for_any_participant():
 
 
 def test_internal_template_is_generic_and_covers_supported_paths():
-    from survey_text import TEMPLATE,FIELDS,GROUPS
+    from survey_text import TEMPLATE,fields,group_descriptions
     assert TEMPLATE['format']=='sue-interview-extraction-template'
-    assert len(FIELDS)==len(set(FIELDS))
-    assert all('knowledge.'+key in FIELDS for key in GROUPS)
+    assert not any(f.startswith('knowledge.') for f in TEMPLATE['fieldPaths'])  # groups come from the workflow
+    assert len(fields())==len(set(fields()))
+    assert all('knowledge.'+key in fields() for key in group_descriptions())
     assert TEMPLATE['evidencePolicy']['unknownIsNotZero']
+
+
+def test_knowledge_fields_follow_the_workflow_file(tmp_path, monkeypatch):
+    import json, workflow
+    from survey_text import fields
+    flow=json.loads(workflow.DEFAULT_FLOW.read_text(encoding='utf-8'))
+    flow['knowledgeGroups']=[{'key':'reports','title':'Report terms','word':True,'default':1,'description':'Report terminology','items':['T06']},
+                             {'key':'hiddenstuff','title':'Hidden','word':False,'default':1,'description':'x','items':['T08'],'hidden':True}]
+    other=tmp_path/'flow.json';other.write_text(json.dumps(flow),encoding='utf-8')
+    monkeypatch.setenv('SUE_FLOW',str(other))
+    knowledge=[f for f in fields() if f.startswith('knowledge.')]
+    assert knowledge==['knowledge.reports']
 
 def test_explicit_configuration_only_human_factors():
     text='I have difficulty reading small text.'

@@ -59,6 +59,42 @@ def problems(flow: dict) -> list[str]:
                 out.append(f"item {i['id']}: unknown experience {x}")
         if i.get("kind") == "word" and i.get("common") not in ("common", "rare", "none"):
             out.append(f"item {i['id']}: common must be common, rare or none")
+    out += knowledge_group_problems(flow)
+    return out
+
+
+def knowledge_group_problems(flow: dict) -> list[str]:
+    """Persona Studio's knowledge groups (2026-10-19): every item that is not an alternative or a
+    habit is in exactly one group; a word group holds only words, any other group none."""
+    groups = flow.get("knowledgeGroups")
+    if groups is None:
+        return ["knowledgeGroups: missing; Persona Studio needs them to set knowledge"]
+    out, keys, owner = [], set(), {}
+    kinds = {i["id"]: i.get("kind") for i in flow.get("items", [])}
+    for g in groups:
+        key = g.get("key")
+        if not key or key in keys:
+            out.append(f"knowledge group {key!r}: needs a unique key")
+        keys.add(key)
+        if not g.get("title") or not g.get("description"):
+            out.append(f"knowledge group {key}: needs a title and a description")
+        if g.get("default") not in (0, 1, 2):
+            out.append(f"knowledge group {key}: default must be 0, 1 or 2")
+        if not g.get("items"):
+            out.append(f"knowledge group {key}: has no items")
+        for item in g.get("items", []):
+            if item not in kinds:
+                out.append(f"knowledge group {key}: unknown item {item}")
+                continue
+            if item in owner:
+                out.append(f"item {item}: in knowledge groups {owner[item]} and {key}")
+            owner[item] = key
+            if (kinds[item] == "word") != bool(g.get("word")):
+                out.append(f"knowledge group {key}: item {item} is a {kinds[item]}, but the group is "
+                           + ("a word group" if g.get("word") else "not a word group"))
+    for i in flow.get("items", []):
+        if not i.get("altOf") and i.get("kind") != "habit" and i["id"] not in owner:
+            out.append(f"item {i['id']}: in no knowledge group")
     return out
 
 

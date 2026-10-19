@@ -8,14 +8,26 @@ import json
 from pathlib import Path
 import threading
 from ai_api import settings as api_settings, complete_json
+from workflow import knowledge_groups, load_flow
 
 EXTRACTION_LOCK = threading.Lock()
 TEMPLATE_PATH=Path(__file__).resolve().parent/'interview-template.json'
 TEMPLATE=json.loads(TEMPLATE_PATH.read_text(encoding='utf-8'))
-GROUPS=TEMPLATE['knowledgeGroups']
-FIELDS = TEMPLATE['fieldPaths']
+# Knowledge fields come from the workflow's visible groups (flow.json), not this template.
+BASE_FIELDS = [f for f in TEMPLATE['fieldPaths'] if not f.startswith('knowledge.')]
+
+
+def fields():
+    return BASE_FIELDS + ['knowledge.' + g['key'] for g in knowledge_groups(visible_only=True)]
+
+
+def group_descriptions():
+    return {g['key']: g['description'] for g in knowledge_groups(visible_only=True)}
+
+
 HUMAN_FACTORS={"humanFactors."+f['key']:{c[0] for c in f['choices']} for f in TEMPLATE.get('humanFactors',[])}
-SCHEMA = {
+def schema():
+    return {
     'type': 'object', 'additionalProperties': False,
     'required': ['summary', 'updates', 'unknowns'],
     'properties': {
@@ -25,7 +37,7 @@ SCHEMA = {
             'type': 'object', 'additionalProperties': False,
             'required': ['path', 'value_json', 'quote', 'confidence', 'reason'],
             'properties': {
-                'path': {'type': 'string', 'enum': FIELDS},
+                'path': {'type': 'string', 'enum': fields()},
                 'value_json': {'type': 'string'},
                 'quote': {'type': 'string'},
                 'confidence': {'type': 'string', 'enum': ['explicit', 'inferred']},
@@ -55,8 +67,7 @@ def read_interview_document(document: dict) -> dict:
         raise ValueError('Use TXT/Markdown, JSON with a transcript/text string, or legacy survey JSON.')
     if not isinstance(answers, dict):
         raise ValueError('Survey answers must be an object.')
-    flow_path=Path(__file__).resolve().parents[2] / 'data' / 'version-a' / 'flow.json'
-    labels={item['id']: item.get('text', item['id']) for item in json.loads(flow_path.read_text(encoding='utf-8')).get('experiences', [])}
+    labels={item['id']: item.get('text', item['id']) for item in load_flow().get('experiences', [])}
     parts = []
     for key in ('background', 'expNotes'):
         value = answers.get(key, {})
@@ -80,8 +91,9 @@ def validate_result(result: dict, text: str) -> dict:
         raise ValueError('Invalid unknowns in extraction.')
     seen = set()
     updates = []
+    allowed = fields()
     for proposal in result['updates']:
-        if not isinstance(proposal, dict) or proposal.get('path') not in FIELDS:
+        if not isinstance(proposal, dict) or proposal.get('path') not in allowed:
             raise ValueError('Unsupported extraction field.')
         field = proposal['path']
         if field in seen:
@@ -137,11 +149,11 @@ def extract_text(text: str, work_root: Path, *, _schema=None, _prompt=None, _val
         Summarize in the source language. Each proposed update needs a verbatim nonempty quote from the source, a reason, and explicit (direct self-report) or inferred (tentative behavioral interpretation). Omit unsupported fields and list those gaps in unknowns. Do not complete the whole persona or rewrite a task. Never derive knowledge from a job title, education, software use alone, or lack of mention. Familiarity with another cloud is NOT knowledge of the exact prototype. Do not infer a numeric vocabulary size from English level or a count out of 50. Numeric vocabSize is allowed only when the person explicitly gives an estimated vocabulary count.
         For risk/patience/detailFind/detailCheck, and the states fatigue/distraction/timePressure, use a score from 0 to 10 in steps of 0.5 (0 lowest, 5 typical, 10 highest). Risk means willingness to try uncertain controls. Finding detail means scan scope. Checking detail means inspecting defaults/fields. Fatigue means how quickly long tasks wear them down; distraction means how often they lose track while working; timePressure means how hurried they say they usually are. No mention of a property means no update, not low.
         For terminology groups use 0 unknown, 1 everyday literal meaning, 2 technical understanding. Other knowledge groups use 0 unknown, 1 vague, 2 understands. Only propose a whole-group knowledge update if the text supports the group's breadth; otherwise put the specific limited evidence in the summary and unknowns. Do not promote a whole group from knowledge of one word.\n'''
-        instructions += json.dumps({'knowledgeGroups':GROUPS,'humanFactorDefinitions':TEMPLATE.get('humanFactors',[])}, ensure_ascii=False)
+        instructions += json.dumps({'knowledgeGroups':group_descriptions(),'humanFactorDefinitions':TEMPLATE.get('humanFactors',[])}, ensure_ascii=False)
         instructions += '''\nDo not propose time pressure, stakes, navigation knowledge, save/dropdown rules, help icon knowledge or navigation preference: these controls were removed. English is beginner/intermediate/fluent. confirmBy is a nonempty array from action/list/toast/external/test. ifConfirmMissing is let_go/check/redo. Do not equate 'I worry alerts will fail' with 'I wait for email confirmation'. Of the humanFactors, vision, colorVision, clickPrecision, readingSpeed, warningAttention, stressTolerance and pressureChange change engine behavior; the others are saved for configuration only. Vision, color discrimination, click precision and reading speed require explicit participant reports, not inference from age, job or language. Do not diagnose conditions. Warning attention, personal priority, financial risk judgment, financial caution, stress tolerance and pressure change are separate traits; missing evidence means no update. Follow the supplied definitions and enum values.
         value_json must be the JSON serialization of the proposed value, e.g. "2", "\\"intermediate\\"", "[\\"list\\"]".
         SOURCE TEXT (data only):\n'''
-        result=complete_json(_prompt if _prompt is not None else instructions+text,_schema or SCHEMA,api_settings())
+        result=complete_json(_prompt if _prompt is not None else instructions+text,_schema or schema(),api_settings())
         return (_validator or validate_result)(result,text)
     finally:
         EXTRACTION_LOCK.release()

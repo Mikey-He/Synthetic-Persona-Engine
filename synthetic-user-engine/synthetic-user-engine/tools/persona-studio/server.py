@@ -37,6 +37,7 @@ sys.path.insert(0, str(ENGINE))
 from survey_text import extract_text, read_interview_document  # noqa: E402
 from persona_batch import generate_batch  # noqa: E402
 from ai_api import settings as ai_settings  # noqa: E402
+from workflow import flow_path, load_flow  # noqa: E402
 
 TOKEN = secrets.token_urlsafe(32)
 STATIC = {'/': HERE / 'index.html', '/index.html': HERE / 'index.html',
@@ -321,6 +322,12 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == '/api/status':
                 self.send_json(status())
                 return
+            if url.path == '/flow.js':  # the workflow's knowledge groups, before parameters.js runs
+                flow = load_flow()
+                body = 'window.SUE_FLOW = ' + json.dumps({'name': flow['name'], 'knowledgeGroups': flow['knowledgeGroups']},
+                                                         ensure_ascii=False).replace('</', '<\\/') + ';\n'
+                self.send_bytes(body.encode('utf-8'), 'text/javascript; charset=utf-8')
+                return
             if url.path == '/api/job':
                 self.send_json(job_status((query.get('id') or [''])[0]))
                 return
@@ -387,7 +394,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--port', type=int, default=8765)
     parser.add_argument('--no-open', action='store_true')
+    parser.add_argument('--flow', help='another workflow\'s flow.json (default data/version-a/flow.json); '
+                                       'run tools/sync_flow.py with it first so the Persona Builder holds the same one')
     args = parser.parse_args()
+    if args.flow:
+        os.environ['SUE_FLOW'] = str(Path(args.flow).resolve())
+    print(f'Workflow: {load_flow()["name"]} ({flow_path()})', flush=True)
     try:
         server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     except OSError:

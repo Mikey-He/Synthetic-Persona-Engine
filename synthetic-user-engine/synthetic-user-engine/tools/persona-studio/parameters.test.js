@@ -9,6 +9,16 @@ const ROOT = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(ROOT,'tools/persona-builder.html'),'utf8');
 const embeddedFlow = html.match(/<script type="application\/json" id="flow">([\s\S]*?)<\/script>/)[1];
 const flow = JSON.parse(embeddedFlow);
+parameters.configure(flow);  // knowledge groups come from the workflow, as the page gets them from /flow.js
+
+test('knowledge groups come from the workflow, cover every item once, and a flow without them is refused',()=>{
+  assert.deepEqual(parameters.GROUPS.map(g=>g.key),flow.knowledgeGroups.map(g=>g.key));
+  const primary=flow.items.filter(i=>!i.altOf && i.kind!=='habit').map(i=>i.id).sort();
+  assert.deepEqual(parameters.GROUPS.flatMap(g=>g.ids).sort(),primary);
+  assert.deepEqual(parameters.defaults().knowledge,Object.fromEntries(flow.knowledgeGroups.map(g=>[g.key,g.default])));
+  assert.throws(()=>parameters.configure({...flow,knowledgeGroups:undefined}),/no knowledgeGroups/);
+  assert.deepEqual(parameters.GROUPS.map(g=>g.key),flow.knowledgeGroups.map(g=>g.key));  // a refused flow changes nothing
+});
 
 function originalBuilder(overrideFlow) {
   // The production conversion code runs unchanged. Only the page's output DOM is stubbed.

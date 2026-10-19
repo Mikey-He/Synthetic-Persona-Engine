@@ -2,8 +2,8 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const HIDDEN_KNOWLEDGE=new Set(['navigation','operations','icons']);
-const VISIBLE_KNOWLEDGE=PersonaParameters.GROUPS.filter(g=>!HIDDEN_KNOWLEDGE.has(g.key));
+// Knowledge groups come from the workflow (flow.json); hidden ones keep the role's baseline.
+const VISIBLE_KNOWLEDGE=PersonaParameters.GROUPS.filter(g=>!g.hidden);
 const VISIBLE_HUMAN_FACTORS=PersonaParameters.HUMAN_FACTORS.filter(f=>f.key!=='searchPreference');
 const LEVELS = ['Low', 'Medium', 'High'];
 const FIELDS = [
@@ -362,6 +362,7 @@ function connectBuilder() {
     if (!frame.__sueBuilder) return;
     builder = frame.__sueBuilder;
     flow = JSON.parse(frame.document.getElementById('flow').textContent);
+    if (window.SUE_FLOW && flow.name !== window.SUE_FLOW.name) throw Error(`The Persona Builder holds "${flow.name}", but Persona Studio was started on "${window.SUE_FLOW.name}". Run tools/sync_flow.py with this workflow first.`);
     controls(); update(); status('Preview ready. Save creates a new card in data/personas.');
   } catch(error){showError(error);}
 }

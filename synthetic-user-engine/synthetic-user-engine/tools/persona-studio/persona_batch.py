@@ -5,21 +5,21 @@ import secrets
 from pathlib import Path
 FACTOR_DEFINITIONS=json.loads((Path(__file__).resolve().parent/'human-factors.json').read_text(encoding='utf-8'))
 from survey_text import extract_text
+from workflow import knowledge_groups
 
 # Traits and states are 0-10 scores (2026-10-19); a batch samples from these steps.
 SCORES=[0,2.5,5,7.5,10]
-DOMAINS = {**{k:SCORES for k in ('risk','patience','detailFind','detailCheck','fatigue','distraction','timePressure')},
-    **{'knowledge.'+k:[0,1,2] for k in ('billing','scope','budget','alerts','concepts','navigation','operations','icons')},
+BASE_DOMAINS = {**{k:SCORES for k in ('risk','patience','detailFind','detailCheck','fatigue','distraction','timePressure')},
     'english':['beginner','intermediate','fluent'], 'vocabSize':[500,2000,5000,10000,20000,30000,40000],
-    'urgency':['calm','urgent'],'stakes':['low','high'],
     'confirmBy':[['action'],['list'],['toast'],['external'],['test']],
-    'ifConfirmMissing':['let_go','check','redo']}
+    'ifConfirmMissing':['let_go','check','redo'],
+    **{'humanFactors.'+f['key']:[c[0] for c in f['choices']] for f in FACTOR_DEFINITIONS if f['key']!='searchPreference'}}
 
-DOMAINS.update({'humanFactors.'+f['key']:[c[0] for c in f['choices']] for f in FACTOR_DEFINITIONS})
 
-REMOVED_CONTROLS={'urgency','stakes','knowledge.navigation','knowledge.operations','knowledge.icons','humanFactors.searchPreference'}
-for path in REMOVED_CONTROLS:
-    DOMAINS.pop(path,None)
+def domains():
+    """What a batch may vary. Knowledge comes from the workflow's visible groups (flow.json);
+    hidden groups keep the role's baseline."""
+    return {**BASE_DOMAINS, **{'knowledge.'+g['key']:[0,1,2] for g in knowledge_groups(visible_only=True)}}
 
 def generate_batch(body, work_root):
     count=body.get('count')
@@ -33,6 +33,7 @@ def generate_batch(body, work_root):
     if not isinstance(references,list) or len(references)>200 or any(not isinstance(r,dict) for r in references):
         raise ValueError('Provide valid participant records.')
     fields=body.get('fields')
+    DOMAINS=domains()
     text=body.get('instructions','')
     if type(count) is not int or not 1<=count<=200:
         raise ValueError('Choose 1–200 cards.')

@@ -33,6 +33,8 @@ Both pages read the workflow definition `data/version-a/flow.json`. After changi
 
 It uses the keys in `engine/.env` (GEMINI_API_KEY, ADMIN_PASSWORD). Its AI features call Gemini through its OpenAI-compatible endpoint unless `AI_*` settings say otherwise.
 
+The knowledge groups (which items move together when you set "Billing terminology" or "Concepts") come from the workflow's `flow.json` (`knowledgeGroups`), not the Studio's code. For another workflow: write its flow.json with its groups, run `python tools/sync_flow.py path/to/flow.json` (it refuses groups that miss or repeat an item), then start the Studio with `--flow path/to/flow.json`.
+
 ## Running
 
 ```sh
