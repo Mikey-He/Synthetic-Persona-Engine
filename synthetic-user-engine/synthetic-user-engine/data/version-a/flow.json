@@ -146,6 +146,9 @@
   "engine": {
     "note": "Settings the engine needs for this workflow (engine-design.md 6). config.toml holds only what is the same for every workflow.",
     "created": "budget",
+    "grading": {"scope": "The scope is the Atlas project only", "period": "The period is monthly", "amount": "The amount is a specified $1,000",
+                "alert": "A rule fires at 80% of actual spend", "recipients": "Only the Atlas project owner gets the email", "persistence": "The settings are saved"},
+    "gradingSteps": {"scope": "A4", "period": "A4", "amount": "A5", "alert": "A6", "recipients": "A7", "persistence": "A8"},
     "routes": {
       "list": [
         "/billing/budgets"

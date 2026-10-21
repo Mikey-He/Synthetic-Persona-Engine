@@ -5,6 +5,73 @@
 (() => {
   if (window.__sue) return;
 
+  // ---- Shadow DOM (engine-design.md 6.3) ---------------------------------------------------
+  // Web components keep their text and controls in shadow roots, which document-wide queries
+  // do not reach. Every query here goes through the document and every shadow root. A closed
+  // shadow root is opened as it is created (this script runs before the page's own), so the
+  // engine reads it like any other; the page behaves the same.
+  const attach = Element.prototype.attachShadow;
+  Element.prototype.attachShadow = function (init) {
+    return attach.call(this, Object.assign({}, init, { mode: "open" }));
+  };
+  function roots() {
+    const out = [document];
+    const walk = (root) => {
+      for (const el of root.querySelectorAll("*")) {
+        if (el.shadowRoot) {
+          out.push(el.shadowRoot);
+          walk(el.shadowRoot);
+        }
+      }
+    };
+    walk(document);
+    return out;
+  }
+  function queryAll(selector) {
+    const rs = roots();
+    return rs.length === 1 ? [...document.querySelectorAll(selector)] : rs.flatMap((r) => [...r.querySelectorAll(selector)]);
+  }
+  // Text nodes in document order, going into each shadow root where its host is.
+  function* walkText(node) {
+    if (node.nodeType === 3) {
+      yield node;
+      return;
+    }
+    if (node.shadowRoot) yield* walkText(node.shadowRoot);
+    for (let c = node.firstChild; c; c = c.nextSibling) yield* walkText(c);
+  }
+  function parentOf(el) {
+    return el.parentElement || (el.parentNode && el.parentNode.host) || null;
+  }
+  function closestDeep(el, selector) {
+    for (let n = el; n; ) {
+      const hit = n.closest ? n.closest(selector) : null;
+      if (hit) return hit;
+      const root = n.getRootNode ? n.getRootNode() : null;
+      n = root && root.host ? root.host : null;
+    }
+    return null;
+  }
+  function containsDeep(a, b) {
+    for (let n = b; n; n = n.parentNode || (n.host || null)) {
+      if (n === a) return true;
+    }
+    return false;
+  }
+  function deepFromPoint(x, y) {
+    let el = document.elementFromPoint(x, y);
+    while (el && el.shadowRoot) {
+      const inner = el.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === el) break;
+      el = inner;
+    }
+    return el;
+  }
+  function byId(el, id) {
+    const root = el.getRootNode ? el.getRootNode() : document;
+    return (root.getElementById ? root.getElementById(id) : null) || document.getElementById(id);
+  }
+
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
   const CLICKABLE = [
     "a[href]", "button", "input:not([type=hidden])", "select", "textarea", "summary",
@@ -14,10 +81,10 @@
   let nodes = [];
 
   function harnessRoot(selector, buttonText) {
-    const marked = document.querySelector(selector);
+    const marked = queryAll(selector)[0];
     if (marked) return marked;
-    const button = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === buttonText);
-    for (let el = button; el && el !== document.body; el = el.parentElement) {
+    const button = queryAll("button").find((b) => b.textContent.trim() === buttonText);
+    for (let el = button; el && el !== document.body; el = parentOf(el)) {
       if (getComputedStyle(el).position === "fixed") return el;
     }
     return null;
@@ -40,11 +107,14 @@
     return false;
   }
 
+  function textParent(n) {
+    return n.parentElement || (n.parentNode && n.parentNode.host) || null;
+  }
   function textNodes() {
     const out = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const parent = n.parentElement;
+    if (!document.body) return out;
+    for (const n of walkText(document.body)) {
+      const parent = textParent(n);
       if (!parent || SKIP.has(parent.tagName) || !n.nodeValue.trim()) continue;
       out.push(n);
     }
@@ -57,9 +127,9 @@
     return nodes.map((n) => {
       const range = document.createRange();
       range.selectNodeContents(n);
-      const style = getComputedStyle(n.parentElement);
+      const style = getComputedStyle(textParent(n));
       const visible = style.visibility !== "hidden" && inViewport(range.getClientRects());
-      return { orig: original(n), cur: n.nodeValue, visible, harness: !!(root && root.contains(n)), size: parseFloat(style.fontSize) || 0 };
+      return { orig: original(n), cur: n.nodeValue, visible, harness: !!(root && containsDeep(root, n)), size: parseFloat(style.fontSize) || 0 };
     });
   }
 
@@ -73,17 +143,20 @@
     });
   }
 
+  const GRAY_CSS = "[data-sue-gray]{background:#c8c8c8 !important;border-radius:3px}" +
+    "[data-sue-gray] *{visibility:hidden !important}";
   function grayIcons(ids) {
-    if (!document.getElementById("sue-style")) {
+    for (const root of roots()) {  // a shadow root does not see the document's styles
+      const host = root === document ? document.head : root;
+      if (!host || (root === document ? document.getElementById("sue-style") : root.querySelector("style[data-sue-style]"))) continue;
       const style = document.createElement("style");
-      style.id = "sue-style";
-      style.textContent =
-        "[data-sue-gray]{background:#c8c8c8 !important;border-radius:3px}" +
-        "[data-sue-gray] *{visibility:hidden !important}";
-      document.head.appendChild(style);
+      if (root === document) style.id = "sue-style";
+      else style.setAttribute("data-sue-style", "");
+      style.textContent = GRAY_CSS;
+      host.appendChild(style);
     }
     const wanted = new Set(ids);
-    document.querySelectorAll("[data-kl]").forEach((el) => {
+    queryAll("[data-kl]").forEach((el) => {
       if (wanted.has(el.dataset.kl)) el.setAttribute("data-sue-gray", "");
       else el.removeAttribute("data-sue-gray");
     });
@@ -91,8 +164,7 @@
 
   function originalText(el) {
     const parts = [];
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    for (const n of walkText(el)) {
       if (n.nodeValue.trim()) parts.push(n.__sueOrig !== undefined ? n.__sueOrig : n.nodeValue);
     }
     return parts.join(" ").replace(/\s+/g, " ").trim();
@@ -112,24 +184,24 @@
     return regionIds.get(node);
   }
   function popupRoots() {
-    const roots = [...document.querySelectorAll('[aria-expanded="true"]')].map((b) => b.parentElement).filter(Boolean);
-    document.querySelectorAll("[role=dialog]").forEach((d) => roots.push(d));
-    return roots;
+    const out = queryAll('[aria-expanded="true"]').map((b) => parentOf(b)).filter(Boolean);
+    queryAll("[role=dialog]").forEach((d) => out.push(d));
+    return out;
   }
-  function regionOf(el, roots) {
+  function regionOf(el, popups) {
     let best = null;
-    for (const node of roots) {
-      if (!node.contains(el)) continue;
+    for (const node of popups) {
+      if (!containsDeep(node, el)) continue;
       const r = node.getBoundingClientRect();
       if (!best || r.width * r.height < best.area) best = { node, area: r.width * r.height };
     }
-    const node = best ? best.node : el.closest("main, nav, aside, header, footer") || document.body;
+    const node = best ? best.node : closestDeep(el, "main, nav, aside, header, footer") || document.body;
     const kind = best ? "popup" : node === document.body ? "other" : node.tagName.toLowerCase();
     // What a glance takes in: a whole opened part, else a list, table or group inside the region.
     let group = node;
     if (!best) {
-      const g = el.closest("ul, ol, table, fieldset, [role=group], [role=listbox]");
-      if (g && node.contains(g) && g !== node) group = g;
+      const g = closestDeep(el, "ul, ol, table, fieldset, [role=group], [role=listbox]");
+      if (g && containsDeep(node, g) && g !== node) group = g;
     }
     const box = (n) => {
       const r = n.getBoundingClientRect();
@@ -145,7 +217,7 @@
   function headingOf(group, region) {
     if (!group || group === region) return "";
     const by = (group.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean)
-      .map((id) => document.getElementById(id)).filter(Boolean).map(originalText).join(" ").trim();
+      .map((id) => byId(group, id)).filter(Boolean).map(originalText).join(" ").trim();
     if (by) return by;
     const own = group.tagName === "FIELDSET" ? group.querySelector("legend") : group.tagName === "TABLE" ? group.querySelector("caption") : null;
     if (own) return originalText(own);
@@ -160,18 +232,18 @@
   // Controls drawn invisible until the mouse is over their row (opacity 0), such as a
   // delete icon. A person sees them only when hovering; see reveal().
   function hiddenUntilHover(el) {
-    for (let n = el, i = 0; n && i < 3; n = n.parentElement, i++) {
+    for (let n = el, i = 0; n && i < 3; n = parentOf(n), i++) {
       if (getComputedStyle(n).opacity === "0") return true;
     }
     return false;
   }
   function reveal(indices) {
-    document.querySelectorAll("[data-sue-revealed]").forEach((el) => {
+    queryAll("[data-sue-revealed]").forEach((el) => {
       el.style.removeProperty("opacity");
       el.removeAttribute("data-sue-revealed");
     });
     for (const i of indices) {
-      const el = document.querySelector(`[data-sue-i="${i}"]`);
+      const el = queryAll(`[data-sue-i="${i}"]`)[0];
       if (!el) continue;
       el.style.setProperty("opacity", "1", "important");
       el.setAttribute("data-sue-revealed", "");
@@ -201,10 +273,12 @@
   // not see it. Only a button with no text at all is named by it, standing for its icon.
   function elements(selector, buttonText) {
     const root = harnessRoot(selector, buttonText);
-    const roots = popupRoots();
+    const popups = popupRoots();
     const out = [];
-    for (const el of document.querySelectorAll(CLICKABLE)) {
-      if (el.tagName === "LABEL") continue;
+    for (const el of queryAll(CLICKABLE + ",label")) {
+      // A label is read with its field, unless the field cannot be seen (a file upload drawn as a
+      // button): then the label is what a person clicks.
+      if (el.tagName === "LABEL" && !(el.control && (el.control.type === "file" || !shown(el.control)))) continue;
       const r = el.getBoundingClientRect();
       if (r.width < 1 || r.height < 1) continue;
       if (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) continue;
@@ -212,17 +286,17 @@
       if (style.visibility === "hidden" || style.display === "none") continue;
       const cx = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
       const cy = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
-      const hit = document.elementFromPoint(cx, cy);
-      if (!hit || !(hit === el || el.contains(hit) || hit.contains(el))) continue;
+      const hit = deepFromPoint(cx, cy);
+      if (!hit || !(hit === el || containsDeep(el, hit) || containsDeep(hit, el))) continue;
 
       const isField = ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName);
       const label = isField && el.labels && el.labels[0] ? el.labels[0] : null;
-      const kl = el.closest("[data-kl]");
+      const kl = closestDeep(el, "[data-kl]");
       const text = clean(label ? label.innerText : el.innerText);
       // A button that is only a picture (trash can, cross, question mark): he sees the
       // picture, so it is named by what it shows, its accessible name. Python passes the
       // name through his vocabulary like any word. A grayed icon he does not recognise.
-      const icon = !text && !isField && !el.closest("[data-sue-gray]")
+      const icon = !text && !isField && !closestDeep(el, "[data-sue-gray]")
         ? clean(el.getAttribute("aria-label") || el.getAttribute("title") || "") : "";
       el.setAttribute("data-sue-i", String(out.length));
       out.push({
@@ -239,9 +313,12 @@
         disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
         expanded: el.hasAttribute("aria-expanded") ? el.getAttribute("aria-expanded") === "true" : null,
         kl: kl ? kl.dataset.kl : null,
-        explains: (el.closest("[data-kl-explains]") || {}).dataset?.klExplains || null,
-        harness: !!(root && root.contains(el)),
-        region: regionOf(el, roots),
+        explains: (closestDeep(el, "[data-kl-explains]") || {}).dataset?.klExplains || null,
+        harness: !!(root && containsDeep(root, el)),
+        region: regionOf(el, popups),
+        // A native dropdown opens outside the page, where no screenshot sees it: its options are listed.
+        options: el.tagName === "SELECT" ? [...el.options].map((o) => o.text) : undefined,
+        selected: el.tagName === "SELECT" && el.selectedIndex >= 0 ? el.options[el.selectedIndex].text : undefined,
         box: { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) },
         font: { size: parseFloat(style.fontSize), weight: style.fontWeight, color: style.color },
         background: style.backgroundColor,
@@ -252,19 +329,39 @@
 
   // Help text that is open on screen and says which item it explains (engine-design.md 4.5, 7).
   function openExplanations() {
-    return [...document.querySelectorAll("[data-kl-explains]")]
+    return queryAll("[data-kl-explains]")
       .filter((el) => inViewport(el.getClientRects()))
       .map((el) => ({ item: el.dataset.klExplains, original: originalText(el) }));
   }
 
+  // The page's scroll, or, when the page itself does not scroll, the biggest panel in view that
+  // does (an app that scrolls inside a container): cx, cy is where the wheel has to be.
+  function scroller() {
+    let best = null;
+    for (const el of queryAll("*")) {
+      if (el.scrollHeight <= el.clientHeight + 4) continue;
+      const oy = getComputedStyle(el).overflowY;
+      if (oy !== "auto" && oy !== "scroll" && oy !== "overlay") continue;
+      const r = el.getBoundingClientRect();
+      const w = Math.min(r.right, innerWidth) - Math.max(r.left, 0), h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+      if (w <= 0 || h <= 0) continue;
+      if (!best || w * h > best.area) best = { el, area: w * h, cx: Math.max(r.left, 0) + w / 2, cy: Math.max(r.top, 0) + h / 2 };
+    }
+    return best && best.area > innerWidth * innerHeight * 0.25 ? best : null;
+  }
   function scrollState() {
     const el = document.scrollingElement;
-    return { y: Math.round(el.scrollTop), max: Math.round(el.scrollHeight - innerHeight) };
+    const max = Math.round(el.scrollHeight - innerHeight);
+    if (max > 0) return { y: Math.round(el.scrollTop), max };
+    const inner = scroller();
+    if (!inner) return { y: Math.round(el.scrollTop), max };
+    return { y: Math.round(inner.el.scrollTop), max: Math.round(inner.el.scrollHeight - inner.el.clientHeight),
+             cx: Math.round(inner.cx), cy: Math.round(inner.cy) };
   }
 
   // Every item mark on the page, visible or not, to report items that were never marked.
   function marks() {
-    return [...new Set([...document.querySelectorAll("[data-kl]")].map((el) => el.dataset.kl))];
+    return [...new Set(queryAll("[data-kl]").map((el) => el.dataset.kl))];
   }
 
   // Every value on the page: field contents and ticked boxes. Part of the screen state,
@@ -273,14 +370,14 @@
   // change because he scrolled (engine-design.md 4.5).
   function expanded(selector, buttonText) {
     const root = harnessRoot(selector, buttonText);
-    return [...document.querySelectorAll('[aria-expanded="true"]')]
-      .filter((el) => !(root && root.contains(el)))
+    return queryAll('[aria-expanded="true"]')
+      .filter((el) => !(root && containsDeep(root, el)))
       .map((el) => originalText(el) || el.getAttribute("aria-label") || "")
       .filter(Boolean);
   }
 
   function formState() {
-    return [...document.querySelectorAll("input, select, textarea")]
+    return queryAll("input, select, textarea")
       .map((el) => (el.type === "checkbox" || el.type === "radio" ? (el.checked ? "1" : "0") : el.value))
       .join("\u0001");
   }
@@ -292,17 +389,17 @@
   const LOGGED = "a[href], button, input, select, textarea, label, summary, [role=button], [role=link], " +
     "[role=option], [role=checkbox], [role=radio], [role=menuitem], [role=tab], [contenteditable=true]";
   function labelForLog(x, y) {
-    const hit = document.elementFromPoint(x, y);
-    const control = hit && hit.closest(LOGGED);
+    const hit = deepFromPoint(x, y);
+    const control = hit && closestDeep(hit, LOGGED);
     if (!control || control.hasAttribute("aria-label")) return null;
     const by = (control.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean)
-      .map((id) => document.getElementById(id)).filter(Boolean).map(originalText).join(" ").trim();
+      .map((id) => byId(control, id)).filter(Boolean).map(originalText).join(" ").trim();
     control.setAttribute("aria-label", by || originalText(control));
     control.setAttribute("data-sue-aria", "");
     return control.getAttribute("aria-label");
   }
   function clearLabelForLog() {
-    document.querySelectorAll("[data-sue-aria]").forEach((el) => {
+    queryAll("[data-sue-aria]").forEach((el) => {
       el.removeAttribute("aria-label");
       el.removeAttribute("data-sue-aria");
     });
@@ -320,22 +417,22 @@
     return rgb.length >= 3 && rgb[0] >= 170 && rgb[1] <= 100 && rgb[2] <= 100;
   }
   function warningRoot(el) {
-    for (let n = el, i = 0; n && n !== document.body && i < 3; n = n.parentElement, i++) {
+    for (let n = el, i = 0; n && n !== document.body && i < 3; n = parentOf(n), i++) {
       if (n.tagName === "LABEL" || n.matches(CLICKABLE) || n.querySelector(CLICKABLE)) return null;
       if (isWarning(n)) return n;
     }
     return null;
   }
   function hideWarnings(on) {
-    document.querySelectorAll("[data-sue-unnoticed]").forEach((el) => {
+    queryAll("[data-sue-unnoticed]").forEach((el) => {
       el.style.removeProperty("visibility");
       el.removeAttribute("data-sue-unnoticed");
     });
     if (!on) return [];
     const hidden = [];
     for (const n of textNodes()) {
-      const el = n.parentElement;
-      if (!el || el.closest("label") || el.closest(CLICKABLE)) continue;
+      const el = textParent(n);
+      if (!el || closestDeep(el, "label") || closestDeep(el, CLICKABLE)) continue;
       const w = warningRoot(el);
       if (!w || w.hasAttribute("data-sue-unnoticed")) continue;
       w.style.setProperty("visibility", "hidden", "important");
@@ -345,9 +442,236 @@
     return hidden;
   }
 
+  // ---- item marks from the flow's locators (engine-design.md 6.3) ----------------------
+  // A product that is not our platform carries no data-kl marks. The flow says how to find
+  // each item's control (locate) and the help text that explains it (explainedBy); the marks
+  // are put on before every look, and taken off again, so a page that re-renders is marked
+  // afresh. Marks the product carries itself are never touched.
+  // Controls: everything clickable, plus pictures with a name that hold no control (an info
+  // icon). A container with a name (a nav labelled Main) is not a control: its links are.
+  const ICONISH = "[aria-label],[title],img[alt],[role=img]";
+  function norm(t) {
+    return (t || "").replace(/\s+/g, " ").trim().toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+  }
+  function roleOf(el) {
+    const role = el.getAttribute("role");
+    if (role) return role;
+    const tag = el.tagName;
+    if (tag === "A") return el.hasAttribute("href") ? "link" : "";
+    if (tag === "BUTTON" || tag === "SUMMARY") return "button";
+    if (tag === "SELECT") return "combobox";
+    if (tag === "TEXTAREA") return "textbox";
+    if (tag === "IMG") return "img";
+    if (tag === "INPUT") {
+      const t = (el.getAttribute("type") || "text").toLowerCase();
+      if (t === "checkbox" || t === "radio") return t;
+      if (["button", "submit", "reset"].includes(t)) return "button";
+      return "textbox";
+    }
+    return "";
+  }
+  function labelOf(el) {
+    const by = (el.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean)
+      .map((id) => byId(el, id)).filter(Boolean).map(originalText).join(" ").trim();
+    return clean(el.getAttribute("aria-label") || by || el.getAttribute("title") || el.getAttribute("alt") || "");
+  }
+  function textOf(el) {
+    const isField = ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName);
+    if (isField) {
+      if (el.labels && el.labels[0]) return originalText(el.labels[0]);
+      if (["button", "submit", "reset"].includes(el.type)) return clean(el.value);
+      return clean(el.getAttribute("placeholder") || "");
+    }
+    return originalText(el);
+  }
+  function shown(el) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return false;
+    const style = getComputedStyle(el);
+    return style.visibility !== "hidden" && style.display !== "none";
+  }
+  function regionKind(el) {
+    if (closestDeep(el, "[role=dialog], dialog")) return "dialog";
+    const lm = closestDeep(el, "main, nav, aside, header, footer");
+    return lm ? lm.tagName.toLowerCase() : "other";
+  }
+  function groupOf(el) {
+    return (regionOf(el, popupRoots()).group || {}).heading || "";
+  }
+  function same(have, want, how) {
+    const h = norm(have), w = norm(want);
+    if (!w) return false;
+    if (how === "contains") return h.includes(w);
+    if (how === "starts") return h.startsWith(w);
+    return h === w;
+  }
+  function fits(el, loc, how) {
+    if (loc.role && roleOf(el) !== loc.role) return false;
+    if (loc.text && !same(textOf(el), loc.text, how)) return false;
+    if (loc.label && !same(labelOf(el), loc.label, how)) return false;
+    if (loc.region && regionKind(el) !== loc.region) return false;
+    if (loc.group && !same(groupOf(el), loc.group, "exact")) return false;
+    return true;
+  }
+  function outermost(found) {
+    return found.filter((el) => !found.some((o) => o !== el && containsDeep(o, el)));
+  }
+  function deepest(found) {
+    return found.filter((el) => !found.some((o) => o !== el && containsDeep(el, o)));
+  }
+  function controlsIn() {
+    const clickable = outermost(queryAll(CLICKABLE).filter(shown));
+    const icons = queryAll(ICONISH).filter((el) => shown(el) && !el.matches(CLICKABLE)
+      && !el.querySelector(CLICKABLE) && !closestDeep(el, CLICKABLE) && !SKIP.has(el.tagName));
+    return [...clickable, ...icons].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  }
+  function pick(found, loc) {
+    return loc.nth != null ? [found[loc.nth]].filter(Boolean) : found;
+  }
+  function locate(loc) {
+    if (loc.kind === "explains") {
+      let pool;
+      try {
+        pool = loc.selector ? queryAll(loc.selector) : queryAll("body *").concat(roots().slice(1).flatMap((r) => [...r.querySelectorAll("*")]));
+      } catch (e) {
+        return { found: [], how: "bad selector" };
+      }
+      const want = norm(loc.text);
+      return { found: deepest(pool.filter((el) => !SKIP.has(el.tagName) && shown(el) && norm(originalText(el)).includes(want))), how: "contains" };
+    }
+    let pool;
+    try {
+      pool = loc.selector ? queryAll(loc.selector).filter(shown) : controlsIn();
+    } catch (e) {
+      return { found: [], how: "bad selector" };
+    }
+    const how = loc.match || "exact";
+    const found = outermost(pool.filter((el) => fits(el, loc, how)));
+    if (!found.length && how === "exact" && (loc.text || loc.label)) {
+      // Not word for word: a looser match, only when it finds one control (Send must not mark
+      // Send invite), and reported as such so the flow can be fixed.
+      const loose = outermost(pool.filter((el) => fits(el, loc, "contains")));
+      if (loose.length === 1 || (loose.length && loc.nth != null)) return { found: pick(loose, loc), how: "contains" };
+    }
+    return { found: pick(found, loc), how };
+  }
+  function onRoute(routes, route) {
+    if (!routes || !routes.length) return true;
+    const path = route.split("?")[0];
+    return routes.some((r) => r === route || r === path || (r.endsWith("*") && route.startsWith(r.slice(0, -1))));
+  }
+  function mark(locs, route) {
+    queryAll("[data-sue-kl]").forEach((el) => {
+      el.removeAttribute("data-kl");
+      el.removeAttribute("data-sue-kl");
+    });
+    queryAll("[data-sue-explains]").forEach((el) => {
+      el.removeAttribute("data-kl-explains");
+      el.removeAttribute("data-sue-explains");
+    });
+    const report = {};
+    for (const loc of locs || []) {
+      if (!onRoute(loc.routes, route)) continue;
+      const { found, how } = locate(loc);
+      const key = loc.kind === "explains" ? loc.item + ":explains" : loc.item;
+      report[key] = { n: found.length, how };
+      for (const el of found) {
+        if (loc.kind === "explains") {
+          if (el.hasAttribute("data-kl-explains")) continue;
+          el.setAttribute("data-kl-explains", loc.item);
+          el.setAttribute("data-sue-explains", "");
+        } else {
+          if (el.hasAttribute("data-kl")) continue;
+          el.setAttribute("data-kl", loc.item);
+          el.setAttribute("data-sue-kl", "");
+        }
+      }
+    }
+    return report;
+  }
+
+  // What one control is, as a locator can name it: for the recorder and the mark check.
+  function describe(el) {
+    const r = el.getBoundingClientRect();
+    const field = ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName);
+    return {
+      tag: el.tagName.toLowerCase(), role: roleOf(el), type: (el.getAttribute("type") || "").toLowerCase(),
+      text: textOf(el), label: labelOf(el), region: regionKind(el), group: groupOf(el),
+      kl: (closestDeep(el, "[data-kl]") || {}).dataset?.kl || null,
+      box: { x: Math.round(r.left + scrollX), y: Math.round(r.top + scrollY), w: Math.round(r.width), h: Math.round(r.height) },
+      checked: ["checkbox", "radio"].includes(el.type) ? el.checked : null,
+      value: field && !["checkbox", "radio", "password"].includes(el.type) ? el.value : null,
+    };
+  }
+  function controlOf(node) {
+    const el = node && node.nodeType === 1 ? node : node && node.parentElement;
+    if (!el) return null;
+    const clickable = closestDeep(el, CLICKABLE);
+    if (clickable) return clickable;
+    const icon = closestDeep(el, ICONISH);
+    return icon && !icon.querySelector(CLICKABLE) ? icon : null;
+  }
+  // Every control on the whole page, scrolled into view or not.
+  function inventory() {
+    return controlsIn().map(describe);
+  }
+
+  // The page has stopped changing: nothing in it changed for quietMs, or maxMs has passed.
+  // A page that polls never goes network-idle, but its DOM settles.
+  function quiet(quietMs, maxMs) {
+    return new Promise((resolve) => {
+      let timer = setTimeout(done, quietMs);
+      const stop = setTimeout(done, maxMs);
+      const obs = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(done, quietMs); });
+      obs.observe(document, { subtree: true, childList: true, characterData: true, attributes: true });
+      function done() { obs.disconnect(); clearTimeout(timer); clearTimeout(stop); resolve(true); }
+    });
+  }
+
+  // The one control a scripted step names (set-up and clean-up steps, sue/target.py): marked so
+  // that the engine's browser can act on it. Returns how many controls the locator found.
+  function target(loc) {
+    queryAll("[data-sue-target]").forEach((el) => el.removeAttribute("data-sue-target"));
+    const { found } = locate(Object.assign({ kind: "control" }, loc));
+    if (found[0]) found[0].setAttribute("data-sue-target", "");
+    return found.length;
+  }
+
+  // The control at a place in the inventory, marked the same way (steps written by the researcher, sue/written.py).
+  function targetAt(i) {
+    queryAll("[data-sue-target]").forEach((el) => el.removeAttribute("data-sue-target"));
+    const el = controlsIn()[i];
+    if (el) el.setAttribute("data-sue-target", "");
+    return !!el;
+  }
+
+  // What this page is made of, for the capability check when a task is recorded.
+  function probe() {
+    const rs = roots();
+    const canvases = queryAll("canvas").map((c) => {
+      const r = c.getBoundingClientRect();
+      return Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+    });
+    const text = document.body ? document.body.innerText || "" : "";
+    const letters = (text.match(/[\p{L}]/gu) || []).length;
+    const cjk = (text.match(/[\u3400-\u9fff]/g) || []).length;
+    const frames = [...document.querySelectorAll("iframe")].map((f) => f.src || "");
+    return {
+      shadowRoots: rs.length - 1,
+      iframes: frames.length,
+      captcha: frames.some((src) => /recaptcha|hcaptcha|turnstile|captcha/i.test(src)),
+      canvasShare: Math.round((Math.max(0, ...canvases) / (innerWidth * innerHeight)) * 100) / 100,
+      nativeSelects: queryAll("select").length,
+      fileInputs: queryAll("input[type=file]").length,
+      cjkShare: letters ? Math.round((cjk / letters) * 100) / 100 : 0,
+      innerScroll: !!(document.scrollingElement.scrollHeight <= innerHeight && scroller()),
+    };
+  }
+
   window.__sue = {
     collect, apply, grayIcons, elements, openExplanations, scrollState, marks, formState, expanded, labelForLog,
     clearLabelForLog,
     focus, reveal, hideWarnings,
+    mark, describe, controlOf, inventory, norm, quiet, target, targetAt, probe,
   };
 })();

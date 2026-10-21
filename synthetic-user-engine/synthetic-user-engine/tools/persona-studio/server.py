@@ -1,4 +1,7 @@
-"""Persona Studio's local server, connected to the engine (engine-design.md 4.9, merged 2026-10-19).
+"""The platform's local server: workflows, personas, runs and results (engine-design.md 6.3), and
+Persona Studio, connected to the engine (engine-design.md 4.9, merged 2026-10-19).
+
+The platform (platform.html) is at /; Persona Studio's full editor is at /studio.
 
 Persona Studio was built by Joy (github.com/Joy0727/Persona-Studio) as an editor without the
 engine. Here it saves sue-persona v3 cards straight into data/personas and runs them: Save &
@@ -38,11 +41,11 @@ from survey_text import extract_text, read_interview_document  # noqa: E402
 from persona_batch import generate_batch  # noqa: E402
 from ai_api import settings as ai_settings  # noqa: E402
 from workflow import flow_path, load_flow  # noqa: E402
+import platform_api as api  # noqa: E402
 
 TOKEN = secrets.token_urlsafe(32)
-STATIC = {'/': HERE / 'index.html', '/index.html': HERE / 'index.html',
-          '/builder': ROOT / 'tools' / 'persona-builder.html',
-          **{'/' + name: HERE / name for name in ('studio.js', 'studio.css', 'roles.js', 'parameters.js')}}
+STATIC = {'/': HERE / 'platform.html', '/studio': HERE / 'index.html', '/index.html': HERE / 'index.html',
+          **{'/' + name: HERE / name for name in ('studio.js', 'studio.css', 'roles.js', 'parameters.js', 'platform.js', 'platform.css')}}
 CARD_ID = re.compile(r'^studio-[0-9a-f]{32}$')
 TRAITS = ('risk', 'patience', 'detailFind', 'detailCheck')
 
@@ -123,7 +126,7 @@ JOBS_LOCK = threading.Lock()
 
 def active_job() -> str | None:
     with JOBS_LOCK:
-        return next((jid for jid, j in JOBS.items() if j['proc'].poll() is None), None)
+        return next((jid for jid, j in JOBS.items() if j['proc'].poll() is None), None) or (api.busy() or {}).get('id')
 
 
 def start_run(body):
@@ -294,6 +297,40 @@ def status():
     return {'token': TOKEN, 'ready': all(c['ok'] for c in checks[:3]), 'activeJob': active_job(), 'checks': checks}
 
 
+def platform_job(jid):
+    job = api.get_job(jid)
+    view = {'record': api.record_view, 'check': api.check_view, 'run': api.run_view}.get(job['kind'], lambda j: {})(job)
+    text = api.log_text(job)
+    return {'id': jid, 'kind': job['kind'], 'workflow': job.get('workflow'), 'state': api.job_state(job),
+            'log': text[-4000:], 'view': view, 'elapsed': round(time.time() - job['started'])}
+
+
+PLATFORM_POST = {
+    '/api/workflows/create': api.create,
+    '/api/workflows/import': api.import_flow,
+    '/api/workflows/select': api.select,
+    '/api/workflows/basics': lambda b: api.update_basics(b.get('id'), b),
+    '/api/workflows/save': lambda b: api.save_flow(b.get('id'), b),
+    '/api/workflows/pick': lambda b: api.pick_control(b.get('id'), b),
+    '/api/workflows/record': lambda b: api.record(b.get('id'), b),
+    '/api/workflows/draft': lambda b: api.draft(b.get('id'), b),
+    '/api/workflows/check': lambda b: api.check(b.get('id'), b),
+    '/api/jobs/stop': api.stop_job,
+    '/api/workflows/facts': api.save_facts,
+    '/api/workflows/signed-in': api.signed_in,
+    '/api/workflows/steps': api.use_steps,
+    '/api/workflows/adjust': api.adjust,
+    '/api/workflows/text': api.edit_text,
+    '/api/personas/draft': api.draft_persona,
+    '/api/personas/save': lambda b: api.save_persona(b, save_card),
+    '/api/personas/save-participant': api.save_participant,
+    '/api/personas/update': api.update_persona,
+    '/api/personas/delete': api.delete_persona,
+    '/api/personas/restore': lambda b: api.delete_persona(b, restore=True),
+    '/api/tests/start': api.start_tests,
+}
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -324,12 +361,42 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if url.path == '/flow.js':  # the workflow's knowledge groups, before parameters.js runs
                 flow = load_flow()
-                body = 'window.SUE_FLOW = ' + json.dumps({'name': flow['name'], 'knowledgeGroups': flow['knowledgeGroups']},
+                body = 'window.SUE_FLOW = ' + json.dumps({'name': flow['name'], 'task': flow.get('task', ''),
+                                                          'knowledgeGroups': flow['knowledgeGroups']},
                                                          ensure_ascii=False).replace('</', '<\\/') + ';\n'
                 self.send_bytes(body.encode('utf-8'), 'text/javascript; charset=utf-8')
                 return
             if url.path == '/api/job':
                 self.send_json(job_status((query.get('id') or [''])[0]))
+                return
+            q = lambda key: (query.get(key) or [''])[0]  # noqa: E731
+            platform_get = {
+                '/api/workflows': lambda: api.list_workflows(),
+                '/api/workflow': lambda: api.detail(q('id')),
+                '/api/wjob': lambda: platform_job(q('id')),
+                '/api/live': lambda: api.live_view(api.get_job(q('id'))),
+                '/api/personas': lambda: api.list_personas(),
+                '/api/results': lambda: api.list_results(),
+                '/api/result': lambda: api.result_detail(q('id')),
+                '/api/facts': lambda: api.facts(q('id')),
+                '/api/summary': lambda: api.summary_view(q('id')),
+            }
+            if url.path in platform_get:
+                self.send_json(platform_get[url.path]())
+                return
+            if url.path == '/builder':
+                self.send_bytes(api.builder_page(), 'text/html; charset=utf-8')
+                return
+            if url.path == '/questionnaire':
+                self.send_bytes(api.questionnaire_page(), 'text/html; charset=utf-8')
+                return
+            if url.path.startswith('/wf/'):
+                parts = url.path.split('/')
+                target = api.shot_path(parts[2], parts[3]) if len(parts) == 4 else None
+                if target is None:
+                    self.send_json({'error': 'Not found.'}, 404)
+                    return
+                self.send_bytes(target.read_bytes(), 'image/png')
                 return
             if url.path == '/report':
                 self.send_bytes(report_page((query.get('job') or [''])[0]).encode('utf-8'), 'text/html; charset=utf-8')
@@ -361,7 +428,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get('Content-Length', '0'))
-            if not 0 < length <= 1000000:
+            if not 0 < length <= 5000000:
                 raise ValueError('Invalid request size.')
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
@@ -380,6 +447,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = start_run(body)
             elif self.path == '/api/stop':
                 result = stop_run(body)
+            elif self.path in PLATFORM_POST:
+                result = PLATFORM_POST[self.path](body)
             else:
                 self.send_json({'error': 'Unknown endpoint.'}, 404)
                 return
@@ -399,6 +468,8 @@ def main():
     args = parser.parse_args()
     if args.flow:
         os.environ['SUE_FLOW'] = str(Path(args.flow).resolve())
+    else:
+        api.select({'id': api.STATE['current']})
     print(f'Workflow: {load_flow()["name"]} ({flow_path()})', flush=True)
     try:
         server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)

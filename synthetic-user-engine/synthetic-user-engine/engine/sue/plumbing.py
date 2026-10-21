@@ -1,4 +1,4 @@
-"""Checks a whole run against the real platform without a model: a scripted
+"""Checks a whole run against the real product without a model: a scripted
 "model" proposes the workflow's correct path (flow.json engine.plumbing) one screen at a time, and everything
 else (rewriting, evidence, choosing, acting, logging, the platform result) is real.
 
@@ -12,10 +12,10 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .config import load_config, load_env, platform_url, require_env
+from .config import load_config, load_env
 from .model import LabelScriptModel
-from .platform import ResearchConsole
 from .run import run
+from .target import make_target
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,10 +31,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{config['workflow']['file']} has no engine.plumbing path to follow", file=sys.stderr)
         return 1
     load_env()
-    console = ResearchConsole(platform_url(config), require_env("ADMIN_PASSWORD"))
-    run(args.card, config, console, LabelScriptModel(path), headed=args.headed, watch=args.watch,
-        max_steps=len(path) + 8)
-    return 0
+    summary = run(args.card, config, make_target(config), LabelScriptModel(path), headed=args.headed, watch=args.watch,
+                  max_steps=len(path) + 8)
+    return 0 if (summary.get("evaluation") or {}).get("overall") or args.card != "full" else 1
 
 
 if __name__ == "__main__":

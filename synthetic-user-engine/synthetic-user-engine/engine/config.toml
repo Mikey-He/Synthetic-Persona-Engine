@@ -36,6 +36,14 @@ ui_words = [
   "tab", "tabs", "upload", "download", "save", "apply", "close", "back", "next", "previous",
   "search", "help", "profile", "required", "optional", "default", "enable", "disable", "enabled", "disabled",
 ]
+# Chinese words (2026-10-19): the top N of the Chinese frequency list (wordfreq) by the person's Chinese level, card
+# persona.lang.chinese. A card without one counts as native, so English workflows are unaffected. Placeholders.
+top_n_zh = { "native" = 50000, "fluent" = 20000, "intermediate" = 3000, "beginner" = 800, "none" = 0 }
+# Chinese interface words, treated like ui_words: known on every card except the blank one. Placeholder.
+ui_words_zh = [
+  "确定", "取消", "保存", "删除", "编辑", "搜索", "设置", "下一步", "上一步", "返回", "提交", "关闭",
+  "登录", "退出", "帮助",
+]
 # After swapping, check that every original word is really gone; at most this many rounds (React may render them back).
 max_rewrite_rounds = 3
 

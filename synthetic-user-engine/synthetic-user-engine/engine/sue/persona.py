@@ -70,6 +70,7 @@ class Persona:
     version: int = CARD_VERSION
     state: dict[str, Any] | None = None  # v3 only
     flow: str = ""  # the name of the workflow the card was built for (the flow's name)
+    chinese: str = "native"  # Chinese level: native / fluent / intermediate / beginner / none
 
     def item(self, item_id: str) -> Item | None:
         return self.items.get(item_id)
@@ -130,15 +131,21 @@ def persona_from_card(card: dict[str, Any], path: Path) -> Persona:
         version=card["version"],
         state=card.get("state") if card["version"] >= 3 else None,
         flow=card.get("flow") or "",
+        chinese=lang.get("chinese") or "native",
     )
 
 
 CARD_FILES = {"blank": "blank-card.json", "full": "full-card.json"}
 
 
-def load_card(personas_dir: Path, name: str) -> Persona:
+def load_card(personas_dir: Path, name: str, flow_file: Path | str | None = None) -> Persona:
     """name is blank / full, or a card file name in the personas folder (the .json may be
-    left off, so a new person's card p4.json runs as --card p4)."""
+    left off, so a new person's card p4.json runs as --card p4). flow_file: the workflow the
+    engine runs; blank and full are then that workflow's own self-test cards (sue/selfcards.py)."""
+    if flow_file and name in CARD_FILES:
+        from .selfcards import card_for
+
+        return persona_from_card(card_for(personas_dir, name, flow_file), Path(personas_dir) / CARD_FILES[name])
     file = CARD_FILES.get(name, name)
     if not (Path(personas_dir) / file).exists() and not file.endswith(".json"):
         file += ".json"

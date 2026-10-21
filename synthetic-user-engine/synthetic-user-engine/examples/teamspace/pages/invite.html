@@ -1,0 +1,117 @@
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="/members">Members</a></li>
+    <li aria-current="page">Invite people</li>
+  </ol>
+</nav>
+
+<div class="page-header">
+  <div>
+    <h1>Invite people</h1>
+    <p class="muted">Add someone to the Lumen Labs workspace. They'll get an email with a link to join.</p>
+  </div>
+</div>
+
+<section class="card form-card wizard">
+  <ol class="steps" aria-label="Invite steps">
+    <li class="step is-current" id="step-ind-1" aria-current="step"><span class="step-num" aria-hidden="true">1</span><span class="step-text">Details</span></li>
+    <li class="step-sep" aria-hidden="true"></li>
+    <li class="step" id="step-ind-2"><span class="step-num" aria-hidden="true">2</span><span class="step-text">Access</span></li>
+  </ol>
+
+  <form id="invite-form" novalidate>
+    <!-- Step 1: Details -->
+    <div class="step-panel" id="step-1" aria-labelledby="step-1-title">
+      <h2 id="step-1-title" class="panel-title">Details</h2>
+
+      <div class="field" id="email-field">
+        <label for="invite-email">Email address</label>
+        <input id="invite-email" name="email" type="email" autocomplete="off" spellcheck="false" aria-describedby="invite-email-help">
+        <p class="helper" id="invite-email-help">We'll send the invitation to this address.</p>
+      </div>
+
+      <div class="field">
+        <label for="invite-name">Display name</label>
+        <input id="invite-name" name="name" type="text" autocomplete="off" aria-describedby="invite-name-help">
+        <p class="helper" id="invite-name-help">Optional. Shown to teammates across Teamspace.</p>
+      </div>
+
+      <fieldset class="field role-fieldset">
+        <legend class="legend-row">
+          <span>Role</span>
+          <span class="help-wrap">
+            <button type="button" class="help-btn" id="roles-help-btn" aria-label="About roles" aria-expanded="false" aria-controls="roles-popover">
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7.8 7.7a2.3 2.3 0 0 1 4.4.9c0 1.5-2.2 1.9-2.2 3.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="14.4" r="1" fill="currentColor"/></svg>
+            </button>
+            <div class="popover" id="roles-popover" role="tooltip" hidden>
+              <p><strong>Viewer</strong> can open the projects they're added to, but can't change anything.</p>
+              <p><strong>Contributor</strong> can create and edit work in the projects they're added to.</p>
+              <p><strong>Workspace admin</strong> can manage members, billing and every workspace setting.</p>
+            </div>
+          </span>
+        </legend>
+        <div class="radio-cards">
+          <label class="radio-card">
+            <input type="radio" name="role" value="viewer">
+            <span class="radio-card-title">Viewer</span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="role" value="contributor" checked>
+            <span class="radio-card-title">Contributor</span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="role" value="admin">
+            <span class="radio-card-title">Workspace admin</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="form-actions">
+        <a class="btn btn-link" href="/members">Cancel</a>
+        <button type="button" class="btn btn-primary" id="continue-btn">Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Access -->
+    <div class="step-panel" id="step-2" aria-labelledby="step-2-title" hidden>
+      <h2 id="step-2-title" class="panel-title">Access</h2>
+      <p class="muted invite-summary" id="invite-summary"></p>
+
+      <fieldset class="field">
+        <legend>Project access</legend>
+        <p class="helper">Choose which projects this person can open. You can change this later.</p>
+        <div class="check-list">
+          <label class="check-row"><input type="checkbox" name="projects" value="Orion" checked><span>Orion</span></label>
+          <label class="check-row"><input type="checkbox" name="projects" value="Vega" checked><span>Vega</span></label>
+          <label class="check-row"><input type="checkbox" name="projects" value="Lyra"><span>Lyra</span></label>
+          <label class="check-row"><input type="checkbox" name="projects" value="Atlas-Retail"><span>Atlas-Retail</span></label>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label class="check-row plain"><input type="checkbox" name="welcomeEmail" id="welcome-email" checked><span>Send a welcome email</span></label>
+        <p class="helper indent">Includes a short getting-started guide.</p>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="back-btn">Back</button>
+        <div class="actions-right">
+          <a class="btn btn-link" href="/members">Cancel</a>
+          <button type="button" class="btn btn-primary" id="send-invite-btn">Send invite</button>
+        </div>
+      </div>
+    </div>
+  </form>
+</section>
+
+<div class="modal-backdrop" id="confirm-backdrop" hidden>
+  <div class="modal" id="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
+    <h2 id="confirm-title">Send invite?</h2>
+    <p id="confirm-desc" class="muted"></p>
+    <div class="form-banner error" id="confirm-error" role="alert" hidden></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" id="confirm-back-btn">Go back</button>
+      <button type="button" class="btn btn-primary" id="confirm-send-btn">Send</button>
+    </div>
+  </div>
+</div>

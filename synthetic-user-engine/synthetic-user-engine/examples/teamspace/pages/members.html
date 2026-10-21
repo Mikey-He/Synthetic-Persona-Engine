@@ -1,0 +1,27 @@
+<div class="page-header">
+  <div>
+    <h1>Members <span class="count-pill" id="member-count"></span></h1>
+    <p class="muted">Everyone who can sign in to the Lumen Labs workspace.</p>
+  </div>
+  <a class="btn btn-primary" href="/members/invite">
+    <svg class="btn-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    Invite people
+  </a>
+</div>
+
+<section class="card table-card">
+  <div class="table-toolbar">
+    <label for="member-search" class="visually-hidden">Search members</label>
+    <input id="member-search" type="search" placeholder="Search by name or email" class="search-input">
+    <span class="helper" id="member-summary"></span>
+  </div>
+  <table class="data-table">
+    <caption class="visually-hidden">Workspace members</caption>
+    <thead>
+      <tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Last active</th></tr>
+    </thead>
+    <tbody id="members-body">
+      <tr><td colspan="5" class="muted">Loading members…</td></tr>
+    </tbody>
+  </table>
+</section>

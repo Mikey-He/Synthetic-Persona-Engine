@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}} - Teamspace</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="brand" href="/home">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="2" width="9" height="9" rx="2.5"/><rect x="13" y="2" width="9" height="9" rx="2.5" opacity=".55"/><rect x="2" y="13" width="9" height="9" rx="2.5" opacity=".55"/><rect x="13" y="13" width="9" height="9" rx="2.5"/></svg>
+      <span>Teamspace</span>
+    </a>
+    <span class="workspace-name">Lumen Labs</span>
+    <div class="topbar-spacer"></div>
+    <div class="user-chip">
+      <span class="avatar" aria-hidden="true">{{user_initials}}</span>
+      <span class="user-text">
+        <span class="user-name">{{user_name}}</span>
+        <span class="user-email">{{user_email}}</span>
+      </span>
+    </div>
+    <form method="post" action="/logout" class="signout-form">
+      <button type="submit" class="btn btn-ghost btn-sm">Sign out</button>
+    </form>
+  </header>
+  <div class="shell">
+    <nav class="sidenav" aria-label="Main">
+      {{nav}}
+    </nav>
+    <main id="main" class="content" tabindex="-1">
+      {{content}}
+    </main>
+  </div>
+  <div class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  {{scripts}}
+</body>
+</html>

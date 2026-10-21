@@ -85,6 +85,22 @@ def check_list(persona: Persona, observations: dict[str, Any], route: str, hits,
     return Check(True, True, "the list shows the one just made; the quote checks out", answer, quote)
 
 
+def check_found(observations: dict[str, Any], key: str, hits, visible_text: str, what: str) -> Check:
+    """An answer found, or the page reached (flow.json engine.outcome, engine-design.md 6.3): the
+    model says the screen shows it and quotes it; code checks the quote is on screen and readable
+    to him. A fake word in it means he could not recognise it, as a person would not. what names
+    it for the log (the answer, the page)."""
+    seen = observations.get(key) or {}
+    answer, quote = seen.get("answer"), str(seen.get("quote") or "").strip()
+    if answer is not True or not quote:
+        return Check(True, False, f"the model says this screen does not show {what}", answer, quote)
+    if not quote_on_screen(quote, visible_text):
+        return Check(True, False, "the quote is not on screen", answer, quote)
+    if check_word(quote, hits, visible_text).level == VOID:
+        return Check(True, False, "the quote has words they cannot read, so they cannot recognise it", answer, quote)
+    return Check(True, True, f"they see {what}; the quote checks out", answer, quote)
+
+
 def review_link(check: Check, elements: list[dict[str, Any]], review_items: list[str], knows) -> dict[str, Any] | None:
     """A careful checker (detail when checking: high) who confirms by the list or the
     detail page opens the one he just saved and checks it once before he is done, if he

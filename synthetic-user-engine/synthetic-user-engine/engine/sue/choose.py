@@ -27,7 +27,7 @@ from .evidence import HALF, SURE, VOID, Verdict, best_level
 from .memory import SessionMemory, action_key
 from .prompt import CHECK, EXPLORE, FIX, RETREAT, TASK
 
-NO_ELEMENT_ACTIONS = {"scroll", "back"}
+NO_ELEMENT_ACTIONS = {"scroll", "back", "press"}
 
 ACT, LOOK, BACK, ABANDON = "act", "look", "back", "abandon"
 

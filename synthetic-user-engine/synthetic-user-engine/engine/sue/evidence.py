@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from .memory import SessionMemory
 from .persona import EVERYDAY, HABIT, KNOW, OTHER, VAGUE, Persona
-from .words import Hit
+from .words import Hit, tokens
 
 SURE = "sure"
 HALF = "half"
@@ -56,9 +56,6 @@ def _hit_level(hit: Hit) -> str:
     return VOID
 
 
-_TOKEN = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
-
-
 def check_word(ref: str, screen_hits: list[Hit], visible_text: str = "", on_element: str | None = None) -> Verdict:
     """ref is text as he sees it on screen, often a whole element label. Every English
     word in it must be on screen, alone or inside a phrase (Target amount); the ref then
@@ -67,11 +64,13 @@ def check_word(ref: str, screen_hits: list[Hit], visible_text: str = "", on_elem
 
     on_element is the text he sees on the element the action targets. When given, the
     ref must be on that element itself (2026-10-04): "Atlas" elsewhere on screen is no
-    reason to press a button whose label he cannot read."""
+    reason to press a button whose label he cannot read.
+
+    Chinese in a ref is cut into words the same way the screen was (words.tokens)."""
     if on_element is not None:
-        own = {t.lower() for t in _TOKEN.findall(on_element)}
-        tokens = [t.lower() for t in _TOKEN.findall(ref)]
-        if (tokens and not set(tokens) <= own) or (not tokens and _norm(ref) not in _norm(on_element)):
+        own = {t.lower() for t in tokens(on_element)}
+        words = [t.lower() for t in tokens(ref)]
+        if (words and not set(words) <= own) or (not words and _norm(ref) not in _norm(on_element)):
             return Verdict("word", ref, VOID, "not on the element acted on")
     by_shown: dict[str, Hit] = {}
     for h in screen_hits:
@@ -82,19 +81,19 @@ def check_word(ref: str, screen_hits: list[Hit], visible_text: str = "", on_elem
         return Verdict("word", ref, _hit_level(h), f"{h.source}, {h.level}")
     token_level: dict[str, str] = {}
     for h in screen_hits:
-        for t in _TOKEN.findall(h.shown):
+        for t in tokens(h.shown):
             t = t.lower()
             if t not in token_level or RANK[_hit_level(h)] > RANK[token_level[t]]:
                 token_level[t] = _hit_level(h)
-    tokens = [t.lower() for t in _TOKEN.findall(ref)]
-    if not tokens:
+    words = [t.lower() for t in tokens(ref)]
+    if not words:
         if key and visible_text and key in _norm(visible_text):
             return Verdict("word", ref, SURE, "a number or amount on screen")
         return Verdict("word", ref, VOID, "not on screen")
-    missing = [t for t in tokens if t not in token_level]
+    missing = [t for t in words if t not in token_level]
     if missing:
         return Verdict("word", ref, VOID, f"not on screen: {' '.join(missing[:3])}")
-    level = min((token_level[t] for t in tokens), key=lambda lv: RANK[lv])
+    level = min((token_level[t] for t in words), key=lambda lv: RANK[lv])
     return Verdict("word", ref, level, "counted at its weakest word")
 
 

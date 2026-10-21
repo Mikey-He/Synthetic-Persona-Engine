@@ -5,3 +5,5 @@ httpx>=0.28
 wordfreq>=3.1
 pytest>=9.0
 pillow>=11  # 2026-10-19: colour-vision filter on screenshots (sue/variability.py)
+jieba>=0.42  # 2026-10-19: wordfreq's Chinese tokenizer, to cut Chinese text into words (sue/words.py)
+rapidocr-onnxruntime==1.2.3  # 2026-10-19: OCR for screens that draw text on a canvas (sue/vision.py); English and Chinese, offline on CPU

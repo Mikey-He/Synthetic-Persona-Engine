@@ -14,13 +14,13 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
-from .config import load_config, load_env, platform_url, require_env
+from .config import load_config, load_env
 from .memory import SessionMemory
 from .persona import load_card
-from .platform import ResearchConsole
 from .run import gray_icon_ids
 from .runlog import RunLog
-from .screen import Screen, open_browser
+from .screen import Screen, Strip, open_browser
+from .target import make_target
 from .words import build_vocabulary
 
 
@@ -44,18 +44,19 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_config(flow=args.flow)
     load_env()
-    console = ResearchConsole(platform_url(config), require_env("ADMIN_PASSWORD"))
+    target = make_target(config)
     log = RunLog(config["paths"]["runs"], "smoke")
 
     with sync_playwright() as pw:
         for card in args.cards:
-            persona = load_card(config["paths"]["personas"], card)
-            session = console.create_session(
-                model_id="none", prompt_version="smoke", persona_id=persona.id, variant=config["platform"]["variant"]
-            )
-            browser, page = open_browser(pw, config, headless=not args.headed)
-            screen = Screen(page, build_vocabulary(persona, config), config)
+            persona = load_card(config["paths"]["personas"], card, config["workflow"]["file"])
+            session = target.start(model_id="none", prompt_version="smoke", persona_id=persona.id)
+            platform = config["platform"]
+            strip = Strip(persona.task, platform["harness_button_text"], platform["viewport_width"]) if target.harness == "strip" else None
+            browser, page = open_browser(pw, config, headless=not args.headed, strip=strip)
+            screen = Screen(page, build_vocabulary(persona, config), config, strip=strip)
             memory = SessionMemory()
+            target.prepare(page)
             page.goto(session.link)
             print(f"\n=== {card} ({persona.name}) session {session.id}")
             obs = None
@@ -78,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
                     extra = "; ".join(e["understanding"])
                     print(f"    {e['id']:>6} {seen}" + (f"  [{extra}]" if extra else ""))
             browser.close()
-            console.end(session.id, "abandoned")
+            target.end(session.id, "abandoned")
     log.close()
     print(f"\nScreenshots and element lists are in {log.dir}")
     return 0

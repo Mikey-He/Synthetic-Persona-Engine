@@ -67,4 +67,4 @@ def test_a_card_from_another_workflow_is_not_run_on_this_one(config, monkeypatch
     assert card.flow == config["workflow"]["name"]  # cards record the workflow they were built for
     monkeypatch.setitem(config["workflow"], "name", "Some other workflow")
     with pytest.raises(ValueError, match="was built for the workflow"):
-        run_module.run("full", config, console=None, model=None)
+        run_module.run("full", config, target=None, model=None)

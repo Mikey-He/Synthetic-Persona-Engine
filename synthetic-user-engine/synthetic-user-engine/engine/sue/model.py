@@ -27,14 +27,16 @@ class Model(Protocol):
 
 
 class GeminiModel:
-    def __init__(self, api_key: str, model_id: str, temperature: float, timeout_s: int, created: str):
-        """created: what the workflow makes (flow.json engine.created), for the reply schema."""
+    def __init__(self, api_key: str, model_id: str, temperature: float, timeout_s: int, created: str,
+                 extras: list[str] | tuple = (), outcome: dict | None = None):
+        """created: what the workflow makes (flow.json engine.created), for the reply schema; extras and
+        outcome: the workflow's extra actions and kind of result (engine-design.md 6.3)."""
         from google import genai  # imported here so tests run without the SDK configured
 
         self.model_id = model_id
         self.temperature = temperature
         self.timeout_ms = timeout_s * 1000
-        self.schema = response_schema(created)
+        self.schema = response_schema(created, extras, outcome)
         self.client = genai.Client(api_key=api_key)
 
     def propose(self, system: str, turn: str, screenshot: bytes) -> str:
@@ -60,6 +62,12 @@ class GeminiModel:
         return response.text
 
 
+def gemini_for(config: dict, api_key: str) -> "GeminiModel":
+    """The model for this workflow: config's model, the workflow's made thing, actions and result."""
+    m, w = config["model"], config["workflow"]
+    return GeminiModel(api_key, m["id"], m["temperature"], m["timeout_s"], w["created"], w.get("actions") or (), w.get("outcome"))
+
+
 class ScriptedModel:
     """Replays fixed replies, for tests and for checking a run's plumbing without a model."""
 
@@ -83,6 +91,7 @@ class LabelScriptModel:
     def __init__(self, script: list[dict], model_id: str = "label-script"):
         self.model_id = model_id
         self.script = list(script)
+        self.substitute = lambda text: text  # the run's own values ({run}), set by the run
 
     def propose(self, system: str, turn: str, screenshot: bytes) -> str:
         import json
@@ -90,24 +99,34 @@ class LabelScriptModel:
         if not self.script:
             return '{"candidates": []}'
         step = self.script[0]
-        if "observe" in step:  # answer the list question with this quote, and offer nothing to do
+        if "observe" in step:  # answer the turn's question (the list, the answer, the page) with this quote
             self.script.pop(0)
-            asked = re.search(r"observations\.(\w+):", turn)  # the key the turn's list question names
+            asked = re.search(r"observations\.(\w+):", turn)  # the key the turn's question names
             key = asked.group(1) if asked else "list_has_new_item"
             return json.dumps({"candidates": [], "observations": {
-                key: {"answer": True, "quote": step["observe"]}}}, ensure_ascii=False)
-        candidate = {k: v for k, v in step.items() if k != "label"}
+                key: {"answer": True, "quote": self.substitute(step["observe"])}}}, ensure_ascii=False)
+        candidate = {k: v for k, v in step.items() if k not in ("label", "target")}
+        if isinstance(candidate.get("value"), str):
+            candidate["value"] = self.substitute(candidate["value"])
         candidate.setdefault("why", "script")
-        label = step.get("label")
-        if label:
-            rows = [[c.strip() for c in line.split("|")] for line in turn.splitlines()]
-            rows = [r for r in rows if len(r) >= 3 and r[0].startswith("el_")]
+        label = self.substitute(step["label"]) if step.get("label") else None
+        rows = [[c.strip() for c in line.split("|")] for line in turn.splitlines()]
+        rows = [r for r in rows if len(r) >= 3 and r[0].startswith("el_")]
+
+        def find(name):
             # An exact match first, so "Finish" is not found inside "I'm finished".
-            match = next((r for r in rows if r[2].lower() == label.lower()), None) or next(
-                (r for r in rows if label.lower() in r[2].lower()), None
-            )
+            return next((r for r in rows if r[2].lower() == name.lower()), None) or next(
+                (r for r in rows if name.lower() in r[2].lower()), None)
+
+        if label:
+            match = find(label)
+            drop = find(self.substitute(step["target"])) if step.get("target") else None
+            if match and step.get("target") and not drop:
+                match = None  # dragging: both ends must be in view
             if match:
                 candidate["element"] = match[0]
+                if drop:
+                    candidate["value"] = drop[0]
             elif "They are looking at: the whole screen" in turn:
                 # Not on this screen: look further down, and try the same step next time.
                 return json.dumps({"candidates": [{"action": "scroll", "value": "down", "evidence": [], "why": f"looking for {label}"}]})

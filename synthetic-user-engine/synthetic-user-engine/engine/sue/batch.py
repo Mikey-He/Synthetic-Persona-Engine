@@ -24,10 +24,10 @@ from statistics import mean
 from typing import Any
 
 from .compare import compare_sessions, save_compare, window
-from .config import load_config, load_env, platform_url, require_env
-from .model import GeminiModel
-from .platform import ResearchConsole
+from .config import load_config, load_env, require_env
+from .model import gemini_for
 from .run import run
+from .target import make_target
 
 METRICS = ("content", "precision", "direction", "order", "settings")
 
@@ -84,7 +84,7 @@ def report(agg: dict[str, Any], person: str | None) -> str:
     """The batch as a short Markdown note."""
     n = agg["runs"]
     lines = [f"## {agg['card']}: {n} runs (seeds {', '.join(map(str, agg['seeds']))})", "",
-             f"- Passed the platform's grading: **{agg['passed']} of {n}**"]
+             f"- Passed the grading: **{agg['passed']} of {n}**"]
     for name, ok in agg["checks_passed"].items():
         lines.append(f"  - {name}: {ok} of {n}")
     if agg["missed_defaults"]:
@@ -107,12 +107,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--viewport", help="window size, e.g. 1920x955; default from config.toml")
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--flow", help="the workflow's flow.json (default paths.flow in config.toml)")
+    parser.add_argument("--live", action="store_true", help="write each run's screen and pointer as it goes (the platform's Watch live)")
     args = parser.parse_args(argv)
 
     config = load_config(flow=args.flow)
     load_env()
-    console = ResearchConsole(platform_url(config), require_env("ADMIN_PASSWORD"))
+    target = make_target(config)
     size = args.viewport
+    if args.like_session and target.kind != "uat":
+        print("--like-session needs the person's session on the UAT platform", file=sys.stderr)
+        return 1
+    console = getattr(target, "console", None)
     if args.like_session:
         seen = window(console.events(args.like_session).get(args.like_session, []))
         if not seen or not seen.get("viewport"):
@@ -122,8 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     if size:
         w, h = (int(x) for x in size.lower().split("x"))
         config["platform"]["viewport_width"], config["platform"]["viewport_height"] = w, h
-    m = config["model"]
-    model = GeminiModel(require_env("GEMINI_API_KEY"), m["id"], m["temperature"], m["timeout_s"], config["workflow"]["created"])
+    model = gemini_for(config, require_env("GEMINI_API_KEY"))
 
     out_dir = Path(config["paths"]["runs"]) / f"batch-{datetime.now():%Y%m%d-%H%M%S}"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -132,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         runs = []
         for seed in range(1, args.runs + 1):
             print(f"\n##### {card}, run {seed} of {args.runs} (seed {seed})")
-            summary = run(card, config, console, model, max_steps=args.max_steps, seed=seed)
+            summary = run(card, config, target, model, max_steps=args.max_steps, seed=seed, live=args.live)
             if args.like_session:
                 found = compare_sessions(console, config, args.like_session, summary["session"])
                 if found:
@@ -142,8 +146,11 @@ def main(argv: list[str] | None = None) -> int:
         agg = aggregate(card, runs)
         results.append(agg)
         notes.append(report(agg, args.like_session))
-        (out_dir / "batch.json").write_text(json.dumps({"person": args.like_session, "cards": results}, ensure_ascii=False,
-                                                       indent=2), encoding="utf-8")
+        (out_dir / "batch.json").write_text(json.dumps({"person": args.like_session, "workflow": config["workflow"]["name"],
+                                                        "flow": config["workflow"]["file"], "target": target.kind,
+                                                        "at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                                        "runsPerCard": args.runs, "cards": results},
+                                                       ensure_ascii=False, indent=2), encoding="utf-8")
     (out_dir / "batch.md").write_text("\n".join(notes), encoding="utf-8")
     print("\n" + "\n".join(notes))
     print(f"Saved to {out_dir}")

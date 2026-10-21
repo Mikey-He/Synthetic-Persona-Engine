@@ -15,8 +15,21 @@ from .completion import ways_text
 from .persona import Persona
 
 PROMPT_VERSION = "engine-p2-v4-en"  # recorded on the platform session; bump on any prompt change
+# A workflow that uses more actions or another kind of result (engine-design.md 6.3) gets this
+# version; Version A's prompt is the one above, word for word.
+PROMPT_VERSION_GENERAL = "engine-p3-v1-en"
 
 ACTIONS = ["click", "type", "scroll", "back", "open_help"]
+# Actions some products need (engine-design.md 6.3): a native dropdown, a key, a menu that opens
+# under the mouse, dragging. A workflow lists the ones it allows (flow.json engine.actions); a web
+# product gets them all.
+EXTRA_ACTIONS = {
+    "choose": "- choose: pick an option in a dropdown list; value is the option exactly as they see it in the list.",
+    "press": "- press: press a key; value is Enter, Tab, Escape, ArrowDown, ArrowUp, Space or Backspace. element is the box it is pressed in, if any.",
+    "hover": "- hover: rest the mouse on an element to see what appears under it.",
+    "drag": "- drag: drag an element and drop it on another; value is the id of the element it is dropped on.",
+}
+ALL_ACTIONS = ACTIONS + list(EXTRA_ACTIONS)
 
 # What a candidate is for. Code weighs it with the person's tendencies (engine-design.md 3.2, 4.3).
 TASK, FIX, CHECK, EXPLORE, RETREAT = "advance", "fix", "check", "explore", "retreat"
@@ -50,6 +63,32 @@ The actions:
 
 element is the element id, such as el_12; scroll and back need none. List at most {max_candidates}. Output JSON only."""
 
+
+def system(max_candidates: int, extras: list[str] | tuple = ()) -> str:
+    """The system text, with a workflow's extra actions listed after open_help. With none it is
+    SYSTEM exactly."""
+    text = SYSTEM.format(max_candidates=max_candidates)
+    if not extras:
+        return text
+    lines = [EXTRA_ACTIONS[a] for a in EXTRA_ACTIONS if a in extras]
+    anchor = "- open_help: click a question-mark icon or similar to read the help."
+    return text.replace(anchor, anchor + "\n" + "\n".join(lines))
+
+
+# What the task leaves behind (flow.json engine.outcome): a change saved in the product (Version
+# A), an answer found on screen, or a page reached. The person stops when they see it themselves.
+OUTCOME_KEYS = {"answer": "task_answer", "place": "at_the_place"}
+
+
+def outcome_question(outcome: dict[str, Any]) -> str:
+    kind = outcome.get("kind")
+    if kind == "answer":
+        q = outcome.get("question") or "the question the task asks"
+        return (f"Also answer one question, in observations.task_answer: does this screen show the answer to {q}? "
+                "answer is true or false. If true, quote copies the answer exactly as they see it. Only what is on screen; do not guess.")
+    return ("Also answer one question, in observations.at_the_place: is this the page or screen the task asks them to find? "
+            "answer is true or false. If true, quote copies its heading exactly as they see it. Only what is on screen; do not guess.")
+
 # The completion question names what the workflow makes (flow.json engine.created; Version A: budget).
 # For Version A the text and the schema are exactly what they were, so PROMPT_VERSION stays.
 
@@ -66,19 +105,17 @@ def list_question(created: str, article: str | None = None) -> str:
             "answer is true or false. If true, quote copies that row's text exactly as they see it. Only what is on screen; do not guess.")
 
 
-def response_schema(created: str) -> dict[str, Any]:
+def response_schema(created: str, extras: list[str] | tuple = (), outcome: dict[str, Any] | None = None) -> dict[str, Any]:
+    seen = {"type": "object", "properties": {"answer": {"type": "boolean"}, "quote": {"type": "string"}}, "required": ["answer"]}
+    observed = {list_key(created): seen}
+    if outcome and outcome.get("kind") in OUTCOME_KEYS:
+        observed[OUTCOME_KEYS[outcome["kind"]]] = seen
     return {
     "type": "object",
     "properties": {
         "observations": {
             "type": "object",
-            "properties": {
-                list_key(created): {
-                    "type": "object",
-                    "properties": {"answer": {"type": "boolean"}, "quote": {"type": "string"}},
-                    "required": ["answer"],
-                },
-            },
+            "properties": observed,
         },
         "candidates": {
             "type": "array",
@@ -86,7 +123,7 @@ def response_schema(created: str) -> dict[str, Any]:
                 "type": "object",
                 "properties": {
                     "element": {"type": "string"},
-                    "action": {"type": "string", "enum": ACTIONS},
+                    "action": {"type": "string", "enum": ACTIONS + [a for a in EXTRA_ACTIONS if a in extras]},
                     "value": {"type": "string"},
                     "purpose": {"type": "string", "enum": PURPOSES},
                     "evidence": {
@@ -110,8 +147,13 @@ def response_schema(created: str) -> dict[str, Any]:
     }
 
 
-def _kind(e: dict[str, Any]) -> str:
+def _kind(e: dict[str, Any], extras: list[str] | tuple = ()) -> str:
     tag, role, typ = e["tag"], e.get("role", ""), e.get("type", "")
+    if e.get("canvas"):
+        return "text drawn on the page (click it to click there)"
+    if "choose" in extras and e.get("options") is not None:
+        opts = " / ".join(e["options"][:30]) + (" / ..." if len(e["options"]) > 30 else "")  # "|" separates the columns
+        return f"dropdown list (now {e.get('selected') or ''!r}; options: {opts})"
     if typ == "checkbox" or role == "checkbox":
         return "checkbox (ticked)" if e.get("checked") else "checkbox (not ticked)"
     if typ == "radio" or role == "radio":
@@ -129,11 +171,11 @@ def _kind(e: dict[str, Any]) -> str:
     return "button"
 
 
-def element_lines(elements: list[dict[str, Any]]) -> list[str]:
+def element_lines(elements: list[dict[str, Any]], extras: list[str] | tuple = ()) -> list[str]:
     lines = []
     for e in elements:
         text = e["text"] or "(no text)"
-        line = f"{e['id']} | {_kind(e)}{', disabled' if e.get('disabled') else ''} | {text}"
+        line = f"{e['id']} | {_kind(e, extras)}{', disabled' if e.get('disabled') else ''} | {text}"
         if e.get("understanding"):
             line += " | " + "; ".join(e["understanding"])
         lines.append(line)
@@ -142,7 +184,8 @@ def element_lines(elements: list[dict[str, Any]]) -> list[str]:
 
 def build_turn(persona: Persona, elements: list[dict[str, Any]], scroll: dict[str, int], ask_list: bool = False,
                history: list[str] | None = None, looking_at: str | None = None, situation: str | None = None,
-               created: str = "", article: str | None = None) -> str:
+               created: str = "", article: str | None = None, extras: list[str] | tuple = (),
+               outcome: dict[str, Any] | None = None) -> str:
     """created: what the workflow makes (config["workflow"]["created"]); needed when ask_list."""
     if ask_list and not created:
         raise ValueError("ask_list needs created: what the workflow makes, from flow.json engine.created")
@@ -166,12 +209,14 @@ def build_turn(persona: Persona, elements: list[dict[str, Any]], scroll: dict[st
         *([f"Their situation now: {situation}", ""] if situation else []),
         f"They are looking at: {looking_at or 'the whole screen'}",
         "Clickable elements in this part (id | kind | text they see | how they understand it):",
-        *(element_lines(elements) or ["(nothing clickable in this part)"]),
+        *(element_lines(elements, extras) or ["(nothing clickable in this part)"]),
         "",
         f"More content below: {'yes' if scroll.get('y', 0) < scroll.get('max', 0) else 'no'}",
     ]
     if ask_list:
         parts += ["", list_question(created, article)]
+    if outcome and outcome.get("kind") in OUTCOME_KEYS:
+        parts += ["", outcome_question(outcome)]
     return "\n".join(parts)
 
 
@@ -190,7 +235,7 @@ def parse_reply(text: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         raise ReplyError("no candidates list")
     out = []
     for c in candidates:
-        if not isinstance(c, dict) or c.get("action") not in ACTIONS:
+        if not isinstance(c, dict) or c.get("action") not in ALL_ACTIONS:
             continue
         c.setdefault("evidence", [])
         if c.get("purpose") not in PURPOSES:

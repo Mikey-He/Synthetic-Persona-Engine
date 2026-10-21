@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New test · Persona Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400;500;600&family=Roboto+Flex:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap">
+<link rel="stylesheet" href="platform.css">
+<script type="module" src="https://esm.run/@material/web/all.js"></script>
+<style>
+/* A vertical stepper, as in Google Cloud's create flows: one open step, the rest one line each. */
+.vstep { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 16px; }
+.vstep .rail-line { display: flex; flex-direction: column; align-items: center; }
+.vstep .num { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 500; font-size: 14px;
+  background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); flex: none; }
+.vstep.open .num { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.vstep.done .num { background: var(--md-sys-color-tertiary); color: #fff; }
+.vstep .line { width: 2px; flex: 1; background: var(--md-sys-color-outline-variant); margin: 6px 0; min-height: 20px; }
+.vstep:last-child .line { display: none; }
+.vstep .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
+.vstep .head h2 { font-size: 20px; }
+.vstep:not(.open) .head h2 { color: var(--md-sys-color-on-surface-variant); }
+.vstep.done .head h2 { color: var(--md-sys-color-on-surface); }
+.vstep .sum { color: var(--md-sys-color-on-surface-variant); font-size: 14px; margin: 2px 0 0; }
+.vstep .body { padding: 16px 0 32px; }
+.vstep:not(.open) .body { display: none; }
+.vstep.open .sum { display: none; }
+.lead { font-size: 15px; line-height: 22px; max-width: 680px; margin: 0 0 16px; }
+.browser { border-radius: 12px; overflow: hidden; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); }
+.browser .bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--md-sys-color-surface-container-high); font-size: 12px; color: var(--md-sys-color-on-surface-variant); }
+.browser .bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--md-sys-color-outline-variant); display: inline-block; }
+.browser .bar .addr { flex: 1; background: var(--md-sys-color-surface-container-lowest); border-radius: 12px; padding: 4px 12px; }
+.browser img { display: block; width: 100%; height: auto; }
+.rec { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.rec-list { max-height: 420px; }
+.rec-list div { animation: in .25s ease-out; }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--md-sys-color-error); display: inline-block; animation: pulse 1s infinite alternate; }
+.fact { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 8px; align-items: center; padding: 12px 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.fact:first-child { border-top: 0; }
+.fact .why { grid-column: 2; font-size: 12px; color: var(--md-sys-color-on-surface-variant); display: flex; gap: 4px; align-items: center; }
+.fact .why .ms { font-size: 14px; color: var(--md-sys-color-primary); }
+.fact label { font-size: 15px; cursor: pointer; }
+.prep .crow { grid-template-columns: 28px minmax(0, 1fr); }
+.prep .ms.spin { animation: spin 1s linear infinite; color: var(--md-sys-color-primary); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ask { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: center; }
+.crop { border-radius: 12px; overflow: hidden; border: 1px solid var(--md-sys-color-outline-variant); position: relative; background: var(--md-sys-color-surface-container); }
+.crop img { display: block; width: 100%; height: auto; }
+.crop .ring { position: absolute; border: 3px solid #e37400; border-radius: 8px; }
+.story { display: grid; gap: 0; }
+.story .srow { display: grid; grid-template-columns: 28px 160px minmax(0, 1fr); gap: 16px; align-items: center; padding: 12px 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.story .srow:first-child { border-top: 0; }
+.story .srow img { width: 160px; border-radius: 8px; border: 1px solid var(--md-sys-color-outline-variant); display: block; }
+.story .n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 500;
+  background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.fix { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; }
+.fix md-outlined-text-field { flex: 1; }
+@media (max-width: 900px) { .rec, .ask { grid-template-columns: 1fr; } .story .srow { grid-template-columns: 28px 1fr; } .story .srow img { display: none; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><span class="logo"><span class="ms fill" style="font-size:20px">diversity_3</span></span>Persona Engine<small>Prototype</small></div>
+  <span class="spacer"></span>
+  <md-icon-button aria-label="Help"><span class="ms">help</span></md-icon-button>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Main">
+    <div class="fab-slot"><md-fab size="medium" aria-label="New test"><span slot="icon" class="ms">add</span></md-fab></div>
+    <a href="#"><span class="pill"><span class="ms">home</span></span>Home</a>
+    <a href="#" class="on"><span class="pill"><span class="ms">science</span></span>Tests</a>
+    <a href="#"><span class="pill"><span class="ms">groups</span></span>Personas</a>
+    <a href="#"><span class="pill"><span class="ms">insights</span></span>Results</a>
+  </nav>
+  <main>
+    <div class="page" style="max-width:960px">
+      <a class="backlink" href="#"><span class="ms">arrow_back</span>Tests</a>
+      <div class="page-head"><div><h1>New test</h1><p class="muted">Four steps. You only tell us what only you know; we work out the rest.</p></div></div>
+
+      <!-- 1 -->
+      <section class="vstep open" id="s1">
+        <div class="rail-line"><span class="num">1</span><span class="line"></span></div>
+        <div>
+          <div class="head"><h2>What to test</h2><md-text-button data-edit="1" hidden>Edit</md-text-button></div>
+          <p class="sum" id="sum1"></p>
+          <div class="body">
+            <div class="form">
+              <md-outlined-text-field id="f-url" label="Product address" supporting-text="A test environment, never the live product: the test really clicks Send and Save."></md-outlined-text-field>
+              <md-outlined-text-field id="f-task" type="textarea" rows="4" label="The task, as participants will read it"></md-outlined-text-field>
+              <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+                <label class="row small"><md-switch id="f-login"></md-switch>The product needs a sign-in</label>
+                <md-text-button id="example"><span slot="icon" class="ms">auto_awesome</span>Fill in an example</md-text-button>
+              </div>
+              <div class="two" id="f-login-fields" hidden>
+                <md-outlined-text-field id="f-user" label="Test account"></md-outlined-text-field>
+                <md-outlined-text-field id="f-pass" label="Password" type="password" supporting-text="Kept on this computer only"></md-outlined-text-field>
+              </div>
+            </div>
+            <div class="actions" style="justify-content:flex-start;margin-top:20px"><md-filled-button id="next1" disabled>Continue</md-filled-button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="vstep" id="s2">
+        <div class="rail-line"><span class="num">2</span><span class="line"></span></div>
+        <div>
+          <div class="head"><h2>Do it once</h2><md-text-button data-edit="2" hidden>Record again</md-text-button></div>
+          <p class="sum" id="sum2"></p>
+          <div class="body">
+            <p class="lead">A browser window opens on your product, already signed in. Do the task the way it <b>should</b> be done, as a person who knows the product would. We write down each step; we never record passwords.</p>
+            <div id="rec-area"><md-filled-button id="open-browser"><span slot="icon" class="ms">open_in_new</span>Open the browser</md-filled-button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section class="vstep" id="s3">
+        <div class="rail-line"><span class="num">3</span><span class="line"></span></div>
+        <div>
+          <div class="head"><h2>What must be right at the end</h2><md-text-button data-edit="3" hidden>Edit</md-text-button></div>
+          <p class="sum" id="sum3"></p>
+          <div class="body">
+            <p class="lead">When you pressed <b>Send</b>, your product saved the following. Tick what the task requires. After every run we check these in what was saved, not by which page the person ends on: reaching the right page with the wrong settings is the mistake we most want to catch.</p>
+            <div class="card" id="facts"></div>
+            <div class="actions" style="justify-content:flex-start;margin-top:20px"><md-filled-button id="next3">Continue</md-filled-button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section class="vstep" id="s4">
+        <div class="rail-line"><span class="num">4</span><span class="line"></span></div>
+        <div>
+          <div class="head"><h2>We get it ready</h2></div>
+          <p class="sum" id="sum4"></p>
+          <div class="body" id="prep-area"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="snack" id="snack" role="status" aria-live="polite"><span id="snack-text"></span><button id="snack-action" hidden>Undo</button></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const SHOT = n => `../../data/workflows/teamspace-invite-platform-test/recording/state_${String(n).padStart(3, '0')}.png`;
+const EXAMPLE = {url: 'http://127.0.0.1:4100/home', user: 'admin@lumenlabs.example', pass: 'teamspace-demo',
+  task: 'A new colleague, Priya Shah (priya.shah@lumenlabs.example), joins next week. Invite her to the workspace so that she can only view work, and only in the Lyra project.\n\nSend the invite and tell us when you have finished.'};
+// What the recording holds (the real Teamspace recording), as a person would say it.
+const ACTIONS = [
+  [0, '/home', 'Clicked <b>Members</b> in the left menu'], [1, '/members', 'Clicked <b>Invite people</b>'],
+  [2, '/members/invite', 'Typed <b>priya.shah@lumenlabs.example</b> as the email'], [3, '/members/invite', 'Typed <b>Priya Shah</b> as the display name'],
+  [4, '/members/invite', 'Opened <b>About roles</b> to read the help'], [5, '/members/invite', 'Closed <b>About roles</b>'],
+  [6, '/members/invite', 'Chose <b>Viewer</b> (it was Contributor)'], [7, '/members/invite', 'Clicked <b>Continue</b>'],
+  [8, '/members/invite', 'Unticked <b>Orion</b>'], [9, '/members/invite', 'Unticked <b>Vega</b>'], [10, '/members/invite', 'Ticked <b>Lyra</b>'],
+  [11, '/members/invite', 'Clicked <b>Send invite</b>'], [12, '/members/invite', 'Clicked <b>Send</b> in the confirmation'],
+];
+// The saved request, as sentences; the first guess of which ones the task requires, and why.
+const FACTS = [
+  {text: 'Priya Shah is invited, at priya.shah@lumenlabs.example', on: true, why: 'The task names her'},
+  {text: 'Her role is <b>Viewer</b>', on: true, why: 'The task says she can only view work'},
+  {text: 'She can open <b>Lyra</b>, and no other project', on: true, why: 'The task says only the Lyra project'},
+  {text: 'A welcome email is sent', on: false, why: 'The task does not mention it, so either way is fine'},
+];
+const STORY = [
+  {shot: 0, text: 'Go to <b>Members</b> in the left menu'},
+  {shot: 1, text: 'Click <b>Invite people</b>'},
+  {shot: 2, text: 'Fill in her email and name, and choose <b>Viewer</b>', hard: 'Contributor is chosen by default'},
+  {shot: 9, text: 'Untick <b>Orion</b> and <b>Vega</b>, tick <b>Lyra</b>, then <b>Send invite</b>', hard: 'Orion and Vega are ticked by default'},
+  {shot: 12, text: 'Confirm with <b>Send</b>'},
+];
+const KNOW = ['Members are under <b>People</b> in the left menu', 'What a <b>Viewer</b> can and cannot do, and that <b>Contributor</b> can edit',
+  'Ticked projects are the ones she can open; unticked ones she cannot', 'The <b>?</b> next to Role explains the roles',
+  'Nothing is sent until <b>Send</b> in the confirmation is pressed'];
+let facts = FACTS.map(f => ({...f}));
+
+let snackTimer;
+function snack(t) { clearTimeout(snackTimer); $('#snack-text').textContent = t; $('#snack').classList.add('show'); snackTimer = setTimeout(() => $('#snack').classList.remove('show'), 4000); }
+function open(n) {
+  for (let i = 1; i <= 4; i++) {
+    const s = $('#s' + i);
+    s.classList.toggle('open', i === n || (i === 4 && n === 5));
+    s.classList.toggle('done', i < n || (i === 4 && n === 5));
+    const ed = s.querySelector('[data-edit]'); if (ed) ed.hidden = !(i < n);
+    s.querySelector('.num').innerHTML = (i < n || (i === 4 && n === 5)) ? '<span class="ms" style="font-size:18px">check</span>' : i;
+  }
+  const t = $('#s' + Math.min(n, 4)); setTimeout(() => t.scrollIntoView({behavior: 'smooth', block: 'start'}), 50);
+}
+
+/* 1: what to test */
+const valid1 = () => /^https?:\/\/\S+/.test($('#f-url').value) && $('#f-task').value.trim().length > 20;
+['#f-url', '#f-task'].forEach(id => $(id).addEventListener('input', () => { $('#next1').disabled = !valid1(); }));
+$('#f-login').addEventListener('change', () => { $('#f-login-fields').hidden = !$('#f-login').selected; });
+$('#example').addEventListener('click', () => {
+  $('#f-url').value = EXAMPLE.url; $('#f-task').value = EXAMPLE.task; $('#f-login').selected = true; $('#f-login-fields').hidden = false;
+  $('#f-user').value = EXAMPLE.user; $('#f-pass').value = EXAMPLE.pass; $('#next1').disabled = false;
+});
+$('#next1').addEventListener('click', () => {
+  const host = $('#f-url').value.replace(/^https?:\/\//, '').split('/')[0];
+  $('#sum1').textContent = `${host}${$('#f-login').selected ? ' · signed in as ' + $('#f-user').value : ''} · “${$('#f-task').value.trim().split(/(?<=[.!?])\s/)[0]}”`;
+  open(2);
+});
+
+/* 2: do it once (the browser window is simulated with the real recording) */
+$('#open-browser').addEventListener('click', () => {
+  $('#rec-area').innerHTML = `<div class="rec">
+      <div class="browser"><div class="bar"><i></i><i></i><i></i><span class="addr" id="addr">127.0.0.1:4100/home</span></div><img id="live" src="${SHOT(0)}" alt="Your product, in the browser window"></div>
+      <div><div class="row small" style="gap:8px"><span class="rec-dot"></span><b>Recording</b><span class="muted">Do the task in the window</span></div>
+        <div class="rec-list" id="rec-list"></div>
+        <div class="actions" style="justify-content:flex-start;margin-top:12px"><md-filled-button id="done-rec" disabled>I'm done</md-filled-button></div></div></div>`;
+  let i = 0;
+  const tick = () => {
+    if (i >= ACTIONS.length) { $('#done-rec').disabled = false; return; }
+    const [n, route, text] = ACTIONS[i];
+    $('#live').src = SHOT(n + 1); $('#addr').textContent = '127.0.0.1:4100' + (i + 1 < ACTIONS.length ? ACTIONS[i + 1][1] : '/members');
+    $('#rec-list').insertAdjacentHTML('beforeend', `<div><span class="tag">${i + 1}</span><span>${text}</span></div>`);
+    $('#rec-list').scrollTop = 1e6; i++; setTimeout(tick, 700);
+  };
+  setTimeout(tick, 600);
+  $('#done-rec').addEventListener('click', () => {
+    $('#sum2').textContent = `${ACTIONS.length} steps on 3 pages, ending with Send`;
+    renderFacts(); open(3);
+  });
+});
+document.querySelector('[data-edit="2"]').addEventListener('click', () => { $('#rec-area').innerHTML = '<md-filled-button id="open-browser2"><span slot="icon" class="ms">open_in_new</span>Open the browser</md-filled-button>'; open(2); snack('The new recording will replace this one.'); });
+
+/* 3: what must be right */
+function renderFacts() {
+  $('#facts').innerHTML = facts.map((f, i) => `<div class="fact"><md-checkbox id="fact${i}" data-fact="${i}" ${f.on ? 'checked' : ''} touch-target="wrapper"></md-checkbox>
+    <label for="fact${i}">${f.text}</label><div class="why"><span class="ms">auto_awesome</span>${f.why}</div></div>`).join('');
+  document.querySelectorAll('[data-fact]').forEach(c => c.addEventListener('change', () => { facts[+c.dataset.fact].on = c.checked; }));
+}
+$('#next3').addEventListener('click', () => {
+  const n = facts.filter(f => f.on).length;
+  if (!n) return snack('Tick at least one thing that must be right.');
+  $('#sum3').textContent = `${n} things must be right: ` + facts.filter(f => f.on).map(f => f.text.replace(/<[^>]+>/g, '')).join('; ');
+  open(4); prepare();
+});
+document.querySelectorAll('[data-edit="1"],[data-edit="3"]').forEach(b => b.addEventListener('click', () => open(+b.dataset.edit)));
+
+/* 4: we get it ready (background work, then at most a question or two) */
+const WORK = ['Splitting what you did into steps', 'Working out what a person needs to know at each step',
+  'Checking that someone who knows everything can finish', 'Checking that someone who knows nothing gets stuck'];
+function prepare() {
+  $('#prep-area').innerHTML = `<div class="card prep"><div class="checklist">${WORK.map((w, i) => `<div class="crow"><span class="ms" id="w${i}">radio_button_unchecked</span><span>${w}</span></div>`).join('')}</div></div><div id="after"></div>`;
+  let i = 0;
+  const step = () => {
+    if (i > 0) { const p = $('#w' + (i - 1)); p.textContent = 'check_circle'; p.className = 'ms ok'; }
+    if (i === WORK.length) return ask();
+    const c = $('#w' + i); c.textContent = 'progress_activity'; c.className = 'ms spin'; i++; setTimeout(step, 1100);
+  };
+  step();
+}
+function ask() {
+  $('#after').innerHTML = `<div class="card" style="margin-top:16px"><div class="row"><span class="ms" style="color:var(--md-sys-color-primary)">help</span><h3>One thing we are not sure about</h3></div>
+    <div class="ask" style="margin-top:12px">
+      <div class="crop"><img src="${SHOT(0)}" alt="The home page"><span class="ring" style="left:66%;top:42.5%;width:28%;height:3.5%"></span><span class="ring" style="left:0.5%;top:24%;width:15%;height:4.5%;border-color:var(--md-sys-color-primary)"></span></div>
+      <div><p style="margin:0 0 8px">You went to <b>Members</b> in the left menu. The home page also has <b>Manage members</b> under Quick links.</p>
+        <p class="muted" style="margin:0 0 16px">If a person uses that link instead, did they still do it the right way?</p>
+        <div class="row" style="flex-wrap:wrap"><md-filled-tonal-button data-answer="1">Yes, that's fine too</md-filled-tonal-button><md-outlined-button data-answer="0">No, count it as a detour</md-outlined-button></div></div>
+    </div></div>`;
+  document.querySelectorAll('[data-answer]').forEach(b => b.addEventListener('click', () => ready(b.dataset.answer === '1')));
+}
+function ready(both) {
+  $('#after').innerHTML = `<div class="card" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap"><div class="row"><span class="ms ok" style="font-size:28px">verified</span><div><h2>Ready to test</h2>
+        <p class="muted small" style="margin:2px 0 0">Someone who knows everything finished; someone who knows nothing got stuck at step 3.</p></div></div>
+        <md-filled-button id="go"><span slot="icon" class="ms">play_arrow</span>Choose personas and run</md-filled-button></div>
+      <h3 style="margin:24px 0 4px">The task, step by step</h3>
+      <div class="story">${STORY.map((s, i) => `<div class="srow"><span class="n">${i + 1}</span><img src="${SHOT(s.shot)}" alt=""><div>${s.text}${i === 0 && both ? '<div class="muted small">Or <b>Manage members</b> on the home page</div>' : ''}
+        ${s.hard ? `<div style="margin-top:6px"><span class="tag amber"><span class="ms">warning</span>Easy to get wrong: ${s.hard}</span></div>` : ''}</div></div>`).join('')}</div>
+      <details class="more" style="margin-top:16px"><summary><h3>What a person needs to know</h3><span class="ms">expand_more</span></summary>
+        <ul style="margin:8px 0 0;padding-left:20px;line-height:1.8">${KNOW.map(k => `<li>${k}</li>`).join('')}</ul>
+        <p class="muted small">Each persona knows some of these and not others. What they don't know, they see as made-up words or covered icons.</p></details>
+      <div class="fix"><md-outlined-text-field id="fix" label="Something not right? Tell us in a sentence" placeholder="e.g. Most people don't know a Viewer can't comment"></md-outlined-text-field>
+        <md-filled-tonal-button id="fix-send">Update</md-filled-tonal-button></div>
+    </div>`;
+  $('#sum4').textContent = 'Ready';
+  open(5);
+  $('#fix-send').addEventListener('click', () => {
+    const v = $('#fix').value.trim(); if (!v) return;
+    $('#fix').value = ''; const ul = document.querySelector('.story + details ul');
+    ul.insertAdjacentHTML('beforeend', `<li>${v.replace(/[<>&]/g, '')} <span class="tag blue">added</span></li>`);
+    document.querySelector('.story + details').open = true; snack('Updated. We checked again: still ready.');
+  });
+  $('#go').addEventListener('click', () => snack('Next: pick personas and how many runs each (the Run page).'));
+}
+</script>
+</body>
+</html>

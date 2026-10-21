@@ -27,3 +27,13 @@ node_modules/
 synthetic-user-engine/synthetic-user-engine/data/personas/studio-*.json
 synthetic-user-engine/synthetic-user-engine/data/studio-configurations/
 synthetic-user-engine/synthetic-user-engine/tools/persona-studio/.extraction-cache/
+
+# Workflows onboarded in the platform (2026-10-19): the flow.json and basics are the definition; the
+# recording (screenshots of the product), the model's draft notes and check results stay local
+synthetic-user-engine/synthetic-user-engine/data/workflows/*/recording/
+synthetic-user-engine/synthetic-user-engine/data/workflows/*/draft-notes.json
+synthetic-user-engine/synthetic-user-engine/data/workflows/*/check.json
+synthetic-user-engine/synthetic-user-engine/data/workflows/*/flow.prev.json
+synthetic-user-engine/synthetic-user-engine/data/version-a/flow.prev.json
+synthetic-user-engine/synthetic-user-engine/data/personas/.deleted/
+synthetic-user-engine/synthetic-user-engine/data/workflows/*/session.json

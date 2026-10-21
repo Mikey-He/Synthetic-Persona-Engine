@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Persona Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400;500;600&family=Roboto+Flex:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap">
+<script type="module" src="https://esm.run/@material/web/all.js"></script>
+<style>
+/* Material 3 tokens, Google's own product palette (GM3) */
+:root {
+  --md-ref-typeface-brand: "Google Sans Flex", "Roboto Flex", Roboto, system-ui, sans-serif;
+  --md-ref-typeface-plain: "Google Sans Flex", "Roboto Flex", Roboto, system-ui, sans-serif;
+  --md-sys-color-primary: #0b57d0;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d3e3fd;
+  --md-sys-color-on-primary-container: #041e49;
+  --md-sys-color-secondary-container: #c2e7ff;
+  --md-sys-color-on-secondary-container: #001d35;
+  --md-sys-color-tertiary: #146c2e;
+  --md-sys-color-tertiary-container: #c4eed0;
+  --md-sys-color-error: #b3261e;
+  --md-sys-color-error-container: #f9dedc;
+  --md-sys-color-surface: #f8fafd;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f8fafd;
+  --md-sys-color-surface-container: #f0f4f9;
+  --md-sys-color-surface-container-high: #e9eef6;
+  --md-sys-color-surface-container-highest: #dde3ea;
+  --md-sys-color-on-surface: #1f1f1f;
+  --md-sys-color-on-surface-variant: #444746;
+  --md-sys-color-outline: #747775;
+  --md-sys-color-outline-variant: #c4c7c5;
+  --warn: #8a5300; --warn-container: #ffdeac;
+  --radius-l: 28px; --radius-m: 16px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-sys-color-primary: #a8c7fa; --md-sys-color-on-primary: #062e6f;
+    --md-sys-color-primary-container: #0842a0; --md-sys-color-on-primary-container: #d3e3fd;
+    --md-sys-color-secondary-container: #004a77; --md-sys-color-on-secondary-container: #c2e7ff;
+    --md-sys-color-tertiary: #6dd58c; --md-sys-color-tertiary-container: #0f5223;
+    --md-sys-color-error: #f2b8b5; --md-sys-color-error-container: #8c1d18;
+    --md-sys-color-surface: #131314;
+    --md-sys-color-surface-container-lowest: #0e0e0e; --md-sys-color-surface-container-low: #1b1b1b;
+    --md-sys-color-surface-container: #1e1f20; --md-sys-color-surface-container-high: #282a2c;
+    --md-sys-color-surface-container-highest: #333537;
+    --md-sys-color-on-surface: #e3e3e3; --md-sys-color-on-surface-variant: #c4c7c5;
+    --md-sys-color-outline: #8e918f; --md-sys-color-outline-variant: #444746;
+    --warn: #ffb95c; --warn-container: #5a3a00;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface);
+  font: 400 14px/20px var(--md-ref-typeface-plain); -webkit-font-smoothing: antialiased; }
+.ms { font-family: "Material Symbols Outlined"; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1;
+  display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: "liga"; font-feature-settings: "liga"; }
+.ms.fill { font-variation-settings: "FILL" 1; }
+h1, h2, h3 { font-family: var(--md-ref-typeface-brand); font-weight: 400; margin: 0; text-wrap: balance; }
+h1 { font-size: 32px; line-height: 40px; }
+h2 { font-size: 22px; line-height: 28px; }
+h3 { font-size: 16px; line-height: 24px; font-weight: 500; }
+.muted { color: var(--md-sys-color-on-surface-variant); }
+.small { font-size: 12px; line-height: 16px; }
+
+/* app shell: top bar, navigation rail, content */
+.top { height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px; position: sticky; top: 0; z-index: 5;
+  background: var(--md-sys-color-surface); }
+.brand { display: flex; align-items: center; gap: 10px; font: 400 22px/28px var(--md-ref-typeface-brand); padding-left: 8px; }
+.brand .logo { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.brand small { font-size: 12px; color: var(--md-sys-color-on-surface-variant); border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+.top .spacer { flex: 1; }
+.workflow-pick { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 16px; border-radius: 20px;
+  background: var(--md-sys-color-surface-container-high); cursor: pointer; border: 0; color: inherit; font: inherit; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 500;
+  background: #1e8e3e; color: #fff; font-size: 14px; }
+.shell { display: flex; min-height: calc(100% - 64px); }
+.rail { width: 88px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 4px;
+  position: sticky; top: 64px; height: calc(100vh - 64px); }
+.rail .fab-slot { margin: 4px 0 20px; }
+.rail a { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 80px; text-decoration: none;
+  color: var(--md-sys-color-on-surface-variant); font-size: 12px; font-weight: 500; padding: 2px 0 6px; }
+.rail a .pill { width: 56px; height: 32px; border-radius: 16px; display: grid; place-items: center; transition: background .2s; }
+.rail a:hover .pill { background: var(--md-sys-color-surface-container-high); }
+.rail a.on { color: var(--md-sys-color-on-surface); }
+.rail a.on .pill { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.rail a.on .ms { font-variation-settings: "FILL" 1; }
+main { flex: 1; min-width: 0; padding: 8px 24px 48px 8px; }
+.page { max-width: 1120px; margin: 0 auto; animation: in .25s ease-out; }
+@keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.page-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 16px 0 24px; flex-wrap: wrap; }
+.page-head p { margin: 6px 0 0; }
+
+/* surfaces */
+.card { background: var(--md-sys-color-surface-container-lowest); border-radius: var(--radius-m); padding: 20px;
+  border: 1px solid var(--md-sys-color-outline-variant); }
+.card.tonal { background: var(--md-sys-color-surface-container); border-color: transparent; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.row { display: flex; align-items: center; gap: 12px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 8px; font-size: 12px;
+  font-weight: 500; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface-variant); }
+.tag.blue { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.tag.green { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-tertiary); }
+.tag.amber { background: var(--warn-container); color: var(--warn); }
+.tag .ms { font-size: 16px; }
+.proto { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--md-sys-color-on-surface-variant); }
+
+/* home */
+.hello { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+.steps3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+.step3 { border-radius: var(--radius-m); padding: 16px; background: var(--md-sys-color-surface-container); cursor: pointer;
+  border: 0; text-align: left; color: inherit; font: inherit; transition: background .15s; }
+.step3:hover { background: var(--md-sys-color-surface-container-high); }
+.step3 .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 500;
+  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); margin-bottom: 12px; }
+.step3.done .n { background: var(--md-sys-color-tertiary); }
+.insight { font: 400 20px/28px var(--md-ref-typeface-brand); margin: 8px 0 12px; }
+
+/* persona cards */
+.pcard { position: relative; cursor: pointer; transition: box-shadow .2s, transform .2s; }
+.pcard:hover { box-shadow: 0 1px 3px rgba(0,0,0,.15), 0 4px 8px 3px rgba(0,0,0,.08); }
+.pav { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font: 500 18px var(--md-ref-typeface-brand);
+  flex: none; }
+.pcard p { margin: 12px 0; }
+
+/* composer (describe a persona) */
+.composer { max-width: 760px; margin: 40px auto 0; text-align: center; }
+.composer h1 { font-size: 36px; line-height: 44px; }
+.spark { background: linear-gradient(90deg, #4285f4, #9b72cb, #d96570); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.prompt { margin-top: 28px; border-radius: var(--radius-l); background: var(--md-sys-color-surface-container); padding: 8px 8px 8px 20px;
+  display: flex; align-items: end; gap: 8px; text-align: left; border: 1px solid transparent; transition: border-color .15s, background .15s; }
+.prompt:focus-within { background: var(--md-sys-color-surface-container-lowest); border-color: var(--md-sys-color-outline-variant);
+  box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.prompt textarea { flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: inherit;
+  font: 400 16px/24px var(--md-ref-typeface-plain); padding: 12px 0; min-height: 48px; max-height: 200px;
+  overflow-y: hidden; scrollbar-width: none; }
+.prompt textarea::-webkit-scrollbar { display: none; }
+.prompt textarea::placeholder { color: var(--md-sys-color-on-surface-variant); opacity: 1; }
+.composer .chips { justify-content: center; margin-top: 16px; }
+.composer .roles { margin-top: 28px; }
+.drafting { margin: 40px auto; max-width: 760px; }
+.shimmer { height: 14px; border-radius: 7px; margin: 12px 0;
+  background: linear-gradient(90deg, var(--md-sys-color-surface-container-high) 25%, var(--md-sys-color-primary-container) 50%, var(--md-sys-color-surface-container-high) 75%);
+  background-size: 200% 100%; animation: sh 1.4s infinite linear; }
+@keyframes sh { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* persona review */
+.review { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+.summary { position: sticky; top: 80px; }
+.trait { padding: 14px 0; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.trait:first-of-type { border-top: 0; padding-top: 4px; }
+.trait .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.trait md-slider { width: 100%; margin: 4px -8px 0; }
+.readout { font-size: 13px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
+.source { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--md-sys-color-primary);
+  background: color-mix(in srgb, var(--md-sys-color-primary-container) 60%, transparent); padding: 2px 8px; border-radius: 8px; margin-top: 8px; }
+.source.default { color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-high); }
+.source .ms { font-size: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--md-sys-color-outline); border-radius: 20px; overflow: hidden; flex: none; }
+.seg button { border: 0; background: transparent; color: var(--md-sys-color-on-surface); font: 500 13px var(--md-ref-typeface-plain);
+  height: 36px; padding: 0 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.seg button + button { border-left: 1px solid var(--md-sys-color-outline); }
+.seg button.on { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.seg button.on::before { content: "check"; font-family: "Material Symbols Outlined"; font-size: 18px; }
+.knowrow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0;
+  border-top: 1px solid var(--md-sys-color-outline-variant); }
+.knowrow:first-of-type { border-top: 0; }
+details.more summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+details.more summary::-webkit-details-marker { display: none; }
+details.more[open] summary .ms { transform: rotate(180deg); }
+.radar { display: grid; gap: 10px; margin: 16px 0; }
+.bar { height: 8px; border-radius: 4px; background: var(--md-sys-color-surface-container-highest); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 4px; background: var(--md-sys-color-primary); transition: width .3s; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
+
+/* run */
+.run-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+.pick { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-radius: 12px; cursor: pointer; }
+.pick:hover { background: var(--md-sys-color-surface-container); }
+.stepper { display: flex; gap: 4px; align-items: center; }
+.livecard { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 14px 0;
+  border-top: 1px solid var(--md-sys-color-outline-variant); }
+.livecard:first-child { border-top: 0; }
+.dots { display: flex; gap: 6px; margin-top: 8px; }
+.dots span { width: 22px; height: 6px; border-radius: 3px; background: var(--md-sys-color-surface-container-highest); }
+.dots span.ok { background: var(--md-sys-color-tertiary); }
+.dots span.fail { background: var(--md-sys-color-error); }
+.dots span.now { background: var(--md-sys-color-primary); animation: pulse 1s infinite alternate; }
+@keyframes pulse { to { opacity: .35; } }
+
+/* results */
+.headline { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; }
+.big { font: 400 56px/60px var(--md-ref-typeface-brand); color: var(--md-sys-color-error); }
+.friction { display: grid; grid-template-columns: 28px minmax(0,1fr) 180px 80px; gap: 16px; align-items: center; padding: 16px 0;
+  border-top: 1px solid var(--md-sys-color-outline-variant); }
+.friction:first-child { border-top: 0; }
+.friction .bar i.red { background: var(--md-sys-color-error); }
+.friction .bar i.amber { background: var(--warn); }
+.friction .bar i.green { background: var(--md-sys-color-tertiary); }
+table.matrix { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.matrix th, table.matrix td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+table.matrix th { font-weight: 500; color: var(--md-sys-color-on-surface-variant); }
+.cell { display: inline-flex; align-items: center; gap: 6px; }
+.cell .ms { font-size: 18px; }
+.ok { color: var(--md-sys-color-tertiary); } .bad { color: var(--md-sys-color-error); }
+.tabs-wrap md-tabs { --md-primary-tab-container-color: transparent; margin-bottom: 20px; }
+
+/* snackbar and live dialog */
+.snack { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 120px); background: #303030; color: #f2f2f2;
+  border-radius: 4px; padding: 14px 8px 14px 16px; display: flex; align-items: center; gap: 24px; min-width: 320px;
+  box-shadow: 0 3px 5px rgba(0,0,0,.2); transition: transform .25s cubic-bezier(.2,0,0,1); z-index: 20; font-size: 14px; }
+.snack.show { transform: translate(-50%, 0); }
+.snack button { background: none; border: 0; color: #a8c7fa; font: 500 14px var(--md-ref-typeface-plain); cursor: pointer; padding: 8px 12px; border-radius: 20px; }
+.live { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; min-height: 360px; }
+.screen { border-radius: 12px; background: var(--md-sys-color-surface-container); display: grid; place-items: center; min-height: 340px;
+  position: relative; overflow: hidden; }
+.screen .fake { width: 86%; display: grid; gap: 10px; }
+.screen .fake i { display: block; height: 14px; border-radius: 6px; background: var(--md-sys-color-surface-container-highest); }
+.screen .pointer { position: absolute; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fbbc04; left: 62%; top: 58%;
+  animation: move 2.4s infinite ease-in-out; }
+@keyframes move { 50% { left: 40%; top: 70%; } }
+.log { font-size: 13px; display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow: auto; }
+.log div { padding: 10px 12px; border-radius: 12px; background: var(--md-sys-color-surface-container); }
+.log b { font-weight: 500; }
+md-dialog { --md-dialog-container-color: var(--md-sys-color-surface-container-high); max-width: 920px; width: calc(100vw - 48px); }
+md-dialog { z-index: 40; }
+#discard-dialog { max-width: 400px; }
+
+/* side sheet: edit an existing persona without leaving the page */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.32); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30; }
+.scrim.show { opacity: 1; pointer-events: auto; }
+.sheet { position: fixed; top: 0; right: 0; height: 100%; width: min(540px, 100vw); z-index: 31; display: flex; flex-direction: column;
+  background: var(--md-sys-color-surface-container-low); border-radius: 16px 0 0 16px; transform: translateX(105%);
+  transition: transform .3s cubic-bezier(.2,0,0,1); box-shadow: 0 8px 12px 6px rgba(0,0,0,.15), 0 4px 4px rgba(0,0,0,.3); }
+.sheet.show { transform: none; }
+.sheet-head { display: flex; align-items: center; gap: 4px; padding: 12px 12px 4px; }
+.sheet-head h2 { flex: 1; margin-left: 4px; }
+.sheet-body { flex: 1; overflow: auto; padding: 8px 24px 24px; }
+.sheet-foot { display: flex; gap: 8px; align-items: center; padding: 12px 24px; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.sheet-foot .grow { flex: 1; }
+.sec { padding: 20px 0 8px; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.sec:first-child { border-top: 0; padding-top: 4px; }
+.sheet .knowrow { flex-wrap: wrap; }
+.dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--md-sys-color-primary); display: inline-block; margin-left: 6px; vertical-align: middle; }
+
+@media (max-width: 900px) {
+  .hello, .review, .run-grid, .live { grid-template-columns: 1fr; }
+  .summary { position: static; }
+  .steps3 { grid-template-columns: 1fr; }
+  .friction { grid-template-columns: 28px minmax(0,1fr); }
+  .friction .bar, .friction .pct { grid-column: 2; }
+}
+@media (max-width: 640px) {
+  .rail { position: fixed; bottom: 0; top: auto; height: 72px; width: 100%; flex-direction: row; justify-content: space-around;
+    background: var(--md-sys-color-surface-container); z-index: 6; padding: 0; }
+  .rail .fab-slot { display: none; }
+  main { padding: 8px 16px 96px; }
+  .workflow-pick span.label, .brand small, #help-btn, .top > md-icon-button { display: none; }
+  .brand { font-size: 18px; }
+  md-tabs { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <md-icon-button aria-label="Main menu"><span class="ms">menu</span></md-icon-button>
+  <div class="brand"><span class="logo"><span class="ms fill" style="font-size:20px">diversity_3</span></span>Persona Engine<small>Prototype</small></div>
+  <span class="spacer"></span>
+  <button class="workflow-pick" id="workflow-pick" title="The workflow being tested">
+    <span class="ms" style="font-size:20px">account_tree</span><span class="label">Budget setup · Version A</span><span class="ms" style="font-size:20px">arrow_drop_down</span>
+  </button>
+  <md-icon-button aria-label="Help" id="help-btn"><span class="ms">help</span></md-icon-button>
+  <span class="avatar" title="Mikey">M</span>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Main">
+    <div class="fab-slot"><md-fab size="medium" aria-label="New persona" id="rail-fab"><span slot="icon" class="ms">edit</span></md-fab></div>
+    <a href="#home" data-nav="home"><span class="pill"><span class="ms">home</span></span>Home</a>
+    <a href="#personas" data-nav="personas"><span class="pill"><span class="ms">groups</span></span>Personas</a>
+    <a href="#run" data-nav="run"><span class="pill"><span class="ms">play_circle</span></span>Run test</a>
+    <a href="#results" data-nav="results"><span class="pill"><span class="ms">insights</span></span>Results</a>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<md-dialog id="live-dialog">
+  <div slot="headline">Watching run 3 of 5 · Rushed FinOps admin</div>
+  <div slot="content">
+    <div class="live">
+      <div class="screen"><div class="fake"><i style="width:40%"></i><i></i><i style="width:80%"></i><i style="width:65%"></i><i></i><i style="width:50%"></i></div><span class="pointer"></span></div>
+      <div class="log" id="live-log"></div>
+    </div>
+  </div>
+  <div slot="actions"><md-text-button id="live-close">Close</md-text-button></div>
+</md-dialog>
+
+<md-dialog id="workflow-dialog">
+  <div slot="headline">Choose a workflow</div>
+  <div slot="content">
+    <p class="muted" style="margin-top:0">A workflow is one task on one design. Each comes from its own flow file.</p>
+    <md-list>
+      <md-list-item type="button" data-flow="a"><span slot="start" class="ms">account_tree</span><div slot="headline">Budget setup · Version A</div><div slot="supporting-text">One long form, like the Google Cloud console · 38 knowledge items</div><span slot="end" class="ms" style="color:var(--md-sys-color-primary)">check</span></md-list-item>
+      <md-list-item type="button" data-flow="b"><span slot="start" class="ms">view_carousel</span><div slot="headline">Budget setup · Version B</div><div slot="supporting-text">One question per screen · kept back for an unseen-design test</div></md-list-item>
+      <md-list-item type="button" disabled><span slot="start" class="ms">add</span><div slot="headline">Add a workflow</div><div slot="supporting-text">Point to a new flow.json</div></md-list-item>
+    </md-list>
+  </div>
+  <div slot="actions"><md-text-button id="workflow-close">Done</md-text-button></div>
+</md-dialog>
+
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <div class="sheet-head">
+    <md-icon-button id="sheet-close" aria-label="Close"><span class="ms">close</span></md-icon-button>
+    <h2 id="sheet-title">Edit persona</h2>
+    <md-icon-button id="sheet-dup" aria-label="Duplicate" title="Duplicate"><span class="ms">content_copy</span></md-icon-button>
+  </div>
+  <div class="sheet-body" id="sheet-body" data-editor="sheet"></div>
+  <div class="sheet-foot">
+    <md-text-button id="sheet-run"><span slot="icon" class="ms">play_arrow</span>Run a test</md-text-button>
+    <span class="grow"></span>
+    <md-outlined-button id="sheet-cancel">Cancel</md-outlined-button>
+    <md-filled-button id="sheet-save" disabled>Save</md-filled-button>
+  </div>
+  <md-dialog id="discard-dialog">
+    <div slot="headline">Discard your changes?</div>
+    <div slot="content">The persona stays as it was before you opened it.</div>
+    <div slot="actions"><md-text-button id="discard-keep">Keep editing</md-text-button><md-text-button id="discard-yes">Discard</md-text-button></div>
+  </md-dialog>
+</aside>
+
+<div class="snack" id="snack" role="status" aria-live="polite"><span id="snack-text"></span><button id="snack-action" hidden>Undo</button></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------------- sample data (prototype) ---------------- */
+const COLORS = [['#d3e3fd','#041e49'],['#c4eed0','#072711'],['#ffdeac','#2a1800'],['#f9dedc','#410e0b'],['#e8def8','#1d192b']];
+const TRAITS = [
+  {key:'risk', title:'Willingness to try unfamiliar things', low:'Avoids anything unclear; goes back or gives up', mid:'Looks for help first, then tries', high:'Clicks to see what happens'},
+  {key:'patience', title:'Patience', low:'Gives up after about 3 wrong turns', mid:'Keeps going for about 6 wrong turns', high:'Keeps trying for about 10'},
+  {key:'detailFind', title:'Reading pages', low:'Clicks the first thing that looks right', mid:'Skims the main parts first', high:'Reads the whole page first'},
+  {key:'detailCheck', title:'Checking forms', low:'Leaves defaults they were not asked to change', mid:'Fixes what conflicts with the task', high:'Checks every field before saving'},
+];
+const STATES = [
+  {key:'fatigue', title:'Gets tired', note:'Carefulness and patience fall as the task goes on.'},
+  {key:'distraction', title:'Gets distracted', note:'Sometimes misses a small element on the screen.'},
+  {key:'timePressure', title:'Time pressure', note:'Reads less, takes more risks, gives up sooner.'},
+];
+const KNOW = [
+  {key:'billing', title:'Billing terms', ex:'Billing account, Budgets & caps', word:true},
+  {key:'scope', title:'Scope terms', ex:'Projects, Services, Labels, Credits', word:true},
+  {key:'budget', title:'Budget terms', ex:'Target amount, Specified amount', word:true},
+  {key:'alerts', title:'Alert terms', ex:'Threshold, Actual vs forecasted, recipients', word:true},
+  {key:'concepts', title:'How budgets work', ex:'Account vs project, alerts vs caps', word:false},
+];
+let personas = [
+  {id:'p1', name:'Rushed FinOps admin', role:'FinOps / cloud cost administrator', blurb:'Sets up budgets between meetings. Knows the console well but skims defaults.',
+   traits:{risk:5, patience:4, detailFind:5, detailCheck:2.5}, states:{fatigue:4, distraction:3, timePressure:6}, know:{billing:2,scope:2,budget:2,alerts:2,concepts:2}, color:0, runs:1},
+  {id:'p2', name:'Careful finance analyst', role:'Finance / FP&A', blurb:'Understands budgets, less familiar with the console. Checks every field twice.',
+   traits:{risk:2.5, patience:7.5, detailFind:7.5, detailCheck:10}, states:{fatigue:2, distraction:0, timePressure:2}, know:{billing:2,scope:1,budget:2,alerts:1,concepts:1}, color:1, runs:1},
+  {id:'p3', name:'New cloud engineer', role:'Engineer with budget responsibilities', blurb:'Six months on Google Cloud. Moves fast and learns by clicking.',
+   traits:{risk:7.5, patience:5, detailFind:2.5, detailCheck:5}, states:{fatigue:0, distraction:5, timePressure:4}, know:{billing:1,scope:1,budget:1,alerts:0,concepts:0}, color:2, runs:0},
+];
+const RESULT = {
+  title:'Budget setup · Version A', date:'Today, 2:14 PM', runs:15, perPersona:5,
+  checks:['Right project only','Monthly','$1,000','Alert at 80% of actual','Only the project owner','Saved'],
+  table:{p1:[5,5,5,5,2,5], p2:[5,5,5,5,5,5], p3:[4,5,3,5,1,4]},
+  friction:[
+    {sev:'red', icon:'mail', title:'Left the billing admins ticked on the alert email', where:'Actions · Manage notifications',
+     who:'7 of 15 runs', rate:0.47, why:'The box is ticked by default and the task never mentions it. People who skim form defaults leave it as it is.', personas:['p1','p3']},
+    {sev:'amber', icon:'payments', title:'Did not fill in the target amount the first time', where:'Amount section',
+     who:'2 of 15 runs, all new engineers', rate:0.13, why:'"Target amount" reads as everyday English to someone new to budgets, so they moved on and came back after the error.', personas:['p3']},
+    {sev:'amber', icon:'travel_explore', title:'Looked through other billing pages before finding budgets', where:'Billing overview',
+     who:'3 of 15 runs, all new engineers', rate:0.2, why:'They did not know budgets live under Cost control, so they opened the menu items one by one.', personas:['p3']},
+    {sev:'green', icon:'task_alt', title:'Everyone found the save confirmation in the list', where:'Budget list',
+     who:'15 of 15 runs', rate:1, why:'The new row appears right after saving, which matches how all three personas check their work.', personas:[]},
+  ],
+};
+let draft = null;
+let lastRemoved = null;
+
+/* ---------------- helpers ---------------- */
+function initials(name) { return name.split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase(); }
+function avatar(p, size=48) { const [bg, fg] = COLORS[p.color % COLORS.length]; return `<span class="pav" style="background:${bg};color:${fg};width:${size}px;height:${size}px;font-size:${size*.38}px">${initials(p.name)}</span>`; }
+function level(t, score) { return score < 2.5 ? t.low : score < 7.5 ? t.mid : t.high; }
+function mixText(score) {
+  if (score === 0) return 'always'; if (score === 10) return 'always'; if (score === 5) return 'usually';
+  return score < 5 ? `about ${Math.round((5 - score) / 5 * 10)} in 10 times` : `about ${Math.round((score - 5) / 5 * 10)} in 10 times`;
+}
+function readout(t, score) {
+  if (score === 0 || score === 5 || score === 10) return level(t, score);
+  const lower = score < 5 ? t.low : t.mid, upper = score < 5 ? t.mid : t.high;
+  const lowShare = score < 5 ? (5 - score) / 5 : (10 - score) / 5;
+  const [usual, sometimes] = lowShare >= 0.5 ? [lower, upper] : [upper, lower];
+  return `Usually: ${usual.charAt(0).toLowerCase() + usual.slice(1)}. Sometimes: ${sometimes.charAt(0).toLowerCase() + sometimes.slice(1)}.`;
+}
+function chipsFor(p) {
+  const out = [];
+  if (p.traits.detailCheck < 5) out.push(['amber','visibility_off','Skims defaults']);
+  if (p.traits.detailCheck >= 7.5) out.push(['green','fact_check','Checks every field']);
+  if (p.traits.risk >= 7.5) out.push(['blue','ads_click','Clicks to explore']);
+  if (p.states.timePressure >= 5) out.push(['amber','timer','In a hurry']);
+  if (p.states.distraction >= 5) out.push(['','notifications_active','Easily distracted']);
+  if (Object.values(p.know).every(v => v === 2)) out.push(['blue','school','Knows the console']);
+  return out.slice(0, 2).map(([c, i, t]) => `<span class="tag ${c}"><span class="ms">${i}</span>${t}</span>`).join('');
+}
+let snackTimer;
+function snack(text, undo) {
+  clearTimeout(snackTimer);
+  $('#snack-text').textContent = text;
+  const btn = $('#snack-action'); btn.hidden = !undo; btn.onclick = () => { undo(); $('#snack').classList.remove('show'); };
+  $('#snack').classList.add('show');
+  snackTimer = setTimeout(() => $('#snack').classList.remove('show'), 5000);
+}
+
+/* ---------------- pages ---------------- */
+const pages = {
+home() {
+  const done = personas.length > 0, ran = true;
+  return `<div class="page">
+    <div class="page-head"><div><h1>Good afternoon, Mikey</h1><p class="muted">Test a design with synthetic users before you recruit real ones.</p></div></div>
+    <div class="hello">
+      <div class="card">
+        <h2>Three steps to a usability test</h2>
+        <div class="steps3">
+          <button class="step3 ${done?'done':''}" data-go="new"><span class="n">${done?'<span class="ms" style="font-size:18px">check</span>':'1'}</span><h3>Describe who you're testing</h3></button>
+          <button class="step3 ${ran?'done':''}" data-go="run"><span class="n">${ran?'<span class="ms" style="font-size:18px">check</span>':'2'}</span><h3>Run a test</h3></button>
+          <button class="step3" data-go="results"><span class="n">3</span><h3>Read what went wrong</h3></button>
+        </div>
+      </div>
+      <div class="card tonal">
+        <span class="small muted">Latest result</span>
+        <p class="insight">Almost half the runs left the billing admins on the alert email.</p>
+        <p class="muted" style="margin:0 0 16px">Rushed admins and new engineers skim defaults; careful analysts never did.</p>
+        <md-filled-tonal-button data-go="results">See the results<span slot="icon" class="ms">arrow_forward</span></md-filled-tonal-button>
+      </div>
+    </div>
+    <h2 style="margin:32px 0 16px">Your personas</h2>
+    <div class="grid">${personas.map(personaCard).join('')}${newCard()}</div>
+  </div>`;
+},
+personas() {
+  return `<div class="page">
+    <div class="page-head"><div><h1>Personas</h1><p class="muted">Each persona is one kind of user.</p></div>
+      <md-filled-button data-go="new"><span slot="icon" class="ms">add</span>New persona</md-filled-button></div>
+    <div class="grid">${personas.map(personaCard).join('')}${newCard()}</div>
+  </div>`;
+},
+new() {
+  return `<div class="page"><div class="composer">
+    <h1>Who do you want to <span class="spark">test with?</span></h1>
+    <p class="muted" style="font-size:16px;margin-top:12px">Describe them like you would to a colleague. You can fine-tune everything afterwards.</p>
+    <div class="prompt">
+      <textarea id="describe" rows="1" placeholder="e.g. A FinOps admin who sets up budgets between meetings"></textarea>
+      <md-filled-icon-button id="draft-btn" aria-label="Draft persona" disabled><span class="ms">arrow_upward</span></md-filled-icon-button>
+    </div>
+    <div class="chips">
+      <md-suggestion-chip label="Careful finance analyst" data-text="A careful finance analyst who checks every number"></md-suggestion-chip>
+      <md-suggestion-chip label="Engineer new to Google Cloud" data-text="An engineer new to Google Cloud who learns by clicking"></md-suggestion-chip>
+      <md-suggestion-chip label="Tired admin, end of day" data-text="A tired FinOps admin at the end of a long day"></md-suggestion-chip>
+    </div>
+  </div><div id="draft-area"></div></div>`;
+},
+run() {
+  return `<div class="page">
+    <div class="page-head"><div><h1>Run a test</h1><p class="muted">Each persona runs several times, so you see how often a problem happens.</p></div></div>
+    <div class="run-grid">
+      <div class="stack">
+        <div class="card"><div class="row" style="justify-content:space-between"><div><h3>Workflow</h3><p class="muted small" style="margin:4px 0 0">Create a monthly $1,000 budget for Atlas, with an alert to the project owner</p></div><md-outlined-button id="change-flow">Change</md-outlined-button></div></div>
+        <div class="card"><h3 style="margin-bottom:8px">Who takes part</h3>
+          ${personas.map(p => `<label class="pick"><md-checkbox touch-target="wrapper" data-pick="${p.id}" ${!preselect || preselect === p.id ? 'checked' : ''}></md-checkbox>${avatar(p,40)}<div style="flex:1;min-width:0"><div>${esc(p.name)}</div><div class="muted small">${esc(p.role)}</div></div></label>`).join('')}
+        </div>
+        <div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><h3>Runs per persona</h3><p class="muted small" style="margin:4px 0 0">More runs give steadier rates. 5 is a good start.</p></div>
+          <div class="stepper"><md-outlined-icon-button id="runs-minus" aria-label="Fewer runs"><span class="ms">remove</span></md-outlined-icon-button><span id="runs-n" style="font:400 22px var(--md-ref-typeface-brand);width:40px;text-align:center">5</span><md-outlined-icon-button id="runs-plus" aria-label="More runs"><span class="ms">add</span></md-outlined-icon-button></div></div></div>
+      </div>
+      <div class="card tonal summary">
+        <h3>Summary</h3>
+        <p id="run-summary" class="muted"></p>
+        <md-filled-button id="start-run" style="width:100%"><span slot="icon" class="ms">play_arrow</span>Start test</md-filled-button>
+        <p class="small muted" style="margin:12px 0 0">You can leave this page while it runs.</p>
+      </div>
+    </div>
+    <div id="progress-area"></div>
+  </div>`;
+},
+results() {
+  const pmap = Object.fromEntries(personas.map(p => [p.id, p]));
+  return `<div class="page">
+    <div class="page-head"><div><h1>Results</h1><p class="muted">${RESULT.title} · ${RESULT.runs} runs · ${RESULT.date}</p></div>
+      <md-filled-tonal-button data-go="run"><span slot="icon" class="ms">replay</span>Run again</md-filled-tonal-button></div>
+    <div class="card headline" style="margin-bottom:16px">
+      <div class="big">47%</div>
+      <div><p class="insight" style="margin:0 0 6px">of runs sent the alert to people who shouldn't get it.</p>
+        <p class="muted" style="margin:0">This is the main problem in this design. It comes from a box that is ticked by default. The careful analysts always unticked it; people who skim form defaults didn't.</p></div>
+    </div>
+    <div class="tabs-wrap"><md-tabs id="res-tabs"><md-primary-tab>Problems</md-primary-tab><md-primary-tab>By persona</md-primary-tab><md-primary-tab>Every run</md-primary-tab></md-tabs></div>
+    <div id="res-body"></div>
+  </div>`;
+},
+};
+function personaCard(p) {
+  return `<div class="card pcard" data-open="${p.id}">
+    <div class="row" style="padding-right:36px">${avatar(p)}<div style="min-width:0"><h3>${esc(p.name)}</h3><div class="muted small">${esc(p.role)}</div></div></div>
+    <p class="muted">${esc(p.blurb)}</p>
+    <div class="chips">${chipsFor(p)}</div>
+    <md-icon-button data-remove="${p.id}" aria-label="Delete persona" style="position:absolute;top:8px;right:8px"><span class="ms">delete</span></md-icon-button>
+  </div>`;
+}
+function newCard() {
+  return `<button class="card tonal pcard" data-go="new" style="display:grid;place-items:center;min-height:200px;border:0;font:inherit;color:inherit">
+    <span style="text-align:center"><span class="ms" style="font-size:36px;color:var(--md-sys-color-primary)">add_circle</span><h3 style="margin-top:8px">New persona</h3></span></button>`;
+}
+
+/* ---------------- persona drafting and review ---------------- */
+function draftFrom(text) {
+  // Prototype: a few keyword rules stand in for the AI. Each setting records where it came from.
+  const t = text.toLowerCase(), src = {};
+  const p = {id:'p' + Date.now(), name:'New persona', role:'FinOps / cloud cost administrator', color:personas.length + 1, runs:0,
+    traits:{risk:5, patience:5, detailFind:5, detailCheck:5}, states:{fatigue:0, distraction:0, timePressure:0},
+    know:{billing:2, scope:1, budget:2, alerts:1, concepts:1}};
+  const hit = (re, apply, quote) => { const m = t.match(re); if (m) { apply(); return m[0]; } return null; };
+  let q;
+  if ((q = hit(/finance|analyst|fp&a/, () => { p.role = 'Finance / FP&A'; p.know = {billing:2, scope:1, budget:2, alerts:1, concepts:1}; }))) src.role = q;
+  if ((q = hit(/engineer|developer/, () => { p.role = 'Engineer with budget duties'; p.know = {billing:1, scope:1, budget:1, alerts:0, concepts:0}; }))) src.role = q;
+  if ((q = hit(/large|enterprise|retailer|experienced|knows/, () => { p.know = {billing:2, scope:2, budget:2, alerts:2, concepts:2}; }))) src.know = q;
+  if ((q = hit(/new to|new\b|junior|first time/, () => { p.know = {billing:1, scope:0, budget:1, alerts:0, concepts:0}; p.traits.detailFind = 2.5; }))) src.know = src.detailFind = q;
+  if ((q = hit(/rarely reads?|skims?|doesn'?t read|small print/, () => { p.traits.detailCheck = 2.5; }))) src.detailCheck = q;
+  if ((q = hit(/check(s)? every|careful|double.check|thorough/, () => { p.traits.detailCheck = 10; p.traits.detailFind = 7.5; p.traits.risk = 2.5; }))) src.detailCheck = src.detailFind = src.risk = q;
+  if ((q = hit(/between meetings|in a hurry|rush|busy|quick/, () => { p.states.timePressure = 6; p.traits.patience = 4; }))) src.timePressure = src.patience = q;
+  if ((q = hit(/tired|long day|exhausted/, () => { p.states.fatigue = 7; }))) src.fatigue = q;
+  if ((q = hit(/distract|multitask|interrupt/, () => { p.states.distraction = 6; }))) src.distraction = q;
+  if ((q = hit(/learns by clicking|clicks|explore|tries/, () => { p.traits.risk = 7.5; }))) src.risk = q;
+  p.name = (p.states.timePressure >= 5 ? 'Busy ' : p.traits.detailCheck >= 7.5 ? 'Careful ' : p.states.fatigue >= 5 ? 'Tired ' : '') +
+    ({'Finance / FP&A':'finance analyst','Engineer with budget duties':'cloud engineer'}[p.role] || 'FinOps admin');
+  p.name = p.name.charAt(0).toUpperCase() + p.name.slice(1);
+  p.blurb = text.trim();
+  p.src = src;
+  return p;
+}
+function sourceTag(p, key) {
+  const q = (p.src || {})[key];
+  return q ? `<span class="source"><span class="ms">format_quote</span>“${esc(q)}”</span>` : '';
+}
+const PERCEPTION = [['vision','visibility','Has trouble reading small text'],['color','palette',"Can't rely on colour"],
+  ['click','ads_click','Sometimes misses small targets'],['warnings','warning','Often misses warnings']];
+// The editor for a persona: the same controls for a new draft and for the side sheet.
+function editorHTML(p, flat) {
+  const box = flat ? 'sec' : 'card';
+  p.perc = p.perc || {};
+  return `
+      <div class="${box}">
+        <h2>How they work</h2>
+        <p class="muted small" style="margin:6px 0 12px">Each run draws from these, so no two runs are quite the same.</p>
+        ${TRAITS.map(t => `<div class="trait"><div class="head"><h3>${t.title}</h3></div>
+          <md-slider min="0" max="10" step="0.5" value="${p.traits[t.key]}" labeled data-trait="${t.key}" aria-label="${t.title}"></md-slider>
+          <div class="readout" data-r="${t.key}">${esc(readout(t, p.traits[t.key]))}</div>${sourceTag(p, t.key)}</div>`).join('')}
+      </div>
+      <div class="${box}">
+        <h2>During the task</h2>
+        <p class="muted small" style="margin:6px 0 12px">Off unless you turn them up.</p>
+        ${STATES.map(s => `<div class="trait"><div class="head"><h3>${s.title}</h3></div>
+          <md-slider min="0" max="10" step="0.5" value="${p.states[s.key]}" labeled data-state="${s.key}" aria-label="${s.title}"></md-slider>
+          <div class="readout">${s.note}</div>${sourceTag(p, s.key)}</div>`).join('')}
+      </div>
+      <div class="${box}">
+        <h2>What they know</h2>
+        <p class="muted small" style="margin:6px 0 12px">Terms they don't know show up as made-up words, as they would to them.</p>
+        ${KNOW.map(k => `<div class="knowrow"><div style="min-width:0"><h3>${k.title}</h3><div class="muted small">${k.ex}</div></div>
+          <div class="seg" role="radiogroup" aria-label="${k.title}">${(k.word ? ['Unknown','Everyday meaning','Knows it'] : ['Unknown','Vaguely','Knows it']).map((l, i) =>
+            `<button type="button" role="radio" aria-checked="${p.know[k.key] === i}" class="${p.know[k.key] === i ? 'on' : ''}" data-know="${k.key}" data-v="${i}">${l}</button>`).join('')}</div></div>`).join('')}
+        ${sourceTag(p, 'know')}
+      </div>
+      <details class="${box} more">
+        <summary><h2>Seeing, clicking and warnings</h2><span class="ms">expand_more</span></summary>
+        <md-list style="margin-top:8px;background:transparent">
+          ${PERCEPTION.map(([k, i, l]) =>
+            `<md-list-item><span slot="start" class="ms">${i}</span><div slot="headline">${l}</div><md-switch slot="end" data-perc="${k}" ${p.perc[k] ? 'selected' : ''} aria-label="${l}"></md-switch></md-list-item>`).join('')}
+        </md-list>
+      </details>`;
+}
+function renderReview() {
+  const p = draft;
+  $('#draft-area').innerHTML = `<div class="review" style="margin-top:40px">
+    <div class="stack" data-editor="draft">${editorHTML(p, false)}</div>
+    <div class="card summary">
+      <div class="row">${avatar(p, 56)}<div style="min-width:0;flex:1"><md-outlined-text-field id="p-name" label="Name" value="${esc(p.name)}" style="width:100%"></md-outlined-text-field></div></div>
+      <p class="muted small" style="margin:12px 0 4px">${esc(p.role)}</p>
+      <p style="margin:0 0 12px">“${esc(p.blurb)}”</p>
+      <div class="chips" id="sum-chips">${chipsFor(p)}</div>
+      <md-filled-button id="create" style="width:100%"><span slot="icon" class="ms">check</span>Create persona</md-filled-button>
+      <md-outlined-button id="create-run" style="width:100%;margin-top:8px"><span slot="icon" class="ms">play_arrow</span>Create and run a test</md-outlined-button>
+    </div>
+  </div>`;
+  updateSummary();
+  $('#draft-area').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function updateSummary() {
+  if (!draft) return;
+  $('#sum-chips').innerHTML = chipsFor(draft);
+}
+
+/* ---------------- side sheet: edit an existing persona ---------------- */
+let sheetFor = null, sheetCopy = null, sheetDirty = false, preselect = null;
+const clone = x => JSON.parse(JSON.stringify(x));
+function openSheet(id) {
+  sheetFor = personas.find(p => p.id === id); if (!sheetFor) return;
+  sheetCopy = clone(sheetFor); sheetDirty = false;
+  $('#sheet-body').innerHTML = `<div class="row" style="margin:8px 0 4px">${avatar(sheetCopy, 56)}<div style="flex:1;min-width:0">
+      <md-outlined-text-field id="sheet-name" label="Name" value="${esc(sheetCopy.name)}" style="width:100%"></md-outlined-text-field></div></div>
+    <p class="muted small" style="margin:10px 0 2px">${esc(sheetCopy.role)}</p>
+    <p style="margin:0 0 4px">“${esc(sheetCopy.blurb)}”</p>
+    <div class="chips" id="sheet-chips" style="margin-bottom:12px">${chipsFor(sheetCopy)}</div>
+    ${editorHTML(sheetCopy, true)}`;
+  markDirty(false);
+  $('#sheet').hidden = false;
+  requestAnimationFrame(() => { $('#sheet').classList.add('show'); $('#scrim').classList.add('show'); });
+  setTimeout(() => $('#sheet-close').focus(), 300);
+}
+function closeSheet() {
+  $('#sheet').classList.remove('show'); $('#scrim').classList.remove('show');
+  setTimeout(() => { $('#sheet').hidden = true; }, 300);
+  sheetFor = sheetCopy = null;
+}
+function tryClose() { if (sheetDirty) $('#discard-dialog').show(); else closeSheet(); }
+function markDirty(on) {
+  sheetDirty = on; $('#sheet-save').disabled = !on;
+  $('#sheet-title').innerHTML = 'Edit persona' + (on ? '<span class="dirty-dot" title="Unsaved changes"></span>' : '');
+}
+function saveSheet() {
+  const original = sheetFor, before = clone(original);
+  sheetCopy.name = $('#sheet-name').value.trim() || original.name;
+  Object.assign(original, clone(sheetCopy));
+  closeSheet(); render();
+  snack(`Saved “${original.name}”`, () => { Object.assign(original, before); render(); });
+  return original;
+}
+function editing(el) { const root = el.closest('[data-editor]'); return root && (root.dataset.editor === 'sheet' ? sheetCopy : draft); }
+function refreshChips(el) {
+  const root = el.closest('[data-editor]');
+  if (root && root.dataset.editor === 'sheet') { $('#sheet-chips').innerHTML = chipsFor(sheetCopy); markDirty(true); } else updateSummary();
+}
+
+/* ---------------- results body ---------------- */
+function resultsBody(tab) {
+  const pmap = Object.fromEntries(personas.map(p => [p.id, p]));
+  if (tab === 0) return `<div class="card">${RESULT.friction.map(f => `<div class="friction">
+      <span class="ms ${f.sev === 'green' ? 'ok' : f.sev === 'red' ? 'bad' : ''}" style="${f.sev==='amber'?'color:var(--warn)':''}">${f.icon}</span>
+      <div style="min-width:0"><h3>${esc(f.title)}</h3><div class="muted small">${esc(f.where)} · ${esc(f.who)}</div>
+        <details style="margin-top:6px"><summary class="small" style="color:var(--md-sys-color-primary);cursor:pointer">Why this happens</summary><p class="small muted" style="margin:6px 0 0">${esc(f.why)}</p>
+        ${f.personas.length ? `<md-text-button style="margin-top:4px" class="replay-btn"><span slot="icon" class="ms">play_circle</span>Watch a run where it happened</md-text-button>` : ''}</details></div>
+      <div class="bar"><i class="${f.sev}" style="width:${f.rate*100}%"></i></div>
+      <div class="pct" style="font:500 16px var(--md-ref-typeface-brand)">${Math.round(f.rate*100)}%</div></div>`).join('')}</div>`;
+  if (tab === 1) return `<div class="card"><table class="matrix"><tr><th>Grading check</th>${personas.filter(p => RESULT.table[p.id]).map(p => `<th><span class="row" style="gap:8px">${avatar(p,28)}${esc(p.name)}</span></th>`).join('')}</tr>
+      ${RESULT.checks.map((c, i) => `<tr><td>${c}</td>${personas.filter(p => RESULT.table[p.id]).map(p => { const n = RESULT.table[p.id][i]; const ok = n === RESULT.perPersona;
+        return `<td><span class="cell ${ok ? 'ok' : 'bad'}"><span class="ms">${ok ? 'check_circle' : 'error'}</span>${n} of ${RESULT.perPersona}</span></td>`; }).join('')}</tr>`).join('')}</table></div>`;
+  return `<div class="card"><md-list style="background:transparent">${personas.filter(p => RESULT.table[p.id]).flatMap(p => [1,2,3,4,5].map(n => {
+      const pass = !((p.id === 'p1' && (n === 1 || n === 3 || n === 4)) || (p.id === 'p3' && n !== 2));
+      return `<md-list-item type="button" class="replay-btn"><span slot="start">${avatar(p,32)}</span><div slot="headline">${esc(p.name)} · run ${n}</div><div slot="supporting-text">${pass ? 'Passed every check' : 'Sent the alert to the billing admins too'} · ${18 + n * 2} steps</div><span slot="end" class="ms ${pass ? 'ok' : 'bad'}">${pass ? 'check_circle' : 'error'}</span></md-list-item>`; })).join('')}</md-list></div>`;
+}
+
+/* ---------------- router and events ---------------- */
+function go(name) { location.hash = name; }
+function render() {
+  const name = (location.hash || '#home').slice(1);
+  const page = pages[name] ? name : 'home';
+  $('#main').innerHTML = pages[page]();
+  document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === page || (page === 'new' && a.dataset.nav === 'personas')));
+  if (page === 'new') setupComposer();
+  if (page === 'run') setupRun();
+  if (page === 'results') { $('#res-body').innerHTML = resultsBody(0); $('#res-tabs').addEventListener('change', e => { $('#res-body').innerHTML = resultsBody(e.target.activeTabIndex); }); }
+  window.scrollTo(0, 0);
+}
+function setupComposer() {
+  draft = null;
+  const box = $('#describe'), btn = $('#draft-btn');
+  const grow = () => {
+    box.style.height = 'auto';
+    box.style.height = Math.min(box.scrollHeight, 200) + 'px';
+    box.style.overflowY = box.scrollHeight > 200 ? 'auto' : 'hidden';
+    btn.disabled = !box.value.trim();
+  };
+  grow();
+  box.addEventListener('input', grow);
+  box.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (box.value.trim()) start(); } });
+  document.querySelectorAll('md-suggestion-chip').forEach(c => c.addEventListener('click', () => { box.value = c.dataset.text; grow(); box.focus(); }));
+  btn.addEventListener('click', start);
+  function start() {
+    const text = box.value.trim(); if (!text) return;
+    $('#draft-area').innerHTML = `<div class="drafting card tonal"><div class="row"><md-circular-progress indeterminate style="--md-circular-progress-size:28px"></md-circular-progress><span>Drafting a persona from your description…</span></div>
+      <div class="shimmer" style="width:90%;margin-top:20px"></div><div class="shimmer" style="width:70%"></div><div class="shimmer" style="width:80%"></div></div>`;
+    setTimeout(() => { draft = draftFrom(text); renderReview(); }, 1300);
+  }
+}
+function setupRun() {
+  let runs = 5;
+  preselect = null;
+  const summary = () => {
+    const chosen = [...document.querySelectorAll('[data-pick]')].filter(c => c.checked).length;
+    $('#run-summary').innerHTML = chosen ? `${chosen} persona${chosen > 1 ? 's' : ''} × ${runs} runs = <b>${chosen * runs} runs</b>, about ${Math.round(chosen * runs * 4)} minutes.` : 'Choose at least one persona.';
+    $('#start-run').disabled = !chosen;
+  };
+  $('#runs-n').textContent = runs;
+  $('#runs-minus').addEventListener('click', () => { runs = Math.max(1, runs - 1); $('#runs-n').textContent = runs; summary(); });
+  $('#runs-plus').addEventListener('click', () => { runs = Math.min(10, runs + 1); $('#runs-n').textContent = runs; summary(); });
+  document.querySelectorAll('[data-pick]').forEach(c => c.addEventListener('change', summary));
+  $('#change-flow').addEventListener('click', () => $('#workflow-dialog').show());
+  $('#start-run').addEventListener('click', () => {
+    const chosen = personas.filter(p => document.querySelector(`[data-pick="${p.id}"]`).checked);
+    $('#progress-area').innerHTML = `<div class="card" style="margin-top:24px"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h2>Running</h2><span class="muted small" id="eta">About ${chosen.length * runs * 4} minutes left</span></div>
+      <md-linear-progress id="overall" value="0" style="margin:16px 0 8px"></md-linear-progress>
+      ${chosen.map(p => `<div class="livecard">${avatar(p,40)}<div style="min-width:0"><div>${esc(p.name)}</div><div class="muted small" data-status="${p.id}">Waiting</div><div class="dots" data-dots="${p.id}">${Array.from({length:runs}, () => '<span></span>').join('')}</div></div>
+        <md-text-button class="watch-btn"><span slot="icon" class="ms">visibility</span>Watch live</md-text-button></div>`).join('')}</div>`;
+    $('#progress-area').scrollIntoView({behavior:'smooth', block:'start'});
+    simulate(chosen, runs);
+  });
+  summary();
+}
+function simulate(chosen, runs) {
+  // Prototype: fake progress, so the flow can be felt.
+  const total = chosen.length * runs; let done = 0;
+  const plan = chosen.flatMap(p => Array.from({length:runs}, (_, i) => ({p, i})));
+  const tick = () => {
+    if (!document.querySelector('#overall')) return;
+    if (done >= total) { snack('Test finished · 15 runs. 1 serious problem found.'); setTimeout(() => go('results'), 1200); return; }
+    const {p, i} = plan[done];
+    const dots = document.querySelector(`[data-dots="${p.id}"]`).children;
+    dots[i].className = 'now';
+    document.querySelector(`[data-status="${p.id}"]`).textContent = `Run ${i + 1} of ${runs} · on the Actions section`;
+    setTimeout(() => {
+      const fail = (p.id === 'p1' && [0, 2, 3].includes(i)) || (p.id === 'p3' && i !== 1);
+      if (!document.querySelector('#overall')) return;
+      dots[i].className = fail ? 'fail' : 'ok';
+      done++; document.querySelector('#overall').value = done / total;
+      const left = Math.round((total - done) * 4); $('#eta').textContent = left ? `About ${left} minutes left` : 'Wrapping up…';
+      document.querySelector(`[data-status="${p.id}"]`).textContent = i + 1 === runs ? 'Done' : `Run ${i + 2} of ${runs} next`;
+      tick();
+    }, 500);
+  };
+  tick();
+}
+const LIVE = [
+  ['Reading', 'the Actions section, piece 2 of 4'], ['Model suggests', 'Tick "Email alerts to project owners" — the task says only the owner gets it'],
+  ['Rule', 'Skims form defaults this section, so the pre-ticked billing admins box is left alone'],
+  ['Did', 'Ticked "Email alerts to project owners"'], ['Model suggests', 'Click Finish'], ['Rule', 'Finish waits until the section is done; it is'], ['Did', 'Clicked Finish'],
+];
+function openLive() {
+  const log = $('#live-log'); log.innerHTML = '';
+  LIVE.forEach(([k, v], n) => setTimeout(() => { log.insertAdjacentHTML('beforeend', `<div><b>${k}</b> · ${esc(v)}</div>`); log.scrollTop = log.scrollHeight; }, n * 700));
+  $('#live-dialog').show();
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-go],[data-open],[data-remove],.watch-btn,.replay-btn,[data-know],#create,#create-run,#rail-fab,#workflow-pick,#help-btn,#live-close,#workflow-close,[data-flow],#scrim,#sheet-close,#sheet-cancel,#sheet-save,#sheet-dup,#sheet-run,#discard-keep,#discard-yes');
+  if (!t) return;
+  if (t.matches('[data-remove]')) {
+    e.stopPropagation();
+    const i = personas.findIndex(p => p.id === t.dataset.remove); lastRemoved = {p: personas[i], i};
+    personas.splice(i, 1); render();
+    snack(`Deleted “${lastRemoved.p.name}”`, () => { personas.splice(lastRemoved.i, 0, lastRemoved.p); render(); });
+    return;
+  }
+  if (t.matches('[data-go]')) return go(t.dataset.go);
+  if (t.matches('#rail-fab')) return go('new');
+  if (t.matches('[data-open]')) return openSheet(t.dataset.open);
+  if (t.matches('#scrim,#sheet-close,#sheet-cancel')) return tryClose();
+  if (t.matches('#discard-keep')) return $('#discard-dialog').close();
+  if (t.matches('#discard-yes')) { $('#discard-dialog').close(); return closeSheet(); }
+  if (t.matches('#sheet-save')) { saveSheet(); return; }
+  if (t.matches('#sheet-dup')) {
+    const copy = clone(sheetCopy); copy.id = 'p' + Date.now(); copy.name = 'Copy of ' + ($('#sheet-name').value.trim() || copy.name);
+    copy.color = personas.length + 2; copy.runs = 0;
+    personas.splice(personas.indexOf(sheetFor) + 1, 0, copy); closeSheet(); render();
+    snack(`Duplicated as “${copy.name}”`, () => { personas = personas.filter(p => p !== copy); render(); });
+    return;
+  }
+  if (t.matches('#sheet-run')) { const id = sheetFor.id; if (sheetDirty) saveSheet(); else closeSheet(); preselect = id; return go('run'); }
+  if (t.matches('.watch-btn,.replay-btn')) return openLive();
+  if (t.matches('#live-close')) return $('#live-dialog').close();
+  if (t.matches('#workflow-pick')) return $('#workflow-dialog').show();
+  if (t.matches('#workflow-close,[data-flow]')) return $('#workflow-dialog').close();
+  if (t.matches('#help-btn')) return snack('Tip: describe a persona in plain words, then adjust the sliders. Every setting says where it came from.');
+  if (t.matches('[data-know]')) {
+    const obj = editing(t); if (!obj) return;
+    obj.know[t.dataset.know] = Number(t.dataset.v);
+    t.parentElement.querySelectorAll('button').forEach(b => { const on = b === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+    refreshChips(t); return;
+  }
+  if (t.matches('#create,#create-run')) {
+    draft.name = $('#p-name').value.trim() || draft.name;
+    personas.unshift(draft); const made = draft;
+    snack(`Created “${made.name}”`, () => { personas = personas.filter(p => p !== made); render(); });
+    go(t.id === 'create-run' ? 'run' : 'personas');
+  }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'sheet-name') return markDirty(true);
+  const s = e.target.closest('md-slider'); if (!s) return;
+  const obj = editing(s); if (!obj) return;
+  if (s.dataset.trait) { const k = s.dataset.trait; obj.traits[k] = s.value;
+    s.closest('.trait').querySelector(`[data-r="${k}"]`).textContent = readout(TRAITS.find(t => t.key === k), s.value); }
+  if (s.dataset.state) obj.states[s.dataset.state] = s.value;
+  refreshChips(s);
+});
+document.addEventListener('change', e => {
+  const sw = e.target.closest('md-switch[data-perc]'); if (!sw) return;
+  const obj = editing(sw); if (!obj) return;
+  obj.perc = obj.perc || {}; obj.perc[sw.dataset.perc] = sw.selected; refreshChips(sw);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetFor && !$('#discard-dialog').open) tryClose(); });
+window.addEventListener('hashchange', render);
+customElements.whenDefined('md-filled-button').then(render);
+render();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-"""One run (engine-design.md 4, 8): one persona card, one Version A session.
+"""One run (engine-design.md 4, 8): one persona card, one session of the workflow's product.
 
 Each step: he looks at the screen piece by piece (4.8) until there is something he would
 do; code checks the model's candidates against his card and his tendencies (4.3) and
@@ -13,6 +13,7 @@ clicks come from sue/variability.py (4.9), drawn from --seed; a v2 card runs as 
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import sys
 import time
 from collections import Counter
@@ -23,19 +24,21 @@ from playwright.sync_api import sync_playwright
 
 from .attention import Attention
 from .choose import ABANDON, ACT, BACK, LOOK, MISSED_DEFAULT, Decision, Policy, decide, is_consequential, is_toggle, prominence, score
-from .completion import asks_list, check_list, missing_confirmation, review_link, stops_after_last_action, ways_text
-from .config import load_config, load_env, platform_url, require_env
+from .completion import (asks_list, check_found, check_list, missing_confirmation, review_link, stops_after_last_action,
+                         ways_text)
+from .config import load_config, load_env, require_env
 from .evidence import check_evidence, own_words
 from .memory import SessionMemory
-from .model import GeminiModel, Model, ModelError, timed
+from .model import Model, ModelError, gemini_for, timed
 from .persona import ICON, KNOW, NONE, WORD, Persona, load_card
-from .platform import ResearchConsole
-from .prompt import CHECK, FIX, PROMPT_VERSION, SYSTEM, TASK, ReplyError, build_turn, list_key, parse_reply
+from .prompt import (CHECK, FIX, OUTCOME_KEYS, PROMPT_VERSION, PROMPT_VERSION_GENERAL, TASK, ReplyError, build_turn,
+                     list_key, parse_reply, system as system_text)
 from .runlog import RunLog
-from .screen import RewriteError, Screen, open_browser
+from .screen import RewriteError, Screen, Strip, open_browser
 from .similarity import similarity, task_values, task_words
+from .target import Target, make_target
 from .variability import make, traits_of
-from .viewer import Dashboard, write_report
+from .viewer import Dashboard, LiveFeed, write_report
 from .words import Vocabulary, build_vocabulary
 
 DISTRACTED = "Distracted for a moment; did not notice this element"
@@ -84,6 +87,10 @@ def did(action: str, element: dict[str, Any] | None, value: Any) -> str:
         "type": f'typed {value} into "{text}"',
         "scroll": "scrolled up" if str(value).lower() == "up" else "scrolled down",
         "back": "went back to the previous page",
+        "choose": f'chose "{value}" in "{text}"',
+        "press": f"pressed {value}" + (f' in "{text}"' if element else ""),
+        "hover": f'rested the mouse on "{text}"',
+        "drag": f'dragged "{text}" onto another element',
     }.get(action, action)
 
 
@@ -110,18 +117,28 @@ def _candidate_rows(scored) -> list[dict[str, Any]]:
     ]
 
 
-def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Model, *, headed: bool = False,
-        watch: bool = False, max_steps: int | None = None, seed: int = 0) -> dict[str, Any]:
-    persona = load_card(config["paths"]["personas"], card)
+def run(card: str, config: dict[str, Any], target: Target, model: Model, *, headed: bool = False,
+        watch: bool = False, max_steps: int | None = None, seed: int = 0, live: bool = False) -> dict[str, Any]:
+    """live: write the screen and the pointer into the run folder as it goes, for the platform's Watch live."""
     workflow = config["workflow"]
+    persona = load_card(config["paths"]["personas"], card, workflow.get("file"))
     if persona.flow and persona.flow != workflow["name"]:
         raise ValueError(f"{card} was built for the workflow \"{persona.flow}\", but the engine is set to "
                          f"\"{workflow['name']}\" ({workflow['file']}). Pass --flow with that workflow's flow.json.")
     created, answer_key = workflow["created"], list_key(workflow["created"])
+    # What else this workflow needs (engine-design.md 6.3): extra actions, and a result that is an
+    # answer found or a page reached rather than something saved. Version A has neither.
+    extras, aim = workflow.get("actions") or [], workflow.get("outcome") or {"kind": "change"}
+    found_key = OUTCOME_KEYS.get(aim.get("kind"))
+    prompt_version = PROMPT_VERSION if not extras and not found_key else PROMPT_VERSION_GENERAL
+    confirms_by_list = asks_list(persona) and not found_key
     vocab = build_vocabulary(persona, config)
     platform, rules, goal = config["platform"], config["run"], config["goal"]
     max_steps = max_steps or rules["max_steps"]
-    viewport = (platform["viewport_width"], platform["viewport_height"])
+    # A product that is not our platform has no task bar: the engine draws one below its page
+    # (screen.Strip), and the page gets the window less the bar, as on the platform.
+    strip_h = Strip.HEIGHT if target.harness == "strip" else 0
+    viewport = (platform["viewport_width"], platform["viewport_height"] - strip_h)
 
     # His tendencies as 0-10 scores, the states that change during the task, and the seed for
     # every slip (engine-design.md 4.9). A v2 card's levels are scores 0, 5 and 10 with every
@@ -147,7 +164,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
     help_items = set(goal["help_items"])
     # A careful checker who confirms by the list or detail page opens the saved one and
     # checks it once before he is done (engine-design.md 4.6).
-    reviews = policy.check == "high" and asks_list(persona)
+    reviews = policy.check == "high" and confirms_by_list
     # Not knowing where the entry is (the entry items are not understood), a person who dares to
     # click opens a menu group whose heading matches the task item by item (4.3).
     entry_items = goal.get("entry_items", [])
@@ -157,20 +174,26 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
     missed = missing_confirmation(persona)
     let_go = persona.goal.get("ifConfirmMissing") == "let_go"
 
-    session = console.create_session(
-        model_id=model.model_id, prompt_version=PROMPT_VERSION, persona_id=f"{card}-{persona.id}", variant=platform["variant"]
-    )
+    session = target.start(model_id=model.model_id, prompt_version=prompt_version, persona_id=f"{card}-{persona.id}")
+    # This run's own values ({run}: an email no other run uses), in the task he reads and the script.
+    persona = dataclasses.replace(persona, task=target.substitute(persona.task))
+    if hasattr(model, "substitute"):
+        model.substitute = target.substitute
+    policy.consequential = [target.substitute(x) for x in policy.consequential]
+    strip = Strip(persona.task, platform["harness_button_text"], platform["viewport_width"]) if strip_h else None
+    reported: str | None = None  # the answer he found, when the task asks for one
     log = RunLog(config["paths"]["runs"], card)
     started = time.monotonic()
     log.write_json("run.json", {
-        "card": card, "persona": persona.name, "session": session.id, "model": model.model_id,
-        "prompt_version": PROMPT_VERSION, "word_limit": vocab.common.limit,
+        "card": card, "persona": persona.name, "session": session.id, "model": model.model_id, "target": target.kind,
+        "prompt_version": prompt_version, "actions": extras, "outcome": aim,
+        "word_limit": vocab.common.limit,
         "tendency": {"risk": policy.risk, "detail_find": find, "detail_check": policy.check,
                      "patience": patience, "patience_limit": patience_limit},
         "card_version": persona.version, "seed": seed, "traits": traits.as_dict(), "start": start_levels,
         "started_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "config": config,
     })
-    system = SYSTEM.format(max_candidates=config["model"]["max_candidates"])
+    system = system_text(config["model"]["max_candidates"], extras)
     history_n = config["model"]["history_steps"]
     memory = SessionMemory()
     rules_used: Counter[str] = Counter()
@@ -193,21 +216,26 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
           f"patience {patience} (limit {patience_limit})"
           + (f"; seed {seed}, card v{persona.version}" if persona.version >= 3 or seed else ""))
     slips: Counter[str] = Counter()  # lapses, near misses and unnoticed warnings over the run (4.9)
+    # How well the flow's locators found their items, per item (engine-design.md 6.3): on which
+    # routes it was looked for, the most matches seen, and whether a looser match was needed.
+    mark_report: dict[str, dict[str, Any]] = {}
     last_context: str | None = None  # the screen part he last looked at; levels are held per part
 
     with sync_playwright() as pw:
         # In watch mode the engine's own browser has no window: the dashboard streams it.
-        browser, page = open_browser(pw, config, headless=not headed or watch)
-        show = Dashboard(log.dir, pw, page, viewport) if watch else None
-        screen = Screen(page, vocab, config, show=show, reveal_hover=policy.check in ("medium", "high"))
+        browser, page = open_browser(pw, config, headless=not headed or watch, strip=strip, state=target.storage_state())
+        show = Dashboard(log.dir, pw, page, viewport) if watch else LiveFeed(log.dir, page, viewport) if live else None
+        screen = Screen(page, vocab, config, show=show, reveal_hover=policy.check in ("medium", "high"), strip=strip)
         screen.vision_px, screen.color = var.vision_px(), traits.color
+        screen.download_dir = log.dir
         say = show.phase if show else (lambda text: None)
-        say("Opening the platform")
+        say("Opening the product")
+        target.prepare(page)
         page.goto(session.link)
 
         def post(step: int, shot: str, action: dict[str, Any], reason: str | None, executed: bool,
                  error: str | None, latency: int | None) -> None:
-            console.record_step(session.id, {"stepNo": step, "screenshotPath": shot, "action": action, "reason": reason,
+            target.record_step(session.id, {"stepNo": step, "screenshotPath": shot, "action": action, "reason": reason,
                                              "executed": executed, "errorLabel": error, "latencyMs": latency})
 
         def finish(step: int, obs, shot: str, button: dict[str, Any], rule: str, extra: dict[str, Any]) -> tuple[str, str]:
@@ -256,7 +284,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                 try:
                     # Back on the list after a save, someone who confirms by the list looks at the
                     # whole list first, not piece by piece (2026-10-04).
-                    saved_back = first and bool(pending and pending.get("consequential")) and asks_list(persona)
+                    saved_back = first and bool(pending and pending.get("consequential")) and confirms_by_list
                     focus = ((lambda ctx, els: None if ctx.split("|")[0] in goal["list_routes"] else attention.focus(ctx, els))
                              if saved_back else attention.focus)
                     obs = screen.observe(step, gray_icon_ids(persona, memory), focus=focus)
@@ -284,7 +312,13 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                     if not routes or routes[-1] != obs.route:
                         routes.append(obs.route)
                 shot = log.screenshot(step, obs.screenshot, f"_look{len(looks)}" if looks else "")
-                marks |= set(page.evaluate("() => window.__sue.marks()"))
+                marks |= screen.marks_all()
+                for key, found in screen.marks.items():
+                    seen_mark = mark_report.setdefault(key, {"routes": [], "most": 0, "loose": False})
+                    if obs.route not in seen_mark["routes"]:
+                        seen_mark["routes"].append(obs.route)
+                    seen_mark["most"] = max(seen_mark["most"], found["n"])
+                    seen_mark["loose"] = seen_mark["loose"] or (found["n"] > 0 and found["how"] != "exact" and not key.endswith(":explains"))
                 for e in obs.elements:  # only clickable elements need a mark, not running text
                     if not e["harness"]:
                         seen_items |= {h.item_id for h in vocab.rewrite(e["original"]).hits if h.item_id}
@@ -307,13 +341,13 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
 
                 if revert:
                     # He ticked a checkbox to see what it does; having seen, he puts it back.
-                    target = next((e for e in obs.elements if not e["harness"] and is_toggle(e)
-                                   and (e.get("original") or "").strip().lower() == revert), None)
+                    box = next((e for e in obs.elements if not e["harness"] and is_toggle(e)
+                                and (e.get("original") or "").strip().lower() == revert), None)
                     revert = None
-                    if target:
-                        s = score({"action": "click", "element": target["id"], "purpose": FIX,
+                    if box:
+                        s = score({"action": "click", "element": box["id"], "purpose": FIX,
                                    "why": "Clicked it only to see what it does; putting it back", "evidence": []},
-                                  target, [], obs.signature)
+                                  box, [], obs.signature)
                         decision = Decision(ACT, s, "Tried it out; puts it back as it was", [s])
                         record = {
                             "step": step, "screenshot": shot, "route": obs.route, "signature": obs.signature,
@@ -340,7 +374,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                 looking_at = obs.focus.describe() if obs.focus else None
                 situation = ("They have saved, but the confirmation they wait for (" + ways_text(missed)
                              + ") has not appeared; they look around the page for it" if confirming else None)
-                turn = build_turn(persona, seen, obs.scroll, ask_list=asks_list(persona),
+                turn = build_turn(persona, seen, obs.scroll, ask_list=confirms_by_list, extras=extras, outcome=aim,
                                   history=history[-history_n:], looking_at=looking_at, situation=situation, created=created,
                                   article=workflow.get("article"))
                 say(f"Step {step}: waiting for the model's candidates (looking at {looking_at or 'the whole screen'})")
@@ -388,6 +422,13 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                     record.update(candidates=_candidate_rows(scored_raw(candidates, obs)), rule=decision.rule,
                                   completion=completion)
                     break
+                if found_key and not check.done:  # an answer to find, a page to reach: he stops when he sees it
+                    check = check_found(observations, found_key, obs.hits, obs.visible_text,
+                                        "the answer" if aim["kind"] == "answer" else "the page the task asks for")
+                    completion = {"asked": check.asked, "answer": check.answer, "quote": check.quote, "done": check.done,
+                                  "why": check.why}
+                    if check.done:
+                        reported = check.quote
                 if check.done and finish_button:
                     stop = finish(step, obs, shot, finish_button, f"Confirmed done: {check.why}", {
                         "model": {"latency_ms": latency, "attempts": attempts, "error": None},
@@ -494,10 +535,12 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                         if chosen.purpose == CHECK and memory.flipped(obs.route.split("?")[0], element.get("original")) == 1:
                             revert = (element.get("original") or "").strip().lower()
                 last_keys.append(chosen.key)
-            target = f' "{(element or {}).get("text", "")[:40]}"' if element else ""
-            say(f"Step {step}: {decision.rule}; {action}{target}")
+            on_what = f' "{(element or {}).get("text", "")[:40]}"' if element else ""
+            say(f"Step {step}: {decision.rule}; {action}{on_what}")
             try:
-                note = screen.perform(action, element, value, miss=miss)
+                # Dragging: the value names the element it is dropped on.
+                drop = {e["id"]: e for e in obs.elements}.get(value) if action == "drag" else value
+                note = screen.perform(action, element, drop, miss=miss)
                 executed, error = True, None
             except Exception as e:  # noqa: BLE001 - any browser failure ends the run as a technical error
                 note, executed, error = f"Failed: {e}", False, "browser_error"
@@ -508,7 +551,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
                     routes.pop()
             pending = {"did": did(action, element, value), "route": obs.route, "signature": obs.signature,
                        "label": (element or {}).get("original"),
-                       "consequential": is_consequential(element, rules["consequential_labels"])}
+                       "consequential": is_consequential(element, policy.consequential)}
             if confirming:
                 confirm_used += 1
             record["action"] = {
@@ -529,7 +572,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
             if not executed:
                 stop = ("technical_error", note)
                 break
-            declare_now = stops_after_last_action(persona) and is_consequential(element, rules["consequential_labels"])
+            declare_now = stops_after_last_action(persona) and is_consequential(element, policy.consequential)
             repeats = rules["loop_repeats"]
             if len(last_keys) >= repeats and len(set(last_keys[-repeats:])) == 1:
                 stop = ("loop", f"Chose the same action {repeats} times in a row")
@@ -537,8 +580,19 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
 
         reason, why = stop
         if reason != "completion_declared":
-            reason = console.end(session.id, reason)
-        result = console.result(session.id)
+            reason = target.end(session.id, reason)
+        page = screen.page  # a click may have taken him to another tab
+        result = target.result(session.id, page, {"answer": reported, "downloads": list(screen.downloads)})
+        ignored = set(config["workflow"].get("ignored_checks") or [])
+        ev = result.get("evaluation") or {}
+        if ignored and ev.get("criteria"):  # the researcher's choice of what "done right" requires
+            counted = [v for k, v in ev["criteria"].items() if k not in ignored]
+            ev["ignored"], ev["overall"] = sorted(ignored), bool(counted) and all(counted)
+        try:
+            target.cleanup(page)
+            cleanup_error = None
+        except Exception as error:  # noqa: BLE001 - the run's result stands; the next run's set-up will say more
+            cleanup_error = str(error)
         word_items = {i.id for i in persona.items.values() if i.kind in (WORD, ICON)}
         shots = sorted(p.name for p in log.dir.glob("step_*.png") if "_look" not in p.name)
         summary = {
@@ -557,8 +611,19 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
             "missed_defaults": missed_defaults,
             "seed": seed,
             "slips": dict(slips),  # lapses, near misses, steps with unnoticed warnings (4.9)
+            "reported": reported,  # the answer he found, when the task asks for one
+            "downloads": list(screen.downloads),
+            "cleanup_error": cleanup_error,
             # words and icons on clickable elements that carried no data-kl mark: fix the platform marks
             "unmarked_items": sorted((seen_items & word_items) - marks),
+            # the flow's locators (6.3): never found where they were looked for, found more than once, or loosely
+            "marks": {
+                "not_found": sorted(k for k, v in mark_report.items() if v["most"] == 0),
+                "several": sorted(k for k, v in mark_report.items() if v["most"] > 1),
+                "loose": sorted(k for k, v in mark_report.items() if v["loose"]),
+                "by_item": mark_report,
+            },
+            "target": target.kind,
             "seconds": round(time.monotonic() - started, 1),
             "dir": str(log.dir),
             "files": [
@@ -577,7 +642,7 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
 
         ev = summary["evaluation"] or {}
         print(f"\n=== Finished: {reason} ({why}); {actions} actions, {wrong} wrong turns, {backs} backs, {summary['seconds']} s")
-        print(f"Platform grading: {'pass' if ev.get('overall') else 'fail'}  {ev.get('criteria')}")
+        print(f"Grading: {'pass' if ev.get('overall') else 'fail'}  {ev.get('criteria')}")
         print(f"Rules used: {summary['rules']}")
         if missed_defaults:
             print("Missed defaults: " + "; ".join(f"step {m['step']} {m['original']}" for m in missed_defaults))
@@ -585,12 +650,15 @@ def run(card: str, config: dict[str, Any], console: ResearchConsole, model: Mode
             print(f"Slips: {dict(slips)}")
         if summary["unmarked_items"]:
             print(f"Items seen on screen that the platform did not mark: {summary['unmarked_items']}")
+        if summary["marks"]["not_found"]:
+            print(f"Locators that found nothing where they were looked for: {summary['marks']['not_found']}")
         print(f"Files are in {log.dir}")
         for f in summary["files"]:
             print(f"  {f['path']:<24} {f['what']}")
         if show:
             show.finish()
-            print("\nClose the watch window to end. To see it again later, open report.html above.")
+            if watch:
+                print("\nClose the watch window to end. To see it again later, open report.html above.")
             show.wait_until_closed()
             show.close()
         browser.close()
@@ -612,13 +680,16 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_config(flow=args.flow)
     load_env()
-    console = ResearchConsole(platform_url(config), require_env("ADMIN_PASSWORD"))
+    target = make_target(config)
     # Each person takes the test in his own browser window; the engine looks through a
     # window of the same size (engine-design.md 7.5). The card is not touched.
     size = args.viewport
     if args.like_session:
         from .compare import window
-        seen = window(console.events(args.like_session).get(args.like_session, []))
+        if target.kind != "uat":
+            print("--like-session needs the person's session on the UAT platform", file=sys.stderr)
+            return 1
+        seen = window(target.console.events(args.like_session).get(args.like_session, []))
         if not seen or not seen.get("viewport"):
             print(f"Session {args.like_session} has no window size recorded", file=sys.stderr)
             return 1
@@ -627,9 +698,8 @@ def main(argv: list[str] | None = None) -> int:
     if size:
         w, h = (int(x) for x in size.lower().split("x"))
         config["platform"]["viewport_width"], config["platform"]["viewport_height"] = w, h
-    m = config["model"]
-    model = GeminiModel(require_env("GEMINI_API_KEY"), m["id"], m["temperature"], m["timeout_s"], config["workflow"]["created"])
-    run(args.card, config, console, model, headed=args.headed, watch=args.watch, max_steps=args.max_steps, seed=args.seed)
+    model = gemini_for(config, require_env("GEMINI_API_KEY"))
+    run(args.card, config, target, model, headed=args.headed, watch=args.watch, max_steps=args.max_steps, seed=args.seed)
     return 0
 
 
