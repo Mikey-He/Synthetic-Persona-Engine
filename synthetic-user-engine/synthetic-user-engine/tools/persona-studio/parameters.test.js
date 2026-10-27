@@ -15,15 +15,18 @@ parameters.configurePersona(personaConfig());  // config.toml [persona], as the 
 // The [persona] section of engine/config.toml: plain keys holding a number or one-line table.
 function personaConfig() {
   const toml = fs.readFileSync(path.join(ROOT, 'engine/config.toml'), 'utf8');
-  const section = toml.split(/^\[persona\]\s*$/m)[1].split(/^\[/m)[0];
-  const out = {};
-  for (const line of section.split(/\r?\n/)) {
-    const m = line.replace(/\s+#.*$/, '').match(/^(\w+)\s*=\s*(.+)$/);
-    if (!m) continue;
-    const json = m[2].trim().replace(/([{,]\s*)"?(\w+)"?\s*=/g, '$1"$2":');
-    out[m[1]] = JSON.parse(json);
-  }
-  return out;
+  const read = header => {
+    const section = toml.split(new RegExp('^\\[' + header.replace('.', '\\.') + '\\]\\s*$', 'm'))[1].split(/^\[/m)[0];
+    const out = {};
+    for (const line of section.split(/\r?\n/)) {
+      const m = line.replace(/\s+#.*$/, '').match(/^(\w+)\s*=\s*(.+)$/);
+      if (!m) continue;
+      const json = m[2].trim().replace(/([{,]\s*)"?(\w+)"?\s*=/g, '$1"$2":');
+      out[m[1]] = JSON.parse(json);
+    }
+    return out;
+  };
+  return {...read('persona'), answers: read('persona.answers')};
 }
 
 test('knowledge groups come from the workflow, cover every item once, and a flow without them is refused',()=>{
@@ -198,4 +201,22 @@ test('human factors migrate legacy settings, validate enums and stay separate fr
   assert.equal(modified.card.persona.studioFactors.values.vision,'reduced');
   assert.deepEqual(parameters.fromJSON(JSON.stringify(parameters.settings(upgraded))),upgraded);
   assert.throws(()=>parameters.validate({...upgraded,humanFactors:{...upgraded.humanFactors,vision:'diagnosis'}}));
+});
+
+test('answers the Persona Builder does not read, and the questions after the task, become settings as config.toml says',()=>{
+  const map=personaConfig().answers;
+  const p=parameters.defaults();p.name='P';
+  const out=parameters.fromAnswers(p,{tend:{W:0,E:2},perc:{C:2}},{tired:4,rushed:1,focused:2,ease:5});
+  assert.equal(out.humanFactors.warningAttention,map.warnings[0]);
+  assert.equal(out.humanFactors.colorVision,map.color[2]);
+  assert.deepEqual([out.humanFactors.pressureChange,out.humanFactors.stressTolerance],map.setbacks[2]);
+  assert.equal(out.fatigue,map.state_scale[3]);
+  assert.equal(out.timePressure,map.state_scale[0]);
+  assert.equal(out.distraction,map.state_scale[map.state_scale.length-2]);
+  // nothing answered: nothing changes
+  assert.deepEqual(parameters.fromAnswers(p,{},null),parameters.validate(p));
+  // the card the settings build carries the states and factors
+  const card=parameters.build(out,originalBuilder(),flow).card;
+  assert.equal(card.state.fatigue,out.fatigue);
+  assert.equal(card.perception.colorVision,map.color[2]);
 });

@@ -1104,16 +1104,24 @@ def save_participant(body) -> dict:
         raise ValueError('Send the questionnaire answers the card was built from.')
     if not isinstance(parameters, dict):
         raise ValueError('Send the editor settings read from the card.')
+    built, post_task = body.get('built'), body.get('postTask')
+    if built is not None and (not isinstance(built, dict) or built.get('format') != 'sue-persona' or built.get('version') != 3):
+        raise ValueError('Send the v3 card built from the settings.')
     if any(p['name'].lower() == code.lower() for p in list_personas()['personas']):
         raise ValueError(f'{code} is already used; choose another code name.')
     cid = 'studio-' + uuid.uuid4().hex
     card = clone_json(card)
     card['persona'].update(id=cid, name=code)
+    # A participant file from the testing platform (2026-10-27): every answer reaches the engine, so the
+    # card is v3, with what their answers decided item by item kept from the Persona Builder's card.
+    run_card = keep_answers(built, card, parameters, parameters) if built else card
+    run_card['persona'].update(id=cid, name=code)
     answers = clone_json(answers)
     answers.setdefault('answers', {})['name'] = code  # the code name only, never the person's name
-    write_json(PERSONAS / f'{cid}.json', card)
+    write_json(PERSONAS / f'{cid}.json', run_card)
     write_json(RECORDS / f'{cid}.json', {'format': 'sue-studio-record', 'version': 2, 'source': 'questionnaire', 'parameters': parameters,
                                          'baseParameters': parameters, 'baseCard': card, 'answers': answers, 'card': f'{cid}.json',
+                                         **({'postTask': post_task} if post_task else {}),
                                          'description': 'Built from their own answers about what they know and how they work.'})
     return {'id': cid, 'name': code}
 

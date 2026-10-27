@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Billing Config Study</title>
+<script src="study.js"></script>
+<style>
+/* One tab for the whole session: start, questionnaire, task, three questions, the participant's file.
+   Plain on purpose: the prototype is what the participant should look at. */
+:root{
+  --bg:#ffffff; --fill:#f6f7f9; --line:#e2e4e8; --fg:#1f2329; --fg-2:#5d6470;
+  --accent:#1a73e8; --accent-fg:#ffffff; --note:#fef7e0; --note-line:#f3dc8f; --warn:#b3261e;
+  --f-ui:"Segoe UI",Roboto,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-ui)}
+[hidden]{display:none!important}
+.page{max-width:620px;margin:0 auto;padding:64px 24px}
+h1{font-size:26px;font-weight:600;margin:0 0 8px;text-wrap:balance}
+h2{font-size:18px;font-weight:600;margin:0 0 4px}
+p{margin:0 0 12px}
+.muted{color:var(--fg-2)}
+label.field{display:block;margin:24px 0 8px;font-weight:600}
+input[type=text]{font:inherit;width:220px;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.check{display:flex;gap:10px;align-items:flex-start;margin:20px 0;cursor:pointer}
+.check input{width:18px;height:18px;margin-top:2px;flex:none}
+.btn{font:inherit;font-weight:600;border:0;border-radius:20px;padding:10px 22px;cursor:pointer;background:var(--accent);color:var(--accent-fg)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.ghost{background:transparent;color:var(--accent);padding:10px 4px}
+.actions{display:flex;gap:16px;align-items:center;margin-top:28px;flex-wrap:wrap}
+.error{color:var(--warn);min-height:1.5em;margin-top:8px}
+.frame{position:fixed;left:0;right:0;bottom:0;border:0;width:100%;display:block;background:#fff}
+#questionnaire{top:0;height:100%}
+#taskbar{position:fixed;top:0;left:0;right:0;height:var(--bar);display:flex;gap:20px;align-items:flex-start;
+  padding:10px 24px;background:var(--note);border-bottom:1px solid var(--note-line);font-size:13px;line-height:1.45;overflow-y:auto;z-index:2}
+#taskbar .text{flex:1;min-width:0}
+#taskbar .text p{margin:0 0 5px}
+#app{top:var(--bar);height:calc(100% - var(--bar))}
+.scale{margin:28px 0}
+.scale .q{font-weight:600;margin-bottom:10px}
+.scale .opts{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.scale .end{color:var(--fg-2);font-size:13px}
+.scale .opt{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.scale input{width:18px;height:18px}
+.file{margin-top:28px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--fill)}
+.file code{font-size:13px}
+.status{margin-top:12px;min-height:1.5em}
+</style>
+</head>
+<body>
+
+<section id="start" class="page" hidden>
+  <h1>Billing configuration study</h1>
+  <p class="muted">Thank you for taking part. First a short questionnaire, about 5 minutes. Then a task on a mock cloud console. Then three quick questions.</p>
+  <label class="field" for="pid">Participant ID</label>
+  <input type="text" id="pid" autocomplete="off" placeholder="For example 001" maxlength="16">
+  <p class="muted" style="margin-top:6px">The moderator gives you this ID. Please don't enter your name.</p>
+  <label class="check"><input type="checkbox" id="consent"><span>The moderator has gone through the consent form with me, and I agree to take part.</span></label>
+  <div class="actions"><button class="btn" id="begin" disabled>Start</button></div>
+  <div class="error" id="start-error" role="alert"></div>
+</section>
+
+<iframe id="questionnaire" class="frame" title="Questionnaire" hidden></iframe>
+
+<section id="task" hidden>
+  <div id="taskbar">
+    <div class="text" id="task-text"></div>
+    <button class="btn" id="finish">I'm finished</button>
+  </div>
+  <iframe id="app" class="frame" title="Cloud Console prototype"></iframe>
+</section>
+
+<section id="after" class="page" hidden>
+  <h1>Three quick questions</h1>
+  <p class="muted">About the task you just did. Choose the number that fits best.</p>
+  <div id="scales"></div>
+  <div class="actions"><button class="btn" id="submit-after" disabled>Continue</button></div>
+</section>
+
+<section id="done" class="page" hidden>
+  <h1>All done, thank you</h1>
+  <p class="muted">Please let the moderator know you have finished.</p>
+  <div class="file">
+    <h2>For the moderator</h2>
+    <p>Save this participant's file and send it to the data science team, for example in the shared Google Drive folder.</p>
+    <p><code id="file-name"></code></p>
+    <div class="actions" style="margin-top:12px">
+      <button class="btn" id="download">Download file</button>
+      <button class="btn ghost" id="copy">Copy to clipboard</button>
+    </div>
+    <div class="status" id="file-status" role="status"></div>
+  </div>
+  <div class="actions"><button class="btn ghost" id="next">Start the next participant</button></div>
+</section>
+
+<script>
+(function () {
+  "use strict";
+  var STUDY = window.STUDY;
+  var KEY = "uat:study:" + STUDY.study;   // "uat:" keys survive the harness clearing the product between participants
+  var QUESTIONS = [  // the UX team's current-state questions, asked about the task just done (1 to 5)
+    { key: "tired", q: "While doing the task, how mentally tired did you feel?", low: "Not tired at all", high: "Very tired" },
+    { key: "rushed", q: "While doing the task, how rushed did you feel?", low: "Not rushed at all", high: "Very rushed" },
+    { key: "focused", q: "While doing the task, how focused were you?", low: "Not focused at all", high: "Very focused" }
+  ];
+  var $ = function (id) { return document.getElementById(id); };
+  var state = load();
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || { step: "start" }; } catch (e) { return { step: "start" }; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) { /* storage full or blocked: the session goes on in memory and the file still has everything */ }
+  }
+  function go(step) { state.step = step; save(); show(); }
+
+  function show() {
+    ["start", "questionnaire", "task", "after", "done"].forEach(function (id) { $(id).hidden = id !== state.step; });
+    if (state.step === "questionnaire" && !$("questionnaire").src) $("questionnaire").src = "questionnaire.html?s=" + encodeURIComponent(state.session);
+    if (state.step === "task") startTask();
+    if (state.step === "after") drawScales();
+    if (state.step === "done") $("file-name").textContent = fileName();
+  }
+
+  // ---- start ----
+  var ID = /^[A-Za-z0-9_-]{1,16}$/;
+  function canBegin() { $("begin").disabled = !(ID.test($("pid").value.trim()) && $("consent").checked); }
+  $("pid").addEventListener("input", canBegin);
+  $("consent").addEventListener("change", canBegin);
+  $("begin").addEventListener("click", function () {
+    var pid = $("pid").value.trim();
+    if (!ID.test(pid)) { $("start-error").textContent = "Use letters, digits, - or _ only."; return; }
+    state = {
+      step: "questionnaire", participantId: pid, consent: true,
+      session: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)),
+      startedAt: new Date().toISOString(), questionnaire: null, events: [], product: null, postTask: {}
+    };
+    go("questionnaire");
+  });
+
+  // ---- messages from the questionnaire and the prototype ----
+  window.addEventListener("message", function (event) {
+    var m = event.data;
+    if (event.origin !== location.origin || !m || typeof m.type !== "string") return;
+    if (m.type === "uat:answers" && state.step === "questionnaire") {
+      var answers = m.answers;
+      answers.answers.name = /^[A-Za-z]/.test(state.participantId) ? state.participantId : "P" + state.participantId;  // a code name, never a name
+      state.questionnaire = answers;
+      go("task");
+    }
+    if (m.type === "uat:events" && m.session === state.session) {
+      m.events.forEach(function (e) {
+        e.seq = state.events.length + 1; state.events.push(e);
+        if (e.type === "session_started") state.viewport = e.payload.viewport;  // the prototype's window, below the task bar
+      });
+      if (m.product) state.product = m.product;
+      save();
+    }
+    if (m.type === "uat:finished" && m.session === state.session && state.step === "task") {
+      state.endedAt = new Date().toISOString();
+      go("after");
+    }
+  });
+
+  // ---- the task ----
+  function startTask() {
+    var bar = Math.min(200, Math.max(120, 32 + 19 * Math.ceil(STUDY.task.length / 190) + 5 * STUDY.task.split("\n").length));
+    document.documentElement.style.setProperty("--bar", bar + "px");
+    if (!$("task-text").childNodes.length) {
+      STUDY.task.split("\n").filter(Boolean).forEach(function (line) {
+        var p = document.createElement("p"); p.textContent = line; $("task-text").appendChild(p);
+      });
+    }
+    if (!$("app").src) $("app").src = "app/index.html?s=" + encodeURIComponent(state.session);
+  }
+  $("finish").addEventListener("click", function () {
+    $("finish").disabled = true;
+    $("app").contentWindow.postMessage({ type: "uat:finish" }, location.origin);
+    // if the prototype never answers, the session still moves on with what has arrived
+    setTimeout(function () { if (state.step === "task") { state.endedAt = new Date().toISOString(); go("after"); } }, 5000);
+  });
+
+  // ---- after the task ----
+  function drawScales() {
+    var box = $("scales");
+    if (box.childNodes.length) return;
+    QUESTIONS.forEach(function (x) {
+      var d = document.createElement("div"); d.className = "scale";
+      var q = document.createElement("div"); q.className = "q"; q.textContent = x.q; d.appendChild(q);
+      var opts = document.createElement("div"); opts.className = "opts";
+      var lo = document.createElement("span"); lo.className = "end"; lo.textContent = x.low; opts.appendChild(lo);
+      for (var v = 1; v <= 5; v++) {
+        var l = document.createElement("label"); l.className = "opt";
+        var n = document.createElement("span"); n.textContent = v;
+        var r = document.createElement("input"); r.type = "radio"; r.name = x.key; r.value = v;
+        r.checked = state.postTask[x.key] === v;
+        r.addEventListener("change", function (e) { state.postTask[e.target.name] = Number(e.target.value); save(); ready(); });
+        l.appendChild(n); l.appendChild(r); opts.appendChild(l);
+      }
+      var hi = document.createElement("span"); hi.className = "end"; hi.textContent = x.high; opts.appendChild(hi);
+      d.appendChild(opts); box.appendChild(d);
+    });
+    ready();
+  }
+  function ready() { $("submit-after").disabled = !QUESTIONS.every(function (x) { return state.postTask[x.key] >= 1; }); }
+  $("submit-after").addEventListener("click", function () { go("done"); });
+
+  // ---- the participant's file: what the engine reads (testing-platform/README.md) ----
+  function participantFile() {
+    return {
+      kind: "uat-participant-file", version: 1, createdAt: new Date().toISOString(),
+      study: { id: STUDY.study, flow: STUDY.flow, task: STUDY.task },
+      session: { id: state.session, participantId: state.participantId, consent: state.consent, startedAt: state.startedAt, endedAt: state.endedAt || null,
+                 viewport: state.viewport || null, userAgent: navigator.userAgent },
+      questionnaire: state.questionnaire,
+      postTask: state.postTask,
+      events: state.events,
+      product: state.product
+    };
+  }
+  function fileName() { return "participant-" + state.participantId + ".json"; }
+  $("download").addEventListener("click", function () {
+    var url = URL.createObjectURL(new Blob([JSON.stringify(participantFile(), null, 2)], { type: "application/json" }));
+    var a = document.createElement("a"); a.href = url; a.download = fileName();
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    $("file-status").textContent = "Downloaded " + fileName() + ". Check your Downloads folder.";
+  });
+  $("copy").addEventListener("click", function () {
+    var text = JSON.stringify(participantFile(), null, 2);
+    navigator.clipboard.writeText(text).then(function () { $("file-status").textContent = "Copied. Paste it into a file or a message to the data science team."; },
+      function () { $("file-status").textContent = "Couldn't copy here. Please use Download file."; });
+  });
+  var confirmNext = false;
+  $("next").addEventListener("click", function () {
+    if (!confirmNext) { confirmNext = true; $("next").textContent = "Click again: this clears this participant from the page"; return; }
+    try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+    location.reload();
+  });
+
+  show();
+})();
+</script>
+</body>
+</html>

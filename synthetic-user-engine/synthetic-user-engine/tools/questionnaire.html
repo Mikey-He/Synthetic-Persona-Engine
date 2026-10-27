@@ -204,11 +204,13 @@ var HABITS=[
   {id:"D1",q:T("第一次打开一个新页面，你一般怎么看？","When you open a new page for the first time, how do you usually look at it?"),o:[T("看到像的就点","Click the first thing that looks right"),T("扫一眼主要的再点","Skim the main parts, then click"),T("整页看完再动手","Read the whole page first")]},
   {id:"D2",q:T("填一个选项很多的表单，没让你改的默认选项你会看吗？","In a form with many options, do you check the defaults you weren't asked to change?"),o:[T("不看","No"),T("看一眼显眼的","I glance at the obvious ones"),T("每个都看一遍","I check every one")]},
   {id:"D3",q:T("上次填一个选项很多的表单，遇到看不懂的选项，你是怎么做的？","Last time you filled in a form and met an option you didn't understand, what did you do?"),o:[T("不管它，保持原样","Left it as it was"),T("看了旁边的说明，但没去改它","Read the explanation next to it, but didn't change it"),T("点一下或改一下试试，看完再改回来","Tried changing it to see what happened, then changed it back")]},
-  {id:"H",q:T("在一个新网站上找某个功能，你一般先怎么找？","When you look for a feature on a new website, what do you try first?"),o:[T("先用搜索","Search"),T("先翻菜单","Look through the menus"),T("看情况，都可以","It depends")]}
+  {id:"H",q:T("在一个新网站上找某个功能，你一般先怎么找？","When you look for a feature on a new website, what do you try first?"),o:[T("先用搜索","Search"),T("先翻菜单","Look through the menus"),T("看情况，都可以","It depends")]},
+  {id:"W",q:T("上次填表或做设置的时候，页面上出现了黄色或红色的提示，比如“这个设置会影响……”，你是怎么做的？","Last time a yellow or red message appeared while you filled in a form or changed a setting, for example \u201cThis setting will affect\u2026\u201d, what did you do?"),o:[T("没太注意，接着往下做","Didn't really notice it and carried on"),T("扫了一眼就继续","Glanced at it and carried on"),T("停下来读完再继续","Stopped and read it before going on")]},
+  {id:"E",q:T("上次一个操作连着出错好几次，你当时是什么状态？","Last time something went wrong several times in a row, how were you?"),o:[T("跟平时一样，慢慢来","Same as usual; I took my time"),T("有点急，但还是一步步来","A bit stressed, but still went step by step"),T("很急，开始乱点","Very stressed; I started clicking around")]}
 ];
 var SENSES=[
   {id:"V",q:T("看电脑上的小字，比如表单下面的提示，你觉得吃力吗？","Is small text on a computer, like the hints under a form field, hard for you to read?"),o:[T("不吃力","Not hard"),T("又小又淡的才吃力","Only when it's small and faint"),T("比正文小的都吃力","Anything smaller than normal text")]},
-  {id:"C",q:T("你分得清红色和绿色吗？","Can you tell red from green?"),o:[T("分得清","Yes"),T("不太分得清","Not easily")]},
+  {id:"C",q:T("你分得清红色和绿色吗？","Can you tell red from green?"),o:[T("分得清","Yes"),T("不太分得清","Not easily"),T("基本靠不了颜色来分辨东西","I can't rely on colour to tell things apart")]},
   {id:"M",q:T("用鼠标或触控板点很小的东西，比如勾选框，你会点偏吗？","When you click very small things, like checkboxes, do you miss?"),o:[T("基本不会","Rarely"),T("特别小的会","Only very small ones"),T("经常会","Often")]},
   {id:"S",q:T("读界面上的说明文字，你比身边的人快还是慢？","Compared with people around you, do you read on-screen explanations faster or slower?"),sub:T("按读界面语言的速度来答。","Answer for the language the screen is in."),o:[T("快","Faster"),T("差不多","About the same"),T("慢","Slower")]}
 ];
@@ -216,7 +218,12 @@ var DONE_WAYS=[{v:"action",t:T("点完最后一个按钮就算","Once I click th
 var DONE_MISS=[T("不管了","Let it go"),T("回去查一下","Go back and check"),T("重新做一遍","Do it all again"),T("其他","Something else")];
 
 /* ---------- state ---------- */
-var KEY="sue-questionnaire-v2", OLD_KEY="sue-questionnaire-v1";
+/* Inside the study page (testing-platform/<study>/index.html, ?s=<session>) the questionnaire asks only
+   what the engine reads, in English: no code name (the page asks the participant ID), no free text, no
+   preview of the task, and the 50-word test only for people whose first language is not English. The
+   answers go to the study page, which puts them in the participant's file. */
+var PLATFORM=new URLSearchParams(location.search).get("s");
+var KEY="sue-questionnaire-v2"+(PLATFORM?":"+PLATFORM:""), OLD_KEY=PLATFORM?"":"sue-questionnaire-v1";
 var A={name:"",background:{},screen:{},screenOther:{},answers:{},expNotes:{},lang:{},vocab:{},tendStory:"",tendFollow:"",tend:{},perc:{},careText:"",done:[],doneMiss:null,doneMissOther:""};
 var ui={at:"intro",lang:null,msg:"",msgCls:"",confirmReset:false};
 var downloads=null; // the viewer's save capability; false when this view has none
@@ -225,7 +232,7 @@ var advancing=null, shownId=null;
 function load(){
   try{
     var s=JSON.parse(localStorage.getItem(KEY)||"null"), old=!s;
-    if(old)s=JSON.parse(localStorage.getItem(OLD_KEY)||"null");
+    if(old&&OLD_KEY)s=JSON.parse(localStorage.getItem(OLD_KEY)||"null");
     if(s&&s.A){for(var k in s.A)A[k]=s.A[k];if(old)upgrade();ui.at=old?"intro":(s.at||"intro");ui.lang=s.lang||null;}
   }catch(e){}
 }
@@ -250,21 +257,33 @@ function shownExps(k){var sel=A.screen[k]||[];return DATA.experiences.filter(fun
 function asksMiss(){return A.done.some(function(k){return k!=="action";});}
 
 /* ---------- the flow: one screen per question; what is asked follows earlier answers ---------- */
+var NATIVE=[{v:1,t:T("是","Yes")},{v:0,t:T("不是","No")}];
 var PART={you:T("关于你","About you"),exp:T("你的经历","Your experience"),lang:T("语言","Language"),vocab:T("英文词汇","English words"),habits:T("做事习惯","How you work"),senses:T("看和点","Seeing and clicking"),task:T("这次的任务","The task"),end:T("完成","Done")};
 function screens(){
-  var s=[{id:"intro",part:"you"},{id:"name",part:"you"}];
+  var s=[{id:"intro",part:"you"}];
+  if(!PLATFORM)s.push({id:"name",part:"you"});
   SOURCES.forEach(function(src){
-    s.push({id:"bg-"+src.k,part:"exp",src:src});
+    if(!groupsOf(src.k).length)return;
+    if(!PLATFORM)s.push({id:"bg-"+src.k,part:"exp",src:src});
     s.push({id:"screen-"+src.k,part:"exp",src:src});
     shownExps(src.k).forEach(function(e){s.push({id:"exp-"+e.id,part:"exp",src:src,e:e});});
   });
-  s.push({id:"ui",part:"lang"},{id:"english",part:"lang"},{id:"vintro",part:"vocab"});
-  VOCAB.forEach(function(w,i){s.push({id:"v-"+w,part:"vocab",w:w,i:i});});
-  s.push({id:"story",part:"habits"});
-  HABITS.forEach(function(h){s.push({id:"t-"+h.id,part:"habits",h:h});if(h.id==="R1")s.push({id:"follow",part:"habits"});});
+  if(PLATFORM){
+    s.push({id:"native",part:"lang"});
+    if(A.lang.native===false){s.push({id:"english",part:"lang"},{id:"vintro",part:"vocab"});VOCAB.forEach(function(w,i){s.push({id:"v-"+w,part:"vocab",w:w,i:i});});}
+  }else{
+    s.push({id:"ui",part:"lang"},{id:"english",part:"lang"},{id:"vintro",part:"vocab"});
+    VOCAB.forEach(function(w,i){s.push({id:"v-"+w,part:"vocab",w:w,i:i});});
+    s.push({id:"story",part:"habits"});
+  }
+  HABITS.forEach(function(h){
+    if(PLATFORM&&h.id==="H")return; // where they look first: the engine does not read it
+    s.push({id:"t-"+h.id,part:"habits",h:h});if(h.id==="R1"&&!PLATFORM)s.push({id:"follow",part:"habits"});
+  });
   SENSES.forEach(function(q){s.push({id:"p-"+q.id,part:"senses",q:q});});
-  s.push({id:"task",part:"task"},{id:"care",part:"task"},{id:"done",part:"task"});
-  if(asksMiss()){s.push({id:"miss",part:"task"});if(A.doneMiss===3)s.push({id:"missother",part:"task"});}
+  if(!PLATFORM)s.push({id:"task",part:"task"},{id:"care",part:"task"});
+  s.push({id:"done",part:"task"});
+  if(asksMiss()){s.push({id:"miss",part:"task"});if(A.doneMiss===3&&!PLATFORM)s.push({id:"missother",part:"task"});}
   s.push({id:"finish",part:"end"});
   return s;
 }
@@ -276,6 +295,7 @@ function answered(sc){
   if(sc.e)return A.answers[sc.e.id]!=null;
   if(id==="ui")return !!A.lang.ui;
   if(id==="english")return !!A.lang.english;
+  if(id==="native")return A.lang.native!=null;
   if(sc.w)return A.vocab[sc.w]!=null;
   if(sc.h)return A.tend[sc.h.id]!=null;
   if(sc.q)return A.perc[sc.q.id]!=null;
@@ -298,6 +318,12 @@ function cont(enabled,label,skip){return '<div class="actions"><button type="but
 
 function screenHtml(sc){
   var id=sc.id;
+  if(id==="intro"&&PLATFORM){
+    return '<h1>Questionnaire</h1><div class="body"><div class="lines">'+
+      '<p>About 5 minutes, almost all of it choosing an answer. It asks what you have done and how you usually work. There are no right or wrong answers.</p>'+
+      '<p>Please answer with what you really do, not what you think you should do.</p>'+
+      '</div>'+cont(true,"Start")+'</div>';
+  }
   if(id==="intro"){
     return '<h1>'+esc(L(T("参与者问卷","Participant questionnaire")))+'</h1><div class="body"><div class="lines">'+
       '<p>'+esc(L(T("大约 15 到 20 分钟。问的是你用过什么、学过什么、平时怎么做事，没有对错，按真实情况答。","About 15 to 20 minutes. It asks what you have used, what you have studied and how you usually do things. There are no right or wrong answers.")))+'</p>'+
@@ -311,7 +337,7 @@ function screenHtml(sc){
     '<div class="body"><textarea class="input" id="f-bg-'+esc(sc.src.k)+'" data-bg="'+esc(sc.src.k)+'" placeholder="'+esc(L(sc.src.ph))+'">'+esc(A.background[sc.src.k])+'</textarea>'+cont(true,"",true)+'</div>';
   if(id.indexOf("screen-")===0){
     var k=sc.src.k, sel=A.screen[k]||[], opts=groupsOf(k);
-    opts.push({v:"__other",t:T("其他","Something else")});
+    if(!PLATFORM)opts.push({v:"__other",t:T("其他","Something else")});
     opts.push({v:"__none",t:T("都没有","None of these")});
     var h=head(L(sc.src.t),L(sc.src.sq),L(T("可以多选。","Choose all that apply.")))+'<div class="body">'+choices(opts,function(v){return sel.indexOf(v)>=0;},"screen",' data-k="'+esc(k)+'"',true);
     if(sel.indexOf("__other")>=0)h+='<input class="input" id="f-other-'+esc(k)+'" data-other="'+esc(k)+'" value="'+esc(A.screenOther[k])+'" placeholder="'+esc(L(T("写一下是什么","What is it?")))+'">';
@@ -324,7 +350,8 @@ function screenHtml(sc){
       (answered(sc)?cont(true):'')+'</div>';
   }
   if(id==="ui")return head("",L(T("你的手机和电脑平时设成什么语言？","What language are your phone and computer set to?")),"")+'<div class="body">'+choices(UI_LANGS,function(v){return A.lang.ui===v;},"lang",' data-k="ui"')+'</div>';
-  if(id==="english")return head("",L(T("你的英语到什么程度？","How good is your English?")),"")+'<div class="body">'+choices(ENGLISH,function(v){return A.lang.english===v;},"lang",' data-k="english"')+'</div>';
+  if(id==="native")return head("",L(T("英语是你的母语吗？","Is English your first language?")),"")+'<div class="body">'+choices(NATIVE,function(v){return A.lang.native===(v===1);},"native")+'</div>';
+  if(id==="english")return head("",L(T("你的英语到什么程度？","How good is your English?")),"")+'<div class="body">'+choices(PLATFORM?ENGLISH.map(function(o){return o.v==="fluent"?{v:o.v,t:T("流利","Fluent"),d:o.d}:o;}):ENGLISH,function(v){return A.lang.english===v;},"lang",' data-k="english"')+'</div>';
   if(id==="vintro")return head("",L(T("这些英文词，你认识吗？","Do you know these English words?")),L(T("能说出大概是什么意思就算认识，不确定就选不认识。其中有一些是编出来的词。一共 50 个，大约三分钟。","Choose Know if you could say roughly what it means; if unsure, choose Don't know. Some words are made up. 50 words, about three minutes.")))+
     '<div class="body"><p class="hint">'+esc(L(T("键盘上按 1 是认识，按 2 是不认识。","On a keyboard, press 1 for Know and 2 for Don't know.")))+'</p>'+cont(true,L(T("开始","Start")))+'</div>';
   if(sc.w){
@@ -343,19 +370,26 @@ function screenHtml(sc){
     '<div class="body"><textarea class="input" id="f-care" data-f="careText">'+esc(A.careText)+'</textarea>'+cont(answered(sc))+'</div>';
   if(id==="done")return head("",L(T("设置好一个东西以后，你一般怎么确定真的弄好了？","After you set something up, how do you usually make sure it really worked?")),L(T("按平时真实的做法选，可以多选。","Choose what you really do; choose all that apply.")))+
     '<div class="body">'+choices(DONE_WAYS,function(v){return A.done.indexOf(v)>=0;},"done","",true)+cont(answered(sc))+'</div>';
-  if(id==="miss")return head("",L(T("如果你等的确认一直没来，你会怎么办？","If the confirmation you're waiting for never comes, what do you do?")),"")+'<div class="body">'+choices(DONE_MISS,function(v){return A.doneMiss===v;},"miss")+'</div>';
+  if(id==="miss")return head("",L(T("如果你等的确认一直没来，你会怎么办？","If the confirmation you're waiting for never comes, what do you do?")),"")+'<div class="body">'+choices(PLATFORM?DONE_MISS.slice(0,3):DONE_MISS,function(v){return A.doneMiss===v;},"miss")+'</div>';
   if(id==="missother")return head("",L(T("你会怎么做？","What would you do?")),L(T("可以跳过。","You can skip this.")))+
     '<div class="body"><input class="input" id="f-missother" data-f="doneMissOther" value="'+esc(A.doneMissOther)+'">'+cont(true,"",true)+'</div>';
   return finishHtml();
 }
-function exportText(){return JSON.stringify({kind:"sue-questionnaire",version:2,flow:DATA.flow.name,filledAt:new Date().toISOString(),pageLanguage:ui.lang,answers:A},null,2);}
+function exportObject(){return {kind:"sue-questionnaire",version:2,flow:DATA.flow.name,filledAt:new Date().toISOString(),pageLanguage:ui.lang,answers:A};}
+function exportText(){return JSON.stringify(exportObject(),null,2);}
 function fileName(){return "questionnaire-"+(String(A.name||"answers").replace(/[^A-Za-z0-9_-]+/g,"-").replace(/^-+|-+$/g,"")||"answers")+".json";}
 function finishHtml(){
   var list=screens(), todo=list.filter(function(sc){return sc.id!=="finish"&&!answered(sc);});
-  var h=head("",todo.length?L(T("差一点就好了","Almost there")):L(T("都答完了，谢谢！","All done, thank you!")),todo.length?L(T("还有 ","There are still "))+todo.length+L(T(" 题没答。可以回去补，也可以直接交。"," unanswered questions. You can go back to them, or send as is.")):L(T("最后一步，把答案发给研究人员。","One last step: send your answers to the researcher.")))+'<div class="body">';
+  var h=PLATFORM
+    ? head("",todo.length?"Almost there":"Thank you, that's the questionnaire",todo.length?"There are still "+todo.length+" unanswered questions. You can go back to them, or carry on.":"Next is the task on a mock cloud console.")+'<div class="body">'
+    : head("",todo.length?L(T("差一点就好了","Almost there")):L(T("都答完了，谢谢！","All done, thank you!")),todo.length?L(T("还有 ","There are still "))+todo.length+L(T(" 题没答。可以回去补，也可以直接交。"," unanswered questions. You can go back to them, or send as is.")):L(T("最后一步，把答案发给研究人员。","One last step: send your answers to the researcher.")))+'<div class="body">';
   if(todo.length){
     var parts={};todo.forEach(function(sc){parts[sc.part]=parts[sc.part]||{n:0,id:sc.id};parts[sc.part].n++;});
     h+='<ul class="todo">'+Object.keys(parts).map(function(p){return '<li><button type="button" data-act="go" data-v="'+esc(parts[p].id)+'"><span>'+esc(L(PART[p]))+L(T("，差 "," · "))+parts[p].n+L(T(" 题"," missing"))+'</span><span>'+esc(L(T("去补","Answer")))+'</span></button></li>';}).join("")+'</ul>';
+  }
+  if(PLATFORM){
+    h+='<div class="actions"><button type="button" class="btn primary" data-act="submit">'+esc(L(T("继续，开始任务","Continue to the task")))+'</button></div>';
+    return h+'<p class="status'+(ui.msgCls?" "+ui.msgCls:"")+'" role="status">'+esc(ui.msg)+'</p></div>';
   }
   h+='<div class="actions">'+(downloads!==false?'<button type="button" class="btn primary" data-act="savefile">'+esc(L(T("保存答案文件","Save answers file")))+'</button>':'')+'<button type="button" class="btn'+(downloads===false?' primary':'')+'" data-act="copy">'+esc(L(T("复制答案","Copy answers")))+'</button></div>';
   h+='<p class="status'+(ui.msgCls?" "+ui.msgCls:"")+'" role="status">'+esc(ui.msg||L(T("保存不了文件的话，点「复制答案」，粘贴到邮件或消息里发过去。","If the file can't be saved, copy the answers and paste them into an email or message.")))+'</p>';
@@ -396,9 +430,14 @@ document.addEventListener("click",function(ev){
       A.screen[k]=sel;save();render();return;
     case "done":var d=A.done.slice(),di=d.indexOf(v);if(di>=0)d.splice(di,1);else d.push(v);A.done=d;if(!asksMiss()){A.doneMiss=null;A.doneMissOther="";}save();render();return;
     case "exp":A.answers[b.getAttribute("data-id")]=parseInt(v,10);break;
-    case "lang":A.lang[b.getAttribute("data-k")]=v;break;
+    case "lang":A.lang[b.getAttribute("data-k")]=v;if(b.getAttribute("data-k")==="english")A.lang.chosen=true;break;
+    case "native":  // a first language skips the level and the word test: the English level decides (fluent)
+      A.lang.native=v==="1";
+      if(A.lang.native){A.lang.english="fluent";A.vocab={};}else if(A.lang.english==="fluent"&&!A.lang.chosen)delete A.lang.english;
+      break;
     case "tend":A.tend[b.getAttribute("data-id")]=parseInt(v,10);break;
     case "perc":A.perc[b.getAttribute("data-id")]=parseInt(v,10);break;
+    case "submit":submit();return;
     case "miss":A.doneMiss=parseInt(v,10);if(A.doneMiss!==3)A.doneMissOther="";break;
     case "vocab":A.vocab[screens()[index(screens())].w]=parseInt(v,10);break;
     case "savefile":saveFile();return;
@@ -452,6 +491,10 @@ function saveFile(){
     say(L(T("文件已经下载，把它发给研究人员就行。","Downloaded. Send the file to the researcher.")),"ok");
   }catch(e){say(L(T("这里保存不了文件，请点「复制答案」。","Files can't be saved here. Please use Copy answers.")),"warn");}
 }
+// Study mode: the answers go to the study page, which keeps them for the participant's file.
+function submit(){
+  parent.postMessage({type:"uat:answers",answers:exportObject()},location.origin);
+}
 function copyOut(){
   var data=exportText(),fail=function(){say(L(T("没能自动复制。展开下面的答案，全选后复制。","Couldn't copy automatically. Open the answers below, select all and copy.")),"warn");var d=document.querySelector("details");if(d){d.open=true;var o=$("f-out");if(o){o.focus();o.select();}}};
   try{navigator.clipboard.writeText(data).then(function(){say(L(T("已复制，粘贴到邮件或消息里发给研究人员。","Copied. Paste it into an email or message to the researcher.")),"ok");},fail);}catch(e){fail();}
@@ -460,6 +503,7 @@ function copyOut(){
 /* ---------- boot ---------- */
 load();
 if(!ui.lang)ui.lang="en"; // English first; 中文 stays one tap away
+if(PLATFORM){ui.lang="en";$("lang-zh").hidden=true;$("lang-en").hidden=true;document.documentElement.setAttribute("data-theme","light");}
 render();
 if(inViewer){
   window.claude.use("downloads").then(function(d){downloads=d||false;if(ui.at==="finish")render();},function(){downloads=false;});

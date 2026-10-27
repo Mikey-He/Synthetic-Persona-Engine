@@ -137,22 +137,116 @@
   ],
   "groups": [
     {
-      "id": "g-cloud",
+      "id": "g-gcp",
       "source": "product",
       "label": {
-        "en": "Cloud Console Experience",
-        "zh": "云控制台使用经验"
+        "en": "The Google Cloud console",
+        "zh": "Google Cloud 控制台"
+      }
+    },
+    {
+      "id": "g-cloud-billing",
+      "source": "product",
+      "label": {
+        "en": "Billing, costs or budgets in a cloud console (Google Cloud, AWS, Azure)",
+        "zh": "云控制台里的账单、费用或预算（Google Cloud、AWS、Azure）"
+      }
+    },
+    {
+      "id": "g-work-budget",
+      "source": "work",
+      "label": {
+        "en": "Managing a budget or tracking spending at work",
+        "zh": "工作中管预算或跟踪开支"
+      }
+    },
+    {
+      "id": "g-roles",
+      "source": "work",
+      "label": {
+        "en": "Managing who is in a project and what role they have",
+        "zh": "管理项目里有哪些人、各是什么角色"
+      }
+    },
+    {
+      "id": "g-cloud-course",
+      "source": "study",
+      "label": {
+        "en": "A course or certificate in cloud computing",
+        "zh": "云计算的课程或证书"
+      }
+    },
+    {
+      "id": "g-personal-budget",
+      "source": "life",
+      "label": {
+        "en": "A budget or spending alert for yourself",
+        "zh": "给自己设预算或开支提醒"
       }
     }
   ],
   "experiences": [
     {
       "id": "X01",
-      "group": "g-cloud",
-      "text": "Has configured cloud billing budgets and cost alerts in a cloud management console",
+      "group": "g-gcp",
+      "text": "Has used the Google Cloud console",
       "question": {
-        "en": "Have you created budgets or spending alerts in a cloud console (such as Google Cloud or AWS)?",
-        "zh": "您是否在云控制台（如 Google Cloud 或 AWS）中创建过预算或支出提醒？"
+        "en": "Have you used the Google Cloud console, for anything at all?",
+        "zh": "你用过 Google Cloud 控制台吗？做什么都算。"
+      }
+    },
+    {
+      "id": "X02",
+      "group": "g-cloud-billing",
+      "text": "Has looked at billing or costs in a cloud console",
+      "question": {
+        "en": "Have you looked at billing or costs in a cloud console?",
+        "zh": "你在云控制台里看过账单或费用吗？"
+      }
+    },
+    {
+      "id": "X03",
+      "group": "g-cloud-billing",
+      "text": "Has created a budget or a spending alert in a cloud console",
+      "question": {
+        "en": "Have you created a budget or a spending alert in a cloud console?",
+        "zh": "你在云控制台里建过预算或开支提醒吗？"
+      }
+    },
+    {
+      "id": "X04",
+      "group": "g-work-budget",
+      "text": "Has managed a budget or tracked spending against one at work",
+      "question": {
+        "en": "Have you managed a budget at work, or tracked spending against one?",
+        "zh": "你在工作中管过预算，或者对照预算跟踪过开支吗？"
+      }
+    },
+    {
+      "id": "X05",
+      "group": "g-roles",
+      "text": "Has managed the members of a project and their roles in a cloud platform or company system",
+      "question": {
+        "en": "Have you managed who is in a project and what role they have, such as Owner or Editor, in a cloud platform or a company system?",
+        "zh": "你在云平台或公司系统里管过项目成员和他们的角色吗？比如 Owner、Editor。"
+      }
+    },
+    {
+      "id": "X06",
+      "group": "g-cloud-course",
+      "text": "Has studied cloud computing in a course or certificate",
+      "question": {
+        "en": "Have you taken a course or certificate in cloud computing?",
+        "zh": "你上过云计算的课程或考过相关证书吗？"
+      }
+    },
+    {
+      "id": "X07",
+      "group": "g-personal-budget",
+      "text": "Has set a monthly budget or a spending alert for themselves",
+      "question": {
+        "en": "Have you set a monthly budget or a spending alert for yourself, for example in a banking app?",
+        "zh": "你给自己设过每月预算或开支提醒吗？比如在银行 App 里。"
       }
     }
   ],
@@ -169,7 +263,8 @@
       "common": "",
       "altOf": null,
       "exps": [
-        "X01"
+        "X01",
+        "X02"
       ],
       "basis": "Starting point to reach billing settings from the main console menu",
       "locate": {
@@ -188,7 +283,8 @@
       "common": "",
       "altOf": null,
       "exps": [
-        "X01"
+        "X02",
+        "X03"
       ],
       "basis": "Direct location for configuring budgets in the billing section",
       "locate": {
@@ -203,11 +299,11 @@
       "kind": "word",
       "text": "+ CREATE BUDGET",
       "meaning": "Button that initiates the multi-step budget creation flow",
-      "everyday": "",
+      "everyday": "create a budget",
       "common": "common",
       "altOf": null,
       "exps": [
-        "X01"
+        "X03"
       ],
       "basis": "Standard CTA to set up a new budget tracking profile",
       "locate": {
@@ -226,7 +322,7 @@
       "common": "",
       "altOf": null,
       "exps": [
-        "X01"
+        "X03"
       ],
       "basis": "Namer requires entering a title before continuing",
       "locate": {
@@ -245,10 +341,13 @@
       "text": "Time range",
       "meaning": "The cadence at which spend tracking resets and accumulates",
       "everyday": "Period of time",
-      "common": "",
+      "common": "common",
       "altOf": null,
       "exps": [
-        "X01"
+        "X03",
+        "X04",
+        "X06",
+        "X07"
       ],
       "basis": "Prompt specifies setting a monthly budget",
       "locate": {
@@ -270,7 +369,9 @@
       "common": "",
       "altOf": null,
       "exps": [
-        "X01"
+        "X03",
+        "X05",
+        "X06"
       ],
       "basis": "The user must narrow the budget to Atlas",
       "locate": {
@@ -292,7 +393,9 @@
       "common": "",
       "altOf": null,
       "exps": [
-        "X01"
+        "X03",
+        "X04",
+        "X07"
       ],
       "basis": "The spending limit allocated by the company is $1,000",
       "locate": {
@@ -314,7 +417,9 @@
       "common": "",
       "altOf": null,
       "exps": [
-        "X01"
+        "X03",
+        "X06",
+        "X07"
       ],
       "basis": "An alert at $800 corresponds to 80% of the $1,000 budget",
       "locate": {
@@ -334,12 +439,13 @@
       "needed": true,
       "kind": "concept",
       "text": "Email alerts to project owners",
-      "meaning": "Routes automated alert emails directly to users with the project owner role",
+      "meaning": "Sends the alert emails to the people who have the Owner role on the budget's project (unticked by default)",
       "everyday": "",
       "common": "",
       "altOf": null,
       "exps": [
-        "X01"
+        "X03",
+        "X05"
       ],
       "basis": "Prompt explicitly specifies notifications go to project owners rather than other users",
       "locate": {
@@ -361,7 +467,7 @@
       "common": "",
       "altOf": null,
       "exps": [
-        "X01"
+        "X03"
       ],
       "basis": "Default threshold 1 is 50% ($500), but team target is $800 (80%)",
       "locate": {
@@ -370,29 +476,113 @@
         "region": "main",
         "nth": 0
       }
+    },
+    {
+      "id": "T11",
+      "step": "A3",
+      "way": null,
+      "needed": false,
+      "kind": "word",
+      "text": "Services",
+      "meaning": "Counts only some cloud services' spending; none ticked means all services",
+      "everyday": "services in the general sense",
+      "common": "common",
+      "altOf": null,
+      "exps": [
+        "X02",
+        "X03",
+        "X06"
+      ],
+      "basis": "Success needs all services; the default (none ticked) already is",
+      "locate": {
+        "text": "Select services"
+      }
+    },
+    {
+      "id": "T12",
+      "step": "A5",
+      "way": null,
+      "needed": false,
+      "kind": "word",
+      "text": "Forecasted",
+      "meaning": "Spending predicted at the current rate, the other trigger besides Actual; the task asks for actual spending",
+      "everyday": "predicted",
+      "common": "common",
+      "altOf": null,
+      "exps": [
+        "X02",
+        "X03",
+        "X04",
+        "X06"
+      ],
+      "basis": "Each threshold rule triggers on Actual (the default) or Forecasted",
+      "locate": {
+        "text": "Trigger on"
+      }
+    },
+    {
+      "id": "T13",
+      "step": "A5",
+      "way": null,
+      "needed": false,
+      "kind": "word",
+      "text": "Billing admins and users",
+      "meaning": "Everyone with a billing role on the billing account; unticked by default here, and must stay unticked",
+      "everyday": "",
+      "common": "none",
+      "altOf": null,
+      "exps": [
+        "X03",
+        "X05"
+      ],
+      "basis": "Notifications go to project owners rather than other users",
+      "locate": {
+        "text": "Email alerts to billing admins and users"
+      }
+    },
+    {
+      "id": "T14",
+      "step": "A2",
+      "way": null,
+      "needed": true,
+      "kind": "location",
+      "text": "The budget form has four sections, Define, Scope, Amount and Actions; NEXT opens the next one",
+      "meaning": "",
+      "everyday": "",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01",
+        "X03"
+      ],
+      "basis": "Every setting sits in one of the four sections",
+      "locate": {
+        "text": "NEXT"
+      }
     }
   ],
-  "knowledgeGroupsNote": "Drafted from the recording; every item that is not a habit is in exactly one group.",
+  "knowledgeGroupsNote": "Rewritten on 2026-10-27: seven experience questions about activities (never a screen label), fourteen items; every item but the habit is in one group.",
   "knowledgeGroups": [
     {
       "key": "navigation",
-      "title": "Billing Navigation",
+      "title": "Finding the budget page",
       "word": false,
       "default": 1,
-      "description": "Locating billing controls and budget setup sections in the console",
-      "examples": "Billing, Budgets & caps",
+      "description": "Where budgets are in the console and how the budget form moves on",
+      "examples": "Billing, Budgets & caps, the four sections and NEXT",
       "items": [
         "T01",
-        "T02"
+        "T02",
+        "T14"
       ]
     },
     {
       "key": "budget-setup",
-      "title": "Budget Scope and Amount Configuration",
+      "title": "What a budget counts",
       "word": false,
       "default": 1,
-      "description": "Setting budget names, monthly scopes, target project, and monetary limits",
-      "examples": "+ CREATE BUDGET, Define step, Time range, Projects scope, Specified amount",
+      "description": "Naming a budget, its period, which project it counts and its amount",
+      "examples": "Define, Time range, Projects, Specified amount",
       "items": [
         "T04",
         "T05",
@@ -402,10 +592,10 @@
     },
     {
       "key": "alerts-notifications",
-      "title": "Thresholds and Alert Routing",
+      "title": "Alerts and who gets them",
       "word": false,
       "default": 1,
-      "description": "Configuring threshold percentages and target recipients for budget overspend alerts",
+      "description": "Alert thresholds as a share of the budget, and the project owners' email alerts",
       "examples": "Threshold rules, Email alerts to project owners",
       "items": [
         "T08",
@@ -417,10 +607,13 @@
       "title": "Other terms",
       "word": true,
       "default": 1,
-      "description": "Other terms on this workflow's screens",
-      "examples": "",
+      "description": "Other terms on the budget form",
+      "examples": "+ CREATE BUDGET, Services, Forecasted, Billing admins and users",
       "items": [
-        "T03"
+        "T03",
+        "T11",
+        "T12",
+        "T13"
       ]
     }
   ],
@@ -683,12 +876,46 @@
               }
             }
           ]
+        },
+        {
+          "name": "All services and a specified amount (in the prototype, no service ticked means all)",
+          "type": "storage",
+          "key": "mpsBudgets",
+          "where": {},
+          "expect": {
+            "type": "Specified amount"
+          },
+          "anyOf": [
+            {
+              "expect": {
+                "services": []
+              }
+            },
+            {
+              "includes": {
+                "services": [
+                  "All services"
+                ]
+              }
+            },
+            {
+              "includes": {
+                "services": [
+                  "Compute Engine",
+                  "Cloud Storage",
+                  "BigQuery",
+                  "Cloud SQL",
+                  "Cloud Run"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     "outcome": {
       "kind": "change"
     },
-    "gradingNote": "Proposed correct answer (DS, 25 Oct 2026), pending confirmation by the UX team."
+    "gradingNote": "Success criteria of the UX team's Test Procedure (section 10, received 2026-10-27): Monthly; Atlas project only; all services; specified amount; $1,000 with a rule at 80% of actual spend, or $800 with a rule at 100%; email alerts to project owners on, to billing admins and users off. Both count, whatever other alert rules stay: the default 50%, 90% and 100% rules may remain, and $800 with the default 100% rule untouched passes (decided 2026-10-27; Stephen wants more than one right outcome)."
   }
 }

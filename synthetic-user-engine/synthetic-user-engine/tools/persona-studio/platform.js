@@ -936,8 +936,12 @@ function readInput(text) {
   try {
     const doc = JSON.parse(text);
     if (doc && doc.kind === 'sue-questionnaire' && doc.answers) return {kind: 'answers', doc};
+    if (doc && doc.kind === 'uat-participant-file') {
+      if (!doc.questionnaire || !doc.questionnaire.answers) throw Error('This participant file has no questionnaire answers; the persona is built from them.');
+      return {kind: 'answers', doc: doc.questionnaire, postTask: doc.postTask || null};
+    }
     if (doc && typeof (doc.transcript || doc.text) === 'string') return {kind: 'survey', text: doc.transcript || doc.text};
-  } catch (e) { /* not JSON */ }
+  } catch (e) { if (!(e instanceof SyntaxError)) throw e; /* not JSON */ }
   const lines = text.split(/\n/).filter(l => l.trim());
   const qa = lines.filter(l => /\?\s*$|^\s*(q\d*|a\d*|question|answer)\b|:\s*\S/i.test(l)).length;
   return text.length > 600 || (lines.length >= 4 && qa >= 3) ? {kind: 'survey', text} : {kind: 'description', text};
@@ -963,10 +967,12 @@ function setupComposer() {
       <div class="shimmer" style="width:90%;margin-top:20px"></div><div class="shimmer" style="width:70%"></div><div class="shimmer" style="width:80%"></div></div>`;
   async function start() {
     const text = box.value.trim(); if (!text) return;
-    const input = readInput(text);
+    let input;
+    try { input = readInput(text); }
+    catch (e) { $('#draft-area').innerHTML = `<div class="banner bad" style="margin-top:24px"><span class="ms">error</span><div>${esc(e.message)}</div></div>`; return; }
     btn.disabled = true;
     try {
-      if (input.kind === 'answers') return fromAnswers(input.doc);
+      if (input.kind === 'answers') return fromAnswers(input.doc, input.postTask);
       if (input.kind === 'survey') {
         $('#draft-area').innerHTML = wait('Reading their answers: every setting has to come from something they said…');
         const r = await api('/api/extract-interview', {text: input.text});
@@ -996,7 +1002,7 @@ function setupComposer() {
 }
 
 /* A participant's own questionnaire answers: the Persona Builder builds the card exactly, no AI. */
-function fromAnswers(doc) {
+function fromAnswers(doc, postTask) {
   const here = (S.flow || {}).name || '';
   if (doc.flow && doc.flow !== here) {
     const other = S.workflows.find(w => w.name === doc.flow);
@@ -1007,7 +1013,8 @@ function fromAnswers(doc) {
   if (!S.builder) throw Error('The persona builder is still loading. Try again in a moment.');
   S.builder.load(doc, 'normal');
   const card = S.builder.buildCard();
-  draft = {kind: 'answers', doc, card};
+  draft = {kind: 'answers', doc, card, postTask: postTask || null};
+  const during = postTask ? PersonaParameters.fromAnswers(paramsFromCard(card, 'P'), doc.answers, postTask) : null;
   const t = card.tendency || {}, items = card.items.filter(i => i.kind !== 'habit');
   const knows = items.filter(i => i.result === 'understands').length, vague = items.filter(i => ['vague', 'everyday', 'other'].includes(i.result)).length;
   const groups = groupsVisible().map(g => {
@@ -1025,11 +1032,13 @@ function fromAnswers(doc) {
       <div class="card"><h2>Language and finishing</h2>
         <div class="knowrow" style="border-top:0"><h3>English</h3><span>${esc(lang.english || 'fluent')}${lang.vocabSize ? ` · about ${lang.vocabSize.toLocaleString()} words` : ''}</span></div>
         <div class="knowrow"><h3>How they make sure it is done</h3><span>${esc((goal.confirmBy || []).map(w => (WAYS.find(([k]) => k === w) || [w, w])[1]).join('; '))}</span></div></div>
+      ${during ? `<div class="card"><h2>During the task</h2><p class="muted small" style="margin:6px 0 12px">From what they said after the task, 1 to 5, as 0 to 10.</p>
+        ${STATES.map(s => `<div class="knowrow"><h3>${s.title}</h3><span>${during[s.key]}</span></div>`).join('')}</div>` : ''}
     </div>
     <div class="card summary">
       <div class="row">${avatar({id: 'draft', name: codeOf(doc.answers.name) || 'P'}, 56)}<div style="min-width:0;flex:1">
         <md-outlined-text-field id="p-name" label="Code name" value="${esc(codeOf(doc.answers.name))}" placeholder="P4" style="width:100%" supporting-text="Only a code name is kept, never their name."></md-outlined-text-field></div></div>
-      <div class="chips" style="margin-top:12px">${chipsFor({...scores, fatigue: 0, distraction: 0, timePressure: 0}, items.length ? knows / items.length : 0)}</div>
+      <div class="chips" style="margin-top:12px">${chipsFor({...scores, fatigue: during ? during.fatigue : 0, distraction: during ? during.distraction : 0, timePressure: during ? during.timePressure : 0}, items.length ? knows / items.length : 0)}</div>
       <md-filled-button id="create" style="width:100%;margin-top:12px"><span slot="icon" class="ms">check</span>Create persona</md-filled-button>
       <md-outlined-button id="create-run" style="width:100%;margin-top:8px"><span slot="icon" class="ms">play_arrow</span>Create and run a test</md-outlined-button>
     </div></div>`;
@@ -1476,7 +1485,9 @@ document.addEventListener('click', async e => {
       if (draft.kind !== 'description' && !/^[A-Za-z][A-Za-z0-9_-]{0,31}$/.test(typed)) return snack('Give the participant a code name, such as P4. Their name is never kept.');
       let r, made;
       if (draft.kind === 'answers') {
-        r = await api('/api/personas/save-participant', {code: typed, card: draft.card, answers: draft.doc, parameters: paramsFromCard(draft.card, typed)});
+        const parameters = PersonaParameters.fromAnswers(paramsFromCard(draft.card, typed), draft.doc.answers, draft.postTask);
+        r = await api('/api/personas/save-participant', {code: typed, card: draft.card, answers: draft.doc, parameters, postTask: draft.postTask,
+          built: draft.postTask ? buildBundle(parameters).card : undefined});
         made = r.name;
       } else {
         draft.p.name = typed || draft.p.name;

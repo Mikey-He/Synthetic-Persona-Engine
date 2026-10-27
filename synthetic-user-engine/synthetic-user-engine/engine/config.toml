@@ -118,6 +118,17 @@ high_stakes_shift = { risk = -5, patience = 0, detailFind = 5, detailCheck = 5, 
 # A setting left unspecified takes the value of a typical person.
 typical = { vision = "normal", colorVision = "typical", clickPrecision = "high", readingSpeed = "average", warningAttention = "high", stressTolerance = "medium", pressureChange = "steady" }
 
+[persona.answers]
+# How questionnaire answers the Persona Builder does not read become settings (tools/questionnaire.html ids;
+# the testing platform's participant file carries them, 2026-10-27). Each list is indexed by the answer.
+warnings = ["low", "medium", "high"]          # W: didn't notice / glanced / stopped and read -> warningAttention
+color = ["typical", "reduced", "no_color_cues"]  # C: can tell red from green / not easily / can't rely on colour
+# E: same as usual / a bit stressed / very stressed, clicking around -> [pressureChange, stressTolerance]
+setbacks = [["steady", "high"], ["rises_after_setbacks", "medium"], ["rises_after_setbacks", "low"]]
+# The questions after the task, 1 to 5, as 0-10 states: tired -> fatigue, rushed -> time pressure, and
+# focused -> distraction read the other way round (5, very focused, is distraction 0).
+state_scale = [0, 2.5, 5, 7.5, 10]
+
 [compare]
 # Comparing an engine run with the person's session (python -m sue.compare). In the platform log a dropdown's name is
 # followed by its current value; cut it off first. The field names belong to the workflow: flow.json engine.compare.fieldLabels.

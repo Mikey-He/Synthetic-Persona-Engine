@@ -6,6 +6,9 @@ then republish the pages.
     python tools/sync_flow.py                    # rewrite both pages
     python tools/sync_flow.py --check            # only report whether they are in step
     python tools/sync_flow.py path/to/flow.json  # another workflow
+    python tools/sync_flow.py path/to/flow.json --platform billing-config
+        # a study page (testing-platform/<study>-study/): its own copy of the questionnaire and
+        # study.js with the task. The two pages above stay as they are.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from sue.workflow import problems as engine_problems  # noqa: E402  the engine b
 FLOW = ROOT / "data" / "version-a" / "flow.json"
 QUESTIONNAIRE = ROOT / "tools" / "questionnaire.html"
 BUILDER = ROOT / "tools" / "persona-builder.html"
+STUDIES = ROOT.parent.parent / "testing-platform"  # the study pages, in this repository
 SOURCES = ("product", "work", "study", "life")
 
 
@@ -110,6 +114,37 @@ def questionnaire_data(flow: dict) -> dict:
     }
 
 
+def study_data(flow: dict, study: str) -> dict:
+    """What the study page shows: the task as the task bar shows it. The success checks stay out of it,
+    since participants can open the page's files; the engine grades the participant file."""
+    return {"study": study, "flow": flow["name"], "task": flow["task"]}
+
+
+def put_platform(flow: dict, study: str, check: bool) -> list[str]:
+    """Writes (or, with check, compares) the study page's questionnaire copy and study.js. Returns what changed."""
+    page = QUESTIONNAIRE.read_text(encoding="utf-8")
+    block = re.compile(r'(<script type="application/json" id="qdata">)(.*?)(</script>)', re.S)
+    m = block.search(page)
+    page = page[: m.start(2)] + dump(questionnaire_data(flow)) + page[m.end(2):]
+    folder = STUDIES / f"{study}-study"
+    if not (folder / "index.html").exists():
+        raise SystemExit(f"no study page at {folder}")
+    files = {
+        folder / "questionnaire.html": page,
+        folder / "study.js": "// Written by synthetic-user-engine/tools/sync_flow.py --platform from the workflow's flow.json; do not edit.\n"
+                             "window.STUDY = " + json.dumps(study_data(flow, study), ensure_ascii=False, indent=2).replace("</", "<\\/") + ";\n",
+    }
+    changed = []
+    for path, text in files.items():
+        if path.exists() and path.read_text(encoding="utf-8") == text:
+            continue
+        changed.append(str(path.relative_to(STUDIES)))
+        if not check:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+    return changed
+
+
 def dump(data: dict) -> str:
     # One record per line keeps diffs readable; "</" is escaped so text can never close the tag.
     lines = ["{"]
@@ -143,7 +178,7 @@ def put(page: Path, block_id: str, data: dict, check: bool) -> bool | None:
 
 
 def main() -> int:
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    args = [a for i, a in enumerate(sys.argv[1:], 1) if not a.startswith("--") and sys.argv[i - 1] != "--platform"]
     check = "--check" in sys.argv
     path = Path(args[0]) if args else FLOW
     flow = json.loads(path.read_text(encoding="utf-8"))
@@ -152,6 +187,11 @@ def main() -> int:
         print("The flow file has problems; fix them first:")
         print("\n".join("  " + x for x in bad))
         return 1
+    if "--platform" in sys.argv:
+        study = sys.argv[sys.argv.index("--platform") + 1]
+        changed = put_platform(flow, study, check)
+        print(("out of step: " if check else "updated: ") + ", ".join(changed) if changed else f"the platform's {study} files are in step")
+        return 1 if changed and check else 0
     changed = []
     for page, block, data in ((QUESTIONNAIRE, "qdata", questionnaire_data(flow)), (BUILDER, "flow", flow)):
         r = put(page, block, data, check)

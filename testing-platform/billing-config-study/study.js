@@ -1,0 +1,6 @@
+// Written by synthetic-user-engine/tools/sync_flow.py --platform from the workflow's flow.json; do not edit.
+window.STUDY = {
+  "study": "billing-config",
+  "flow": "Billing Config · Atlas budget (UX team)",
+  "task": "You are a project manager overseeing the development and operation of a new online platform, 'Atlas'. Your team uses cloud services to support the project.\n\nThe company has allocated a maximum monthly cloud spending limit of $1,000. However, your team aims to keep its monthly spending at $800 or less across all cloud services that generate costs. While spending more than $800 is permitted, your goal is to stay within this target.\nRecently, cloud spending has regularly exceeded the expected amount and occasionally reached the $1000 limit, raising concerns about unexpected costs. Your manager has asked you to set up a monthly budget and alert based on actual spending, helping the team to take action early and prevent potential overspending.\nYou are told that the team prefers that budget notifications go directly to the project owners rather than other users.\nBased on this situation, create a project and configure an appropriate monthly budget and spending alerts for the Atlas project."
+};
