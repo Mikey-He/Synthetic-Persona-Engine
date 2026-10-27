@@ -4,7 +4,9 @@
    - logs what the person does with the event names of the testing platform's versions A and B
      (testing-platform/uat-platform/docs/build-plan.md, Event types): pages, form sections, settings reached
      and returned to, clicks, field changes with the old and new value, validation messages, saves and
-     reopened budgets; plus storage_written (what the product saved) and notice_shown (a pop-up message);
+     reopened budgets; plus storage_written (what the product saved), notice_shown (a toast, a dialog or a
+     help explanation opening), key_pressed (Enter, Escape and the / shortcut, which act without a click)
+     and form_submitted (a dialog's form sent with Enter);
    - hands the events and what the product has saved (its localStorage) to the study page every second,
      and once more when the task bar's "I'm finished" asks for it.
    Opened on its own, without a study page around it, it does nothing and the prototype works as the original. */
@@ -86,7 +88,7 @@
   function kl(el) { var t = el.closest("[data-kl]"); return t ? t.getAttribute("data-kl") : null; }
 
   var INTERACTIVE = "a[href], button, input, select, textarea, label, summary, [role=button], [role=link], [role=option], [role=checkbox], [role=radio], [role=menuitem], [role=tab], [contenteditable=true], [data-page], [data-action], [data-step]";
-  var CONTROL = "a[href], button, [role=button], [role=link], [role=option], [role=menuitem], [role=tab], [data-page], [data-action], [data-step]";
+  var CONTROL = "a[href], button, summary, [role=button], [role=link], [role=option], [role=menuitem], [role=tab], [data-page], [data-action], [data-step]";
   document.addEventListener("click", function (event) {
     var t = event.target instanceof Element ? event.target : null;
     if (!t || !t.closest(INTERACTIVE)) {
@@ -99,6 +101,29 @@
       log("control_clicked", label, { label: label, kl: kl(c), route: route, screen: screen, x: event.clientX, y: event.clientY });
       if (c.matches("[data-finish]")) saveClicked();
     }
+  }, true);
+
+  // Keys that act without a click: Enter in the search box or on a field, Escape (closes a list, a dialog
+  // or a help note), and / (jumps to search). Enter on a button or an option clicks it and is logged as that click.
+  document.addEventListener("keydown", function (event) {
+    var k = event.key, t = event.target instanceof Element ? event.target : null;
+    if (k !== "Enter" && k !== "Escape" && !(k === "/" && !(t && t.matches("input, textarea")))) return;
+    if (k === "Enter" && t && t.closest("button, a[href], summary, [data-page], [data-option], [role=option]")) return;
+    var field = t && t.matches("input, select, textarea") ? fieldName(t) : null;
+    log("key_pressed", k, { key: k, field: field, value: t && t.matches("input, textarea") ? t.value : null, route: route, screen: screen });
+  }, true);
+  document.addEventListener("submit", function (event) {
+    var f = event.target, data = {};
+    try { new FormData(f).forEach(function (v, k) { data[k] = String(v); }); } catch { /* ignore */ }
+    var title = f.closest(".modal") ? text(f.closest(".modal").querySelector("h1, h2, h3")) : null;
+    log("form_submitted", title, { form: title, values: data, route: route, screen: screen });
+  }, true);
+  // A help note opening shows its explanation: what the person could read.
+  document.addEventListener("toggle", function (event) {
+    var d = event.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.open) return;
+    var note = d.querySelector(".help-description, [role=note]") || d;
+    log("notice_shown", labelOf(d.querySelector("summary") || d), { kind: "help", text: text(note).slice(0, 500), route: route, screen: screen });
   }, true);
 
   // The prototype keeps its form in global variables of app.js (draft, errors, editing), read as they are.
@@ -190,7 +215,10 @@
     if (c.type === "checkbox") return c.checked;
     return c.tagName === "BUTTON" ? text(c) : c.value;
   }
-  var reached = {}, visible = {}, left = {}, returnable = {}, shownErrors = [];
+  // settings already reached this session, kept across a reload as versions A and B keep them
+  var REACHED = "uat:reached:" + session, reached = {};
+  try { reached = JSON.parse(sessionStorage.getItem(REACHED)) || {}; } catch { reached = {}; }
+  var visible = {}, left = {}, returnable = {}, shownErrors = [];
   function settings() {
     // a setting's label, or a field without one that names itself (the budget name: aria-label, placeholder)
     var labels = Array.prototype.slice.call(document.querySelectorAll("label, input[aria-label], input[placeholder]"));
@@ -199,8 +227,11 @@
       var label = labels.filter(function (l) { return s[1].test(nameOf(l)) && onScreen(l); })[0], key = s[0];
       if (label && !visible[key]) {
         Object.keys(left).forEach(function (o) { if (o !== key) returnable[o] = true; });
-        if (!reached[key]) { reached[key] = true; log("setting_reached", key, { setting: key, value: settingValue(label), screen: screen }); }
-        else if (returnable[key]) log("setting_returned", key, { setting: key, route: route, screen: screen });
+        if (!reached[key]) {
+          reached[key] = true;
+          try { sessionStorage.setItem(REACHED, JSON.stringify(reached)); } catch { /* ignore */ }
+          log("setting_reached", key, { setting: key, value: settingValue(label), screen: screen });
+        } else if (returnable[key]) log("setting_returned", key, { setting: key, route: route, screen: screen });
         delete left[key]; delete returnable[key];
       }
       if (!label && visible[key]) { left[key] = true; delete returnable[key]; }
@@ -224,6 +255,10 @@
       screen = now;
     }
     settings();
+    var modal = document.querySelector("#overlay .modal");
+    var dialog = modal ? text(modal.querySelector("h1, h2, h3")) || text(modal).slice(0, 80) : "";
+    if (dialog && dialog !== look.dialog) log("notice_shown", dialog, { kind: "dialog", text: text(modal).slice(0, 500), route: route, screen: screen });
+    look.dialog = dialog;
     var toast = document.getElementById("toast");
     var shown = toast && toast.style.display !== "none" ? text(toast) : "";
     if (shown && shown !== look.toast) log("notice_shown", shown, { kind: "toast", text: shown, route: route, screen: screen });

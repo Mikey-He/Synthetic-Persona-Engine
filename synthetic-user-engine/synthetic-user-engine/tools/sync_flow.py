@@ -120,12 +120,25 @@ def study_data(flow: dict, study: str) -> dict:
     return {"study": study, "flow": flow["name"], "task": flow["task"]}
 
 
+def desktop_light(page: str) -> str:
+    """The study page's copy is for a desktop browser in one light look (2026-10-27): without the
+    questionnaire's dark theme and its narrow-screen rule."""
+    for rule in (re.compile(r'@media \(prefers-color-scheme: dark\)\{\n  :root:not\(\[data-theme="light"\]\)\{.*?\n  \}\n\}\n', re.S),
+                 re.compile(r':root\[data-theme="dark"\]\{.*?\n\}\n', re.S),
+                 re.compile(r'@media \(max-width:520px\)\{[^\n]*\}\}\n')):
+        page, n = rule.subn("", page, count=1)
+        if n != 1:
+            raise SystemExit("tools/questionnaire.html changed its theme rules; update desktop_light in sync_flow.py")
+    return page
+
+
 def put_platform(flow: dict, study: str, check: bool) -> list[str]:
     """Writes (or, with check, compares) the study page's questionnaire copy and study.js. Returns what changed."""
     page = QUESTIONNAIRE.read_text(encoding="utf-8")
     block = re.compile(r'(<script type="application/json" id="qdata">)(.*?)(</script>)', re.S)
     m = block.search(page)
     page = page[: m.start(2)] + dump(questionnaire_data(flow)) + page[m.end(2):]
+    page = desktop_light(page)
     folder = STUDIES / f"{study}-study"
     if not (folder / "index.html").exists():
         raise SystemExit(f"no study page at {folder}")
