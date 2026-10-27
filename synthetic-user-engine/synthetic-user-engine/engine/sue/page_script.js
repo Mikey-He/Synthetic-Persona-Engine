@@ -292,7 +292,9 @@
       const isField = ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName);
       const label = isField && el.labels && el.labels[0] ? el.labels[0] : null;
       const kl = closestDeep(el, "[data-kl]");
-      const text = clean(label ? label.innerText : el.innerText);
+      // A field is named by its label; a label with no text (hidden, or only styling) names nothing,
+      // and then he goes by what he sees in the box (its placeholder), else its accessible name.
+      const text = isField ? fieldName(el) : clean(el.innerText);
       // A button that is only a picture (trash can, cross, question mark): he sees the
       // picture, so it is named by what it shows, its accessible name. Python passes the
       // name through his vocabulary like any word. A grayed icon he does not recognise.
@@ -307,7 +309,7 @@
         type: el.getAttribute("type") || "",
         text,
         icon,
-        original: label ? originalText(label) : originalText(el),
+        original: isField ? fieldName(el, true) : originalText(el),
         value: isField && !["checkbox", "radio"].includes(el.type) ? el.value : null,
         checked: ["checkbox", "radio"].includes(el.type) ? el.checked : el.getAttribute("aria-checked") === "true" ? true : null,
         disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
@@ -475,14 +477,18 @@
       .map((id) => byId(el, id)).filter(Boolean).map(originalText).join(" ").trim();
     return clean(el.getAttribute("aria-label") || by || el.getAttribute("title") || el.getAttribute("alt") || "");
   }
+  // A field's name as a person reads it: its label's text; when the label is empty, the placeholder
+  // shown in the box; else its accessible name. The recorder and the engine name it the same way.
+  function fieldName(el, original) {
+    const read = (x) => clean(original ? originalText(x) : x.innerText);
+    const fromLabel = el.labels && el.labels[0] ? read(el.labels[0]) : "";
+    if (fromLabel) return fromLabel;
+    if (["button", "submit", "reset"].includes(el.type)) return clean(el.value);
+    return clean(el.getAttribute("placeholder") || el.getAttribute("aria-label") || "");
+  }
   function textOf(el) {
     const isField = ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName);
-    if (isField) {
-      if (el.labels && el.labels[0]) return originalText(el.labels[0]);
-      if (["button", "submit", "reset"].includes(el.type)) return clean(el.value);
-      return clean(el.getAttribute("placeholder") || "");
-    }
-    return originalText(el);
+    return isField ? fieldName(el, true) : originalText(el);
   }
   function shown(el) {
     const r = el.getBoundingClientRect();

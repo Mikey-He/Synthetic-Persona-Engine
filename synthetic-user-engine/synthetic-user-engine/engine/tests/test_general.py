@@ -185,3 +185,31 @@ def test_a_draft_is_assembled_from_the_recording_and_can_drive_the_engine():
                                             "where": {"email": "priya@x.example"}, "expect": {"projects": ["Lyra"]}}]
     assert any("/api/secret" in n for n in notes)
     assert problems(flow) == []
+
+
+def test_a_storage_check_reads_what_the_browser_kept(tmp_path):
+    """A prototype with no server keeps what was made in localStorage; the check reads it there."""
+    from playwright.sync_api import sync_playwright
+
+    from sue.draft import stored_changes
+    from sue.target import WebTarget, check_problems
+    (tmp_path / "index.html").write_text("<script>localStorage.setItem('budgets', JSON.stringify("
+                                         "[{name: 'Atlas', time: 'Monthly', owners: true}]))</script>", encoding="utf-8")
+    good = {"name": "The budget is monthly", "type": "storage", "key": "budgets", "where": {"name": "Atlas"}, "expect": {"time": "Monthly", "owners": True}}
+    assert check_problems(good, 0) == []
+    assert check_problems({"name": "x", "type": "storage"}, 0)
+    import http.server, threading, functools  # noqa: E401
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(tmp_path)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    start = f"http://127.0.0.1:{server.server_address[1]}/index.html"
+    try:
+        target = WebTarget({"kind": "web", "start": start, "success": [good]})
+        with sync_playwright() as pw:
+            page = pw.chromium.launch().new_page()
+            page.goto(start)
+            assert target.check(good, page)[0]
+            assert not target.check({**good, "expect": {"owners": False}}, page)[0]
+    finally:
+        server.shutdown()
+    rec = {"states": [{"storage": {}}, {"storage": {"budgets": "[1]", "theme": "dark"}}, {"storage": {"budgets": "[1]"}}]}
+    assert stored_changes(rec) == {"budgets": "[1]"}

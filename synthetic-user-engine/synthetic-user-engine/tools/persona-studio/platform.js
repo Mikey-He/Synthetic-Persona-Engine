@@ -51,8 +51,6 @@ const STATES = [
   {key:'distraction', title:'Gets distracted', note:'Sometimes misses a small element on the screen.'},
   {key:'timePressure', title:'Time pressure', note:'Reads less, takes more risks, gives up sooner.'},
 ];
-const PERCEPTION = [['vision','reduced','visibility','Has trouble reading small text'],['colorVision','reduced','palette',"Can't rely on colour"],
-  ['clickPrecision','low','ads_click','Sometimes misses small targets'],['warningAttention','low','warning','Often misses warnings']];
 const WAYS = [['action','Once they click the last button'],['list','Checking the list or details page'],['toast','A success message'],
   ['external','An email or notification'],['test','Making it actually work once']];
 function initials(name) { return (String(name).match(/[\p{L}\p{N}]+/gu) || []).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'; }
@@ -851,18 +849,46 @@ function editorHTML(p, flat, src) {
     <div class="${box}"><h2>During the task</h2><p class="muted small" style="margin:6px 0 12px">Off unless you turn them up.</p>
       ${STATES.map(s => `<div class="trait"><div class="head"><h3>${s.title}</h3></div>
         <md-slider min="0" max="10" step="0.5" value="${p[s.key]}" labeled data-trait="${s.key}" aria-label="${s.title}"></md-slider>
-        <div class="readout">${s.note}</div>${sourceTag(src, s.key)}</div>`).join('')}</div>
+        <div class="readout">${s.note}</div>${sourceTag(src, s.key)}</div>`).join('')}
+      ${choiceRow('How pressure builds', 'With time pressure above 0', 'humanFactors.pressureChange', [['steady', 'Stays steady'], ['rises_after_setbacks', 'Rises after setbacks'], ['rises_over_time', 'Rises over time']], factor(p, 'pressureChange'), src)}
+      ${choiceRow('Coping with setbacks', 'Low: pressure rises fast after a wrong turn', 'humanFactors.stressTolerance', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], factor(p, 'stressTolerance'), src)}
+      ${choiceRow('Urgency', `Urgent sets time pressure to at least ${esc((window.SUE_PERSONA || {}).urgent_min_time_pressure)}`, 'urgency', [['calm', 'Calm'], ['urgent', 'Urgent']], p.urgency, src)}
+      ${choiceRow('Stakes', 'High: more careful when checking, less daring', 'stakes', [['low', 'Low'], ['high', 'High']], p.stakes, src)}</div>
     <div class="${box}"><h2>What they know</h2><p class="muted small" style="margin:6px 0 12px">Terms they don't know show up as made-up words, as they would to them.</p>
       ${groupsVisible().map(g => `<div class="knowrow"><div style="min-width:0"><h3>${esc(g.title)}</h3><div class="muted small">${esc(g.examples || g.description)}</div></div>
         <div class="seg" role="radiogroup" aria-label="${esc(g.title)}">${LEVEL_WORDS[!!g.word].map((l, i) =>
           `<button type="button" role="radio" aria-checked="${p.knowledge[g.key] === i}" class="${p.knowledge[g.key] === i ? 'on' : ''}" data-know="${esc(g.key)}" data-v="${i}">${l}</button>`).join('')}</div></div>${sourceTag(src, 'knowledge.' + g.key)}`).join('')}</div>
     <details class="${box} more"><summary><h2>Seeing, clicking and warnings</h2><span class="ms">expand_more</span></summary>
-      <md-list style="margin-top:8px;background:transparent">${PERCEPTION.map(([k, v, i, l]) =>
-        `<md-list-item><span slot="start" class="ms">${i}</span><div slot="headline">${l}</div><md-switch slot="end" data-perc="${k}" data-on="${v}" ${hf[k] === v ? 'selected' : ''} aria-label="${l}"></md-switch></md-list-item>`).join('')}</md-list></details>
+      ${choiceRow('Reading small text', '', 'humanFactors.vision', [['normal', 'Normal'], ['mild', 'Some difficulty'], ['reduced', 'Difficult']], factor(p, 'vision'), src)}
+      ${choiceRow('Colour', '', 'humanFactors.colorVision', [['typical', 'Normal'], ['reduced', 'Reduced'], ['no_color_cues', 'Cannot rely on it']], factor(p, 'colorVision'), src)}
+      ${choiceRow('Clicking small targets', '', 'humanFactors.clickPrecision', [['high', 'Precise'], ['medium', 'Sometimes misses'], ['low', 'Often misses']], factor(p, 'clickPrecision'), src)}
+      ${choiceRow('Reading speed', 'Slower reading tires them sooner', 'humanFactors.readingSpeed', [['slow', 'Slow'], ['average', 'Average'], ['fast', 'Fast']], factor(p, 'readingSpeed'), src)}
+      ${choiceRow('Noticing warnings', '', 'humanFactors.warningAttention', [['low', 'Often misses'], ['medium', 'Sometimes misses'], ['high', 'Always notices']], factor(p, 'warningAttention'), src)}</details>
     <details class="${box} more"><summary><h2>Language and finishing</h2><span class="ms">expand_more</span></summary>
-      <div class="knowrow" style="border-top:0"><div><h3>English</h3></div><div class="seg">${['beginner','intermediate','fluent'].map(k => `<button type="button" class="${p.english === k ? 'on' : ''}" data-english="${k}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>
+      <div class="knowrow" style="border-top:0"><div style="min-width:0"><h3>English</h3><div class="muted small" data-english-note>${englishNote(p)}</div></div>
+        <div class="seg">${['beginner','intermediate','fluent'].map(k => `<button type="button" class="${p.english === k ? 'on' : ''}" data-english="${k}" title="About ${englishWords(k)} common words">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>
+      ${p.vocabSize ? `<div data-vocab-row><div class="knowrow"><div style="min-width:0"><h3>Vocabulary size</h3><div class="muted small">About ${p.vocabSize.toLocaleString()} words, set for this person, used instead of the English level</div></div>
+        <md-text-button data-vocab-clear>Use English level</md-text-button></div>${sourceTag(src, 'vocabSize')}</div>` : ''}
       <h3 style="margin-top:12px">How they make sure it is done</h3>
-      <div class="chips" style="margin-top:8px">${WAYS.map(([k, l]) => `<md-filter-chip label="${l}" data-way="${k}" ${p.confirmBy.includes(k) ? 'selected' : ''}></md-filter-chip>`).join('')}</div></details>`;
+      <div class="chips" style="margin-top:8px">${WAYS.map(([k, l]) => `<md-filter-chip label="${l}" data-way="${k}" ${p.confirmBy.includes(k) ? 'selected' : ''}></md-filter-chip>`).join('')}</div>${sourceTag(src, 'confirmBy')}
+      ${choiceRow('If no confirmation appears', '', 'ifConfirmMissing', [['let_go', 'Let it go'], ['check', 'Check'], ['redo', 'Do it again']], p.ifConfirmMissing, src)}</details>`;
+}
+/* A setting with a few named choices. path: a top-level setting or humanFactors.<key>. */
+function choiceRow(title, note, path, options, current, src) {
+  return `<div class="knowrow"><div style="min-width:0"><h3>${esc(title)}</h3>${note ? `<div class="muted small">${esc(note)}</div>` : ''}</div>
+    <div class="seg" role="radiogroup" aria-label="${esc(title)}">${options.map(([v, l]) =>
+      `<button type="button" role="radio" aria-checked="${current === v}" class="${current === v ? 'on' : ''}" data-param="${esc(path)}" data-v="${esc(v)}">${esc(l)}</button>`).join('')}</div></div>${sourceTag(src, path)}`;
+}
+/* How many common words an English level knows: config.toml [words] top_n. */
+function englishWords(level) {
+  const n = ((window.SUE_PERSONA || {}).english_words || {})[level];
+  return n ? n.toLocaleString() : '?';
+}
+function englishNote(p) { return p.vocabSize ? 'Word knowledge comes from the vocabulary size below' : `Knows the ${englishWords(p.english)} most common words`; }
+/* A human factor as it takes effect: unspecified means a typical person (config.toml [persona] typical). */
+function factor(p, key) {
+  const v = (p.humanFactors || {})[key];
+  return !v || v === 'unspecified' ? PersonaParameters.typical()[key] : v;
 }
 function scoresOf(p) { return Object.fromEntries([...TRAITS, ...STATES].map(t => [t.key, p[t.key]])); }
 function knownOf(p) { const g = groupsVisible(); return g.length ? g.reduce((s, x) => s + p.knowledge[x.key], 0) / (2 * g.length) : 0; }
@@ -961,6 +987,7 @@ function setupComposer() {
       let p;
       try { p = PersonaParameters.fromJSON(JSON.stringify(r.settings.format ? r.settings : {format: 'sue-studio-settings', version: 3, parameters: r.settings})); }
       catch (e) { p = PersonaParameters.validate({...base, ...(r.settings.parameters || r.settings)}); }
+      p.vocabSize = null;  // a description never measures vocabulary; the English level decides
       draft = {kind: 'description', p, description: text};
       renderReview();
     } catch (e) { $('#draft-area').innerHTML = `<div class="banner bad" style="margin-top:24px"><span class="ms">error</span><div>${esc(e.message)}</div></div>`; }
@@ -1384,7 +1411,7 @@ async function render() {
 
 /* ---------------- events ---------------- */
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-signin],[data-test-edit],#create-test,#save-test,[data-go],[data-open],[data-remove],[data-act],[data-know],[data-english],[data-group-default],[data-state-of],[data-pick-state],.watch-btn,#create,#create-run,#rail-fab,#workflow-pick,#help-btn,#live-close,#live-size,#workflow-close,[data-flow],#scrim,#sheet-close,#sheet-cancel,#sheet-save,#sheet-dup,#sheet-run,#discard-keep,#discard-yes,#save-basics');
+  const t = e.target.closest('[data-param],[data-vocab-clear],[data-signin],[data-test-edit],#create-test,#save-test,[data-go],[data-open],[data-remove],[data-act],[data-know],[data-english],[data-group-default],[data-state-of],[data-pick-state],.watch-btn,#create,#create-run,#rail-fab,#workflow-pick,#help-btn,#live-close,#live-size,#workflow-close,[data-flow],#scrim,#sheet-close,#sheet-cancel,#sheet-save,#sheet-dup,#sheet-run,#discard-keep,#discard-yes,#save-basics');
   if (!t) return;
   try {
     if (t.matches('[data-signin]')) {
@@ -1433,7 +1460,17 @@ document.addEventListener('click', async e => {
       t.parentElement.querySelectorAll('button').forEach(b => { const on = b === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
       return refreshChips(t);
     }
-    if (t.matches('[data-english]')) { const p = editing(t); if (!p) return; p.english = t.dataset.english; t.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === t)); return refreshChips(t); }
+    if (t.matches('[data-param]')) {
+      const p = editing(t); if (!p) return;
+      const [a, b] = t.dataset.param.split('.');
+      if (b) p[a][b] = t.dataset.v; else p[a] = t.dataset.v;
+      t.parentElement.querySelectorAll('button').forEach(x => { x.classList.toggle('on', x === t); x.setAttribute('aria-checked', String(x === t)); });
+      return refreshChips(t);
+    }
+    if (t.matches('[data-english]')) { const p = editing(t); if (!p) return; p.english = t.dataset.english; t.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === t));
+      t.closest('[data-editor]').querySelector('[data-english-note]').textContent = englishNote(p); return refreshChips(t); }
+    if (t.matches('[data-vocab-clear]')) { const p = editing(t); if (!p) return; p.vocabSize = null; const root = t.closest('[data-editor]');
+      root.querySelector('[data-english-note]').textContent = englishNote(p); t.closest('[data-vocab-row]').remove(); return refreshChips(root); }
     if (t.matches('#create,#create-run')) {
       const typed = ($('#p-name').value || '').trim();
       if (draft.kind !== 'description' && !/^[A-Za-z][A-Za-z0-9_-]{0,31}$/.test(typed)) return snack('Give the participant a code name, such as P4. Their name is never kept.');
@@ -1529,8 +1566,6 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const el = e.target;
-  const sw = el.closest && el.closest('md-switch[data-perc]');
-  if (sw) { const p = editing(sw); if (!p) return; p.humanFactors[sw.dataset.perc] = sw.selected ? sw.dataset.on : 'unspecified'; return refreshChips(sw); }
   const way = el.closest && el.closest('md-filter-chip[data-way]');
   if (way) return;
   if (location.hash.startsWith('#workflow/') && W.edit) editFlowField(el, true);

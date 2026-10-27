@@ -46,7 +46,7 @@ from urllib.parse import urljoin, urlparse
 
 END_REASONS = {"abandoned", "step_limit", "time_limit", "loop", "technical_error"}
 KINDS = ("uat", "web")
-CHECK_TYPES = ("text", "json", "url", "answer", "download")
+CHECK_TYPES = ("text", "json", "url", "answer", "download", "storage")
 STEP_ACTIONS = ("request", "goto", "click", "type", "choose", "press", "wait")
 
 
@@ -137,6 +137,24 @@ def secret(name: str) -> str:
     return value
 
 
+NUMBER = re.compile(r"^\$?\s*-?[\d,]*\.?\d+$")
+
+
+def _amount(value: Any) -> Any:
+    """For comparing saved values: 800, "800", "$800" and "800.00" are the same amount."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and NUMBER.match(value.strip()):
+        return float(value.strip().lstrip("$").replace(",", ""))
+    if isinstance(value, list):
+        return sorted(json.dumps(_amount(v), sort_keys=True) for v in value)
+    if isinstance(value, dict):
+        return {k: _amount(v) for k, v in value.items()}
+    return _norm(value)
+
+
 def _norm(value: Any) -> Any:
     if isinstance(value, str):
         return re.sub(r"\s+", " ", value).strip().lower()
@@ -170,21 +188,39 @@ def rows_of(data: Any, path: str | None) -> list[Any]:
 
 
 def same(actual: Any, expected: Any) -> bool:
-    """Strings ignore case and spacing, lists ignore order."""
-    return _norm(actual) == _norm(expected)
+    """Strings ignore case and spacing, lists ignore order, amounts ignore how they are written."""
+    return _amount(actual) == _amount(expected)
+
+
+def holds(row: dict[str, Any], want: dict[str, Any]) -> dict[str, Any]:
+    """The fields of row that are not as wanted: expect, each value equal; includes, each listed item
+    among the row's list (a rule at 80% among the rules, whatever the others are)."""
+    wrong = {k: dig(row, k) for k, v in (want.get("expect") or {}).items() if not same(dig(row, k), v)}
+    for k, items in (want.get("includes") or {}).items():
+        have = dig(row, k)
+        have = have if isinstance(have, list) else []
+        if not all(any(same(h, i) for h in have) for i in items):
+            wrong[k] = have
+    return wrong
 
 
 def json_check(data: Any, check: dict[str, Any]) -> tuple[bool, str]:
+    """where picks the new row (empty: any row); expect and includes say what it must hold; anyOf
+    lists alternatives, each an {expect, includes}, of which one must hold (two right answers)."""
     rows = rows_of(data, check.get("list"))
     where = check.get("where") or {}
     hits = [r for r in rows if isinstance(r, dict) and all(same(dig(r, k), v) for k, v in where.items())]
     if "count" in check and len(hits) != check["count"]:
         return False, f"{len(hits)} rows match, expected {check['count']}"
     if not hits:
-        return False, "no row matches " + json.dumps(where, ensure_ascii=False)
-    expect = check.get("expect") or {}
+        return False, ("no row matches " + json.dumps(where, ensure_ascii=False)) if where else "nothing was saved"
+    wrong: dict[str, Any] = {}
     for row in hits:
-        wrong = {k: dig(row, k) for k, v in expect.items() if not same(dig(row, k), v)}
+        wrong = holds(row, check)
+        if not wrong and check.get("anyOf"):
+            misses = [holds(row, alt) for alt in check["anyOf"]]
+            if all(misses):
+                wrong = {k: v for m in misses for k, v in m.items()}
         if not wrong:
             return True, "a row matches and has every expected value"
     return False, "the matching row has " + json.dumps(wrong, ensure_ascii=False)
@@ -202,10 +238,12 @@ def check_problems(check: Any, n: int) -> list[str]:
         out.append(f"{where}: type is one of {', '.join(CHECK_TYPES)}")
     elif kind == "text" and not (isinstance(check.get("contains"), str) and check["contains"].strip()):
         out.append(f"{where}: a text check needs contains")
-    elif kind == "json" and not (isinstance(check.get("url"), str) and (check.get("where") or check.get("expect") or "count" in check)):
+    elif kind == "json" and not (isinstance(check.get("url"), str) and any(k in check for k in ("where", "expect", "count", "anyOf", "includes"))):
         out.append(f"{where}: a json check needs url and where, expect or count")
     elif kind == "url" and not isinstance(check.get("matches"), str):
         out.append(f"{where}: a url check needs matches (a regular expression)")
+    elif kind == "storage" and not (isinstance(check.get("key"), str) and any(k in check for k in ("where", "expect", "count", "anyOf", "includes"))):
+        out.append(f"{where}: a storage check needs key and where, expect or count")
     elif kind == "answer" and not (isinstance(check.get("expected"), list) and check["expected"]):
         out.append(f"{where}: an answer check needs expected, the right answers as a list")
     elif kind == "download" and not isinstance(check.get("matches"), str):
@@ -414,6 +452,10 @@ class WebTarget:
         if kind == "url":
             ok = re.search(check["matches"], page.url) is not None
             return ok, f"ended on {page.url}"
+        if kind == "storage":
+            # What a prototype without a server keeps in the browser (localStorage), on the product's own origin.
+            # Each run has a fresh browser, so only this run's data is there.
+            return json_check(self._stored(page, check["key"]), check)
         if kind == "json":
             response = page.request.get(self.url(check["url"]))
             if not response.ok:
@@ -437,6 +479,19 @@ class WebTarget:
             other.close()
         ok = _norm(check["contains"]) in _norm(text)
         return ok, ("the page shows " if ok else "the page does not show ") + repr(check["contains"])
+
+    def _stored(self, page, key: str) -> Any:
+        from urllib.parse import urlparse
+        read = "k => { const v = localStorage.getItem(k); try { return JSON.parse(v); } catch (e) { return v; } }"
+        origin = lambda u: urlparse(u)[:2]  # noqa: E731
+        if origin(page.url) == origin(self.spec["start"]):
+            return page.evaluate(read, key)
+        other = page.context.new_page()
+        try:
+            other.goto(self.spec["start"])
+            return other.evaluate(read, key)
+        finally:
+            other.close()
 
     def result(self, session_id: str, page, report: dict[str, Any] | None = None) -> dict[str, Any]:
         criteria, details = {}, {}

@@ -360,10 +360,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(status())
                 return
             if url.path == '/flow.js':  # the workflow's knowledge groups, before parameters.js runs
+                from sue.config import load_config
                 flow = load_flow()
                 body = 'window.SUE_FLOW = ' + json.dumps({'name': flow['name'], 'task': flow.get('task', ''),
                                                           'knowledgeGroups': flow['knowledgeGroups']},
                                                          ensure_ascii=False).replace('</', '<\\/') + ';\n'
+                # how persona settings become card numbers: config.toml [persona], never repeated in the page
+                # plus how many common words each English level knows, config.toml [words] top_n
+                cfg = load_config()
+                body += 'window.SUE_PERSONA = ' + json.dumps({**cfg['persona'], 'english_words': cfg['words']['top_n']}) + ';\n'
                 self.send_bytes(body.encode('utf-8'), 'text/javascript; charset=utf-8')
                 return
             if url.path == '/api/job':

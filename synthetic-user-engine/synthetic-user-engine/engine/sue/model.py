@@ -113,10 +113,14 @@ class LabelScriptModel:
         rows = [[c.strip() for c in line.split("|")] for line in turn.splitlines()]
         rows = [r for r in rows if len(r) >= 3 and r[0].startswith("el_")]
 
+        whole = "They are looking at: the whole screen" in turn
+
         def find(name):
-            # An exact match first, so "Finish" is not found inside "I'm finished".
-            return next((r for r in rows if r[2].lower() == name.lower()), None) or next(
-                (r for r in rows if name.lower() in r[2].lower()), None)
+            # An exact match first, so "Finish" is not found inside "I'm finished". A looser match
+            # only when the whole screen is in view: in one piece of it, "♧ Atlas Billing" in the
+            # middle must not stand in for the menu's "Billing" in a piece not looked at yet.
+            exact = next((r for r in rows if r[2].lower() == name.lower()), None)
+            return exact or (next((r for r in rows if name.lower() in r[2].lower()), None) if whole else None)
 
         if label:
             match = find(label)

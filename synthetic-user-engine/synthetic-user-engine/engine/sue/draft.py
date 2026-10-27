@@ -53,7 +53,7 @@ Knowledge groups are how a persona editor sets knowledge in bulk: a few themes (
 
 Steps, each with a key (s1, s2, ...), group consecutive actions on the same screen into what a person would call one step ("Fill in the email and display name, then click Continue"). actions lists the action numbers (a3 is 3). Every action is in exactly one step, in order. risky: a step whose mistake is costly or hard to undo. defaults: the defaults on that screen the task requires changing, in words, or "".
 
-Also: created, what the task makes, as a short noun as a list would show it (invite, budget, user); consequential, the labels of buttons that commit or cancel something (Send, Save, Delete, Cancel); advancing, labels that only move on (Next, Continue); listRoute, the route of the page that lists what was made, if any; listQuote, the text that page shows for the new one (usually a name typed during the task); dataTerms, names and values in the simulated data that are always shown as they are: names of people, projects, companies, email addresses and ids, never product terms or option names; forceFake, jargon that most people would not know even if it looks English; signals, which confirmations the product gives the person doing the task (toast: a success message, list: what was made appears in a list, external: an email or notification to them, test: it can be triggered to see it work); checks, the task's success criteria in plain words; success, machine checks of what the task should leave behind, each named by a short plain sentence a report can show ("Priya is invited as a viewer of Lyra only", never code like check_invite), which must still be true later (never a message that disappears), one per criterion where possible. Prefer type "json" when the recording shows where what was saved can be read: a request that sent it (POST) and a GET of the same path, even if that GET answered an empty list before the task, or a GET whose answer later holds it. Check every value the task asks for (who, which role, which projects), not only that the row exists: {name, type: "json", url: a GET path from the requests, list: the dotted path to the list in the answer if it is not the answer itself, where: [{field, value}] picking the new row, expect: [{field, value}] its values; a list value is written as JSON, e.g. ["Lyra"]}. Else {name, type: "text", url: a route to open, contains: text that must be on it} or {name, type: "url", matches: a regular expression for the final address}; org, one sentence on who the person is in the product and what they may do; situation {urgency: calm or urgent, stakes: low or high}; outcome, what the task leaves behind: {kind: "change"} when it saves or changes something in the product, {kind: "answer", question: the question the person must answer in a few words, expected: the right answers as they appear on the recorded screens} when the task asks them to find something out and tell it, {kind: "place", heading: the heading of the page they must reach} when it asks them to find a page.
+Also: created, what the task makes, as a short noun as a list would show it (invite, budget, user); consequential, the labels of buttons that commit or cancel something (Send, Save, Delete, Cancel); advancing, labels that only move on (Next, Continue); listRoute, the route of the page that lists what was made, if any; listQuote, the text that page shows for the new one (usually a name typed during the task); dataTerms, names and values in the simulated data that are always shown as they are: names of people, projects, companies, email addresses and ids, never product terms or option names; forceFake, jargon that most people would not know even if it looks English; signals, which confirmations the product gives the person doing the task (toast: a success message, list: what was made appears in a list, external: an email or notification to them, test: it can be triggered to see it work); checks, the task's success criteria in plain words; success, machine checks of what the task should leave behind, each named by a short plain sentence a report can show ("Priya is invited as a viewer of Lyra only", never code like check_invite), which must still be true later (never a message that disappears), one per criterion where possible. Prefer type "json" when the recording shows where what was saved can be read: a request that sent it (POST) and a GET of the same path, even if that GET answered an empty list before the task, or a GET whose answer later holds it. Check every value the task asks for (who, which role, which projects), not only that the row exists: {name, type: "json", url: a GET path from the requests, list: the dotted path to the list in the answer if it is not the answer itself, where: [{field, value}] picking the new row, expect: [{field, value}] its values; a list value is written as JSON, e.g. ["Lyra"]}. When the product has no server and keeps what was made in the browser (the localStorage section), use {name, type: "storage", key: the localStorage key, list, where, expect} the same way. Else {name, type: "text", url: a route to open, contains: text that must be on it} or {name, type: "url", matches: a regular expression for the final address}; org, one sentence on who the person is in the product and what they may do; situation {urgency: calm or urgent, stakes: low or high}; outcome, what the task leaves behind: {kind: "change"} when it saves or changes something in the product, {kind: "answer", question: the question the person must answer in a few words, expected: the right answers as they appear on the recorded screens} when the task asks them to find something out and tell it, {kind: "place", heading: the heading of the page they must reach} when it asks them to find a page.
 
 Write in plain, short English. Output JSON only."""
 
@@ -81,7 +81,7 @@ def schema() -> dict[str, Any]:
         "dataTerms": arr(s), "forceFake": arr(s),
         "signals": obj({"toast": b, "list": b, "external": b, "test": b}),
         "checks": arr(s),
-        "success": arr(obj({"name": s, "type": {"type": "string", "enum": ["json", "text", "url"]}, "url": s, "list": s,
+        "success": arr(obj({"name": s, "type": {"type": "string", "enum": ["json", "text", "url", "storage"]}, "url": s, "key": s, "list": s,
                             "where": arr(obj({"field": s, "value": s})), "expect": arr(obj({"field": s, "value": s})),
                             "contains": s, "matches": s}, ["name", "type"])),
         "org": s,
@@ -166,7 +166,22 @@ def prompt(recording: dict[str, Any], basics: dict[str, Any]) -> str:
             if r["method"] != "GET" and r.get("sent") and r["path"] in gets:
                 lines.append(f"What the task saved can be read back: it sent {r['method']} {r['path']} and the product "
                              f"reads GET {r['path']}. Check the new row there.")
+    changed = stored_changes(recording)
+    if changed:
+        lines += ["", "What the product saved in the browser (localStorage) by the end of the task, key by key "
+                      "(it has no server; check it with type storage):"]
+        for key, value in changed.items():
+            lines.append(f"{key}: {value[:1500]}")
     return "\n".join(lines)
+
+
+def stored_changes(recording: dict[str, Any]) -> dict[str, str]:
+    """localStorage keys whose value at the end differs from the start of the recording."""
+    states = recording.get("states") or []
+    if not states:
+        return {}
+    first, last = states[0].get("storage") or {}, states[-1].get("storage") or {}
+    return {k: v for k, v in last.items() if first.get(k) != v}
 
 
 def ask(text: str, config: dict[str, Any]) -> dict[str, Any]:
@@ -451,6 +466,7 @@ def assemble(recording: dict[str, Any], basics: dict[str, Any], ai: dict[str, An
     if recording.get("reset"):
         target["reset"] = recording["reset"]
     gets = {r["path"] for r in recording.get("network") or [] if r["method"] == "GET" and r["status"] < 400}
+    stored = stored_changes(recording)
 
     def value(v: str):
         try:
@@ -468,6 +484,11 @@ def assemble(recording: dict[str, Any], basics: dict[str, Any], ai: dict[str, An
         elif c["type"] == "json":
             notes.append(f"Check {c['name']!r} reads {c.get('url')!r}, which the product never fetched while recording; left out.")
             continue
+        elif c["type"] == "storage" and c.get("key") in stored and (c.get("where") or c.get("expect")):
+            check.update(key=c["key"], where={w["field"]: value(w["value"]) for w in c.get("where") or []},
+                         expect={w["field"]: value(w["value"]) for w in c.get("expect") or []})
+            if c.get("list"):
+                check["list"] = c["list"]
         elif c["type"] == "text" and (c.get("contains") or "").strip():
             check.update(url=c.get("url") or list_route or routes[-1], contains=c["contains"].strip())
         elif c["type"] == "url" and c.get("matches"):

@@ -836,18 +836,19 @@ def facts(wid: str) -> dict:
     task, out = flow.get('task', ''), []
     basics = read_json(folder / 'basics.json') or {}
     target = (flow.get('engine') or {}).get('target') or {}
-    no_reset = not target.get('reset') and not target.get('cleanup')
+    no_reset = not target.get('reset') and not target.get('cleanup') and any(c.get('type') in ('json', 'text') for c in target.get('success') or [])
     for i, c in enumerate(target.get('success') or []):
         t = c.get('type')
-        if t == 'json':
+        if t in ('json', 'storage'):
             where, expect = c.get('where') or {}, c.get('expect') or {}
-            body = next((r['sent'] for r in sent if r['path'] == c.get('url')), None) or (sent[-1]['sent'] if sent else {})
+            body = stored_row(rec, c) if t == 'storage' else \
+                next((r['sent'] for r in sent if r['path'] == c.get('url')), None) or (sent[-1]['sent'] if sent else {})
             for k, v in where.items():
                 out.append({'key': f'{i}:where:{k}', 'check': i, 'field': k, 'value': v, 'fixed': True, 'on': True,
                             'text': f'{_words(k).capitalize()}: {_show(v)}', 'why': 'How the new one is found',
                             'unique': no_reset and isinstance(v, str) and '{run}' not in v, 'isUnique': isinstance(v, str) and '{run}' in v})
             for k in list(expect) + [k for k in body if k not in expect and k not in where]:
-                v = expect.get(k, body.get(k))
+                v = body[k] if k in body else expect.get(k)  # as the product saved it, not as the draft wrote it
                 out.append({'key': f'{i}:{k}', 'check': i, 'field': k, 'value': v, 'on': k in expect,
                             'text': f'{_words(k).capitalize()}: {_show(v)}',
                             'why': 'The task mentions it' if _mentions(task, v) else ('In the draft' if k in expect else 'The task does not mention it')})
@@ -866,6 +867,21 @@ def facts(wid: str) -> dict:
     kind = ((flow.get('engine') or {}).get('outcome') or {}).get('kind', 'change')
     return {'facts': out, 'kind': kind, 'question': ((flow.get('engine') or {}).get('outcome') or {}).get('question', ''),
             'noReset': no_reset, 'byHand': by_hand(basics)}
+
+
+def stored_row(rec: dict, check: dict) -> dict:
+    """The row a storage check finds, as the recording's last screen kept it in the browser."""
+    from sue.target import rows_of, dig, same
+    states = rec.get('states') or []
+    raw = ((states[-1].get('storage') or {}) if states else {}).get(check.get('key'))
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+    except ValueError:
+        return {}
+    rows = [r for r in rows_of(data, check.get('list')) if isinstance(r, dict)]
+    where = check.get('where') or {}
+    hit = next((r for r in rows if all(same(dig(r, k), v) for k, v in where.items())), rows[-1] if rows else {})
+    return {k: v for k, v in hit.items() if k != 'id'}
 
 
 def _replace_value(flow: dict, old: str, new: str) -> None:
@@ -908,7 +924,7 @@ def save_facts(body) -> dict:
     keep, unique = [], []
     for i, c in enumerate(checks):
         mine = [f for k, f in current.items() if f['check'] == i]
-        if c['type'] == 'json':
+        if c['type'] in ('json', 'storage'):
             c['expect'] = {f['field']: f['value'] for f in mine if not f.get('fixed') and chosen.get(f['key'], f).get('on')}
             keep.append(c)
             unique += [f['value'] for f in mine if f.get('fixed') and f.get('unique') and chosen.get(f['key'], {}).get('unique')]

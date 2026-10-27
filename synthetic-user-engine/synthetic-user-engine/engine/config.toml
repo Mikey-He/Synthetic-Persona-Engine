@@ -106,6 +106,18 @@ click_miss = { "high" = 0.0, "medium" = 0.05, "low" = 0.15 }  # chance of a near
 vision_px = { "normal" = 0, "mild" = 12, "reduced" = 14 }      # text smaller than this (px) he cannot read
 reading_effort = { "fast" = 0.7, "average" = 1.0, "slow" = 1.5 }  # effort per piece read
 
+[persona]
+# How the settings a researcher picks for a persona on the platform become the numbers on its card
+# (tools/persona-studio/parameters.js, engine-design.md 4.9). The platform reads this section; nothing here is
+# repeated in code. Placeholders until calibrated against people.
+stress_tolerance = { "low" = 2, "medium" = 5, "high" = 8 }     # state.stressTolerance, 0 to 10
+warning_attention = { "low" = 3, "medium" = 6, "high" = 10 }   # state.warningAttention: chance in 10 of noticing a warning
+urgent_min_time_pressure = 6                                    # an urgent situation raises time pressure to at least this
+# High stakes: points added to each behaviour score (more careful, less daring).
+high_stakes_shift = { risk = -5, patience = 0, detailFind = 5, detailCheck = 5, detail = 5 }
+# A setting left unspecified takes the value of a typical person.
+typical = { vision = "normal", colorVision = "typical", clickPrecision = "high", readingSpeed = "average", warningAttention = "high", stressTolerance = "medium", pressureChange = "steady" }
+
 [compare]
 # Comparing an engine run with the person's session (python -m sue.compare). In the platform log a dropdown's name is
 # followed by its current value; cut it off first. The field names belong to the workflow: flow.json engine.compare.fieldLabels.

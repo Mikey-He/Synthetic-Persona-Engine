@@ -73,7 +73,7 @@ class WrittenStepError(RuntimeError):
     pass
 
 
-def perform(page_of, steps: list[str], task: str, recorder, config: dict[str, Any], rounds: int = 4) -> None:
+def perform(page_of, steps: list[str], task: str, recorder, config: dict[str, Any], rounds: int = 8) -> None:
     """Carries out each written step on the page; page_of() gives the page the recording follows."""
     done: list[str] = []
     for n, step in enumerate(steps, 1):
@@ -95,16 +95,27 @@ def perform(page_of, steps: list[str], task: str, recorder, config: dict[str, An
                     raise WrittenStepError(f"Step {n} (“{step}”): control {i} is gone from the page.")
                 el = page.locator("[data-sue-target]").first
                 kind, value = a.get("do"), a.get("value") or ""
-                if kind == "click":
-                    el.click()
-                elif kind == "type":
-                    el.click()
-                    el.fill(value)
-                    el.press("Tab")
-                elif kind == "choose":
-                    el.select_option(label=value)
-                elif kind == "press":
-                    el.press(value or "Enter")
+                if kind in ("type", "choose") and el.evaluate("e => e.tagName") == "SELECT":
+                    kind = "choose"  # a value for a dropdown is one of its options, whatever the model called it
+                try:
+                    if kind == "click":
+                        el.click()
+                    elif kind == "type":
+                        el.click()
+                        el.fill(value)
+                        el.press("Tab")
+                    elif kind == "choose":
+                        options = el.evaluate("e => [...e.options].map(o => [o.label.trim(), o.value])")
+                        pick = next((v for lab, v in options if value.strip().lower() in (lab.lower(), v.lower())), None)
+                        if pick is None:
+                            raise WrittenStepError(f"Step {n} (“{step}”): the dropdown has no option “{value}”.")
+                        el.select_option(value=pick)
+                    elif kind == "press":
+                        el.press(value or "Enter")
+                except WrittenStepError:
+                    raise
+                except Exception as error:  # noqa: BLE001 - any browser failure names the step
+                    raise WrittenStepError(f"Step {n} (“{step}”): {kind} did not work ({str(error).splitlines()[0][:160]}).") from None
                 try:
                     page.wait_for_load_state("networkidle", timeout=3000)
                 except Exception:  # noqa: BLE001 - a page that keeps polling

@@ -1,0 +1,694 @@
+{
+  "format": "sue-flow",
+  "version": 1,
+  "name": "Billing Config · Atlas budget (UX team)",
+  "updatedAt": "2026-10-25",
+  "task": "You are a project manager overseeing the development and operation of a new online platform, 'Atlas'. Your team uses cloud services to support the project.\n\nThe company has allocated a maximum monthly cloud spending limit of $1,000. However, your team aims to keep its monthly spending at $800 or less across all cloud services that generate costs. While spending more than $800 is permitted, your goal is to stay within this target.\nRecently, cloud spending has regularly exceeded the expected amount and occasionally reached the $1000 limit, raising concerns about unexpected costs. Your manager has asked you to set up a monthly budget and alert based on actual spending, helping the team to take action early and prevent potential overspending.\nYou are told that the team prefers that budget notifications go directly to the project owners rather than other users.\nBased on this situation, create a project and configure an appropriate monthly budget and spending alerts for the Atlas project.",
+  "start": "The test starts on Budgets & Alerts Created (https://shiningcao77.github.io/Billing_Config/).",
+  "note": "Drafted from a recording by sue/draft.py and confirmed in the platform.",
+  "screenSize": "1440x900 window; the task bar takes 56 px.",
+  "situation": {
+    "urgency": "calm",
+    "stakes": "high"
+  },
+  "org": "Alex Kim is a project manager managing cloud resources and financial limits for the Atlas platform.",
+  "signals": {
+    "toast": true,
+    "list": true,
+    "external": false,
+    "test": false
+  },
+  "checks": [
+    "A monthly budget named 'Atlas monthly budget' is created for the Atlas project.",
+    "Budget target amount is set to $1,000.",
+    "An alert threshold is set at 80% ($800) actual spend.",
+    "Notifications are configured to email project owners."
+  ],
+  "keySettings": [],
+  "screens": [
+    {
+      "id": "S1",
+      "name": "Budgets & Alerts Created",
+      "route": "/Billing_Config/"
+    }
+  ],
+  "steps": [
+    {
+      "id": "A1",
+      "screen": "S1",
+      "action": "Navigate from console home through Billing to Budgets & caps",
+      "note": "",
+      "ways": [],
+      "risky": false,
+      "defaults": "",
+      "recorded": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A2",
+      "screen": "S1",
+      "action": "Click Create Budget, name the budget, and advance to scope",
+      "note": "",
+      "ways": [],
+      "risky": false,
+      "defaults": "",
+      "recorded": [
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "A3",
+      "screen": "S1",
+      "action": "Set the budget time range to Monthly, select the Atlas project, and proceed",
+      "note": "",
+      "ways": [],
+      "risky": false,
+      "defaults": "Time range must be set to Monthly; Project must be scoped to Atlas rather than all projects",
+      "recorded": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    {
+      "id": "A4",
+      "screen": "S1",
+      "action": "Set the target budget amount to 1000 and advance to actions",
+      "note": "",
+      "ways": [],
+      "risky": false,
+      "defaults": "",
+      "recorded": [
+        12,
+        13
+      ]
+    },
+    {
+      "id": "A5",
+      "screen": "S1",
+      "action": "Set the first threshold to 80% ($800), enable alerts to project owners, and finish",
+      "note": "",
+      "ways": [],
+      "risky": true,
+      "defaults": "Default threshold 1 is 50%; Email alerts to project owners is unchecked by default",
+      "recorded": [
+        14,
+        15,
+        16
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "product",
+      "label": {
+        "en": "Products and tools",
+        "zh": "用过的产品和工具"
+      }
+    },
+    {
+      "id": "work",
+      "label": {
+        "en": "Work",
+        "zh": "工作经历"
+      }
+    },
+    {
+      "id": "study",
+      "label": {
+        "en": "Study",
+        "zh": "学习经历"
+      }
+    },
+    {
+      "id": "life",
+      "label": {
+        "en": "Everyday life",
+        "zh": "日常生活"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "id": "g-cloud",
+      "source": "product",
+      "label": {
+        "en": "Cloud Console Experience",
+        "zh": "云控制台使用经验"
+      }
+    }
+  ],
+  "experiences": [
+    {
+      "id": "X01",
+      "group": "g-cloud",
+      "text": "Has configured cloud billing budgets and cost alerts in a cloud management console",
+      "question": {
+        "en": "Have you created budgets or spending alerts in a cloud console (such as Google Cloud or AWS)?",
+        "zh": "您是否在云控制台（如 Google Cloud 或 AWS）中创建过预算或支出提醒？"
+      }
+    }
+  ],
+  "items": [
+    {
+      "id": "T01",
+      "step": "A1",
+      "way": null,
+      "needed": true,
+      "kind": "location",
+      "text": "Billing",
+      "meaning": "The navigation item leading to cloud account billing and financial controls",
+      "everyday": "Invoicing or payment management",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "Starting point to reach billing settings from the main console menu",
+      "locate": {
+        "text": "Billing"
+      }
+    },
+    {
+      "id": "T02",
+      "step": "A1",
+      "way": null,
+      "needed": true,
+      "kind": "location",
+      "text": "Budgets & caps ⋮",
+      "meaning": "The sub-navigation page under Cost control where budgets and spending alerts are managed",
+      "everyday": "",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "Direct location for configuring budgets in the billing section",
+      "locate": {
+        "text": "Budgets & caps ⋮"
+      }
+    },
+    {
+      "id": "T03",
+      "step": "A2",
+      "way": null,
+      "needed": true,
+      "kind": "word",
+      "text": "+ CREATE BUDGET",
+      "meaning": "Button that initiates the multi-step budget creation flow",
+      "everyday": "",
+      "common": "common",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "Standard CTA to set up a new budget tracking profile",
+      "locate": {
+        "text": "+ CREATE BUDGET"
+      }
+    },
+    {
+      "id": "T04",
+      "step": "A2",
+      "way": null,
+      "needed": true,
+      "kind": "concept",
+      "text": "Define step",
+      "meaning": "The first step of the budget wizard where a descriptive budget name is assigned",
+      "everyday": "",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "Namer requires entering a title before continuing",
+      "locate": {
+        "text": "Name *"
+      },
+      "explainedBy": {
+        "text": "A budget enables you to track your actual spend against your planned spend."
+      }
+    },
+    {
+      "id": "T05",
+      "step": "A3",
+      "way": null,
+      "needed": true,
+      "kind": "concept",
+      "text": "Time range",
+      "meaning": "The cadence at which spend tracking resets and accumulates",
+      "everyday": "Period of time",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "Prompt specifies setting a monthly budget",
+      "locate": {
+        "text": "Select time range"
+      },
+      "explainedBy": {
+        "text": "The month starts on the first of the month and resets at the beginning of each month."
+      }
+    },
+    {
+      "id": "T06",
+      "step": "A3",
+      "way": null,
+      "needed": true,
+      "kind": "concept",
+      "text": "Projects scope",
+      "meaning": "Filters the budget tracking to specific cloud projects instead of all projects in the billing account",
+      "everyday": "",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "The user must narrow the budget to Atlas",
+      "locate": {
+        "text": "Select projects"
+      },
+      "explainedBy": {
+        "text": "A budget can be scoped to focus on a specific set of resources."
+      }
+    },
+    {
+      "id": "T07",
+      "step": "A4",
+      "way": null,
+      "needed": true,
+      "kind": "concept",
+      "text": "Specified amount",
+      "meaning": "A fixed monetary amount configured as the target ceiling for the budget",
+      "everyday": "",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "The spending limit allocated by the company is $1,000",
+      "locate": {
+        "text": "Target amount"
+      },
+      "explainedBy": {
+        "text": "Set the budget amount."
+      }
+    },
+    {
+      "id": "T08",
+      "step": "A5",
+      "way": null,
+      "needed": true,
+      "kind": "concept",
+      "text": "Threshold rules",
+      "meaning": "Percentage milestones of the total budget amount that trigger notification emails",
+      "everyday": "",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "An alert at $800 corresponds to 80% of the $1,000 budget",
+      "locate": {
+        "text": "Percent of budget",
+        "role": "combobox",
+        "region": "main",
+        "nth": 0
+      },
+      "explainedBy": {
+        "text": "Set alert threshold rules and notifications."
+      }
+    },
+    {
+      "id": "T09",
+      "step": "A5",
+      "way": null,
+      "needed": true,
+      "kind": "concept",
+      "text": "Email alerts to project owners",
+      "meaning": "Routes automated alert emails directly to users with the project owner role",
+      "everyday": "",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "Prompt explicitly specifies notifications go to project owners rather than other users",
+      "locate": {
+        "text": "Email alerts to project owners"
+      },
+      "explainedBy": {
+        "text": "Manage notifications"
+      }
+    },
+    {
+      "id": "T10",
+      "step": "A5",
+      "way": null,
+      "needed": true,
+      "kind": "habit",
+      "text": "Default threshold percentages",
+      "meaning": "Assuming default threshold percentages (like 50%, 90%, 100%) already alert at the intended warning target",
+      "everyday": "",
+      "common": "",
+      "altOf": null,
+      "exps": [
+        "X01"
+      ],
+      "basis": "Default threshold 1 is 50% ($500), but team target is $800 (80%)",
+      "locate": {
+        "text": "Percent of budget",
+        "role": "combobox",
+        "region": "main",
+        "nth": 0
+      }
+    }
+  ],
+  "knowledgeGroupsNote": "Drafted from the recording; every item that is not a habit is in exactly one group.",
+  "knowledgeGroups": [
+    {
+      "key": "navigation",
+      "title": "Billing Navigation",
+      "word": false,
+      "default": 1,
+      "description": "Locating billing controls and budget setup sections in the console",
+      "examples": "Billing, Budgets & caps",
+      "items": [
+        "T01",
+        "T02"
+      ]
+    },
+    {
+      "key": "budget-setup",
+      "title": "Budget Scope and Amount Configuration",
+      "word": false,
+      "default": 1,
+      "description": "Setting budget names, monthly scopes, target project, and monetary limits",
+      "examples": "+ CREATE BUDGET, Define step, Time range, Projects scope, Specified amount",
+      "items": [
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ]
+    },
+    {
+      "key": "alerts-notifications",
+      "title": "Thresholds and Alert Routing",
+      "word": false,
+      "default": 1,
+      "description": "Configuring threshold percentages and target recipients for budget overspend alerts",
+      "examples": "Threshold rules, Email alerts to project owners",
+      "items": [
+        "T08",
+        "T09"
+      ]
+    },
+    {
+      "key": "other-terms",
+      "title": "Other terms",
+      "word": true,
+      "default": 1,
+      "description": "Other terms on this workflow's screens",
+      "examples": "",
+      "items": [
+        "T03"
+      ]
+    }
+  ],
+  "engine": {
+    "note": "Drafted from a recording; the target, the success checks and the locators are reviewed in the platform.",
+    "created": "budget",
+    "routes": {
+      "list": [
+        "/Billing_Config/"
+      ],
+      "path": [
+        "/Billing_Config/"
+      ]
+    },
+    "labels": {
+      "consequential": [
+        "FINISH",
+        "CANCEL"
+      ],
+      "advancing": [
+        "NEXT"
+      ]
+    },
+    "items": {
+      "entry": [
+        "T01"
+      ],
+      "help": [],
+      "review": []
+    },
+    "words": {
+      "dataTerms": [
+        "Atlas",
+        "project-abc12345def67890",
+        "Atlas monthly budget",
+        "1000",
+        "800"
+      ],
+      "forceFake": []
+    },
+    "compare": {
+      "fieldLabels": []
+    },
+    "plumbing": [
+      {
+        "action": "click",
+        "label": "Billing",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Billing"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Budgets & caps ⋮",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Budgets & caps ⋮"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "+ CREATE BUDGET",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "+ CREATE BUDGET"
+          }
+        ]
+      },
+      {
+        "action": "type",
+        "label": "Name *",
+        "value": "Atlas monthly budget",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Name *"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "NEXT",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "NEXT"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Select time range",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Select time range"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Monthly",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Monthly"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Select projects",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Select projects"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Atlas project-abc12345def67890",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Atlas project-abc12345def67890"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "OK",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "OK"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "NEXT",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "NEXT"
+          }
+        ]
+      },
+      {
+        "action": "type",
+        "label": "Target amount",
+        "value": "1000",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Target amount"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "NEXT",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "NEXT"
+          }
+        ]
+      },
+      {
+        "action": "choose",
+        "label": "Percent of budget",
+        "value": "80%",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Percent of budget"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Email alerts to project owners",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "Email alerts to project owners"
+          }
+        ]
+      },
+      {
+        "action": "click",
+        "label": "FINISH",
+        "evidence": [
+          {
+            "type": "word",
+            "ref": "FINISH"
+          }
+        ]
+      },
+      {
+        "observe": "Atlas monthly budget"
+      }
+    ],
+    "target": {
+      "kind": "web",
+      "start": "https://shiningcao77.github.io/Billing_Config/",
+      "success": [
+        {
+          "name": "Monthly, Atlas only, alerts to project owners only",
+          "type": "storage",
+          "key": "mpsBudgets",
+          "where": {},
+          "expect": {
+            "time": "Monthly",
+            "projects": [
+              "Atlas"
+            ],
+            "owners": true,
+            "admins": false
+          }
+        },
+        {
+          "name": "Amount and alert fit the $800 target ($1,000 with a rule at 80% of actual spend, or $800 with a rule at 100%)",
+          "type": "storage",
+          "key": "mpsBudgets",
+          "where": {},
+          "anyOf": [
+            {
+              "expect": {
+                "amount": "1000"
+              },
+              "includes": {
+                "rules": [
+                  {
+                    "percent": 80,
+                    "trigger": "Actual"
+                  }
+                ]
+              }
+            },
+            {
+              "expect": {
+                "amount": "800"
+              },
+              "includes": {
+                "rules": [
+                  {
+                    "percent": 100,
+                    "trigger": "Actual"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "outcome": {
+      "kind": "change"
+    },
+    "gradingNote": "Proposed correct answer (DS, 25 Oct 2026), pending confirmation by the UX team."
+  }
+}

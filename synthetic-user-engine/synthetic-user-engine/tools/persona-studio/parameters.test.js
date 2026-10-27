@@ -10,6 +10,21 @@ const html = fs.readFileSync(path.join(ROOT,'tools/persona-builder.html'),'utf8'
 const embeddedFlow = html.match(/<script type="application\/json" id="flow">([\s\S]*?)<\/script>/)[1];
 const flow = JSON.parse(embeddedFlow);
 parameters.configure(flow);  // knowledge groups come from the workflow, as the page gets them from /flow.js
+parameters.configurePersona(personaConfig());  // config.toml [persona], as the page gets it from /flow.js
+
+// The [persona] section of engine/config.toml: plain keys holding a number or one-line table.
+function personaConfig() {
+  const toml = fs.readFileSync(path.join(ROOT, 'engine/config.toml'), 'utf8');
+  const section = toml.split(/^\[persona\]\s*$/m)[1].split(/^\[/m)[0];
+  const out = {};
+  for (const line of section.split(/\r?\n/)) {
+    const m = line.replace(/\s+#.*$/, '').match(/^(\w+)\s*=\s*(.+)$/);
+    if (!m) continue;
+    const json = m[2].trim().replace(/([{,]\s*)"?(\w+)"?\s*=/g, '$1"$2":');
+    out[m[1]] = JSON.parse(json);
+  }
+  return out;
+}
 
 test('knowledge groups come from the workflow, cover every item once, and a flow without them is refused',()=>{
   assert.deepEqual(parameters.GROUPS.map(g=>g.key),flow.knowledgeGroups.map(g=>g.key));

@@ -203,6 +203,8 @@ class Recorder:
             "controls": page.evaluate("() => window.__sue.inventory()"),
             "text": page.evaluate("() => (document.body ? document.body.innerText : '').slice(0, 20000)"),
             "scroll": page.evaluate("() => ({w: document.documentElement.scrollWidth, h: document.documentElement.scrollHeight})"),
+            # what a prototype without a server keeps in the browser; the draft checks it like saved data
+            "storage": stored(page),
         })
         return n
 
@@ -236,6 +238,14 @@ class Recorder:
             print(f"  {len(self.actions):>3} {event['action']} {c.get('text') or c.get('label') or ''!r}"
                   f" on {route_of(event.get('route') or page.url)}", flush=True)
         self.save()
+
+
+def stored(page) -> dict[str, str]:
+    try:
+        return page.evaluate("() => Object.fromEntries(Object.keys(localStorage).filter(k => !/token|secret|password|auth|session/i.test(k))"
+                             ".map(k => [k, String(localStorage.getItem(k)).slice(0, 8000)]))")
+    except Exception:  # noqa: BLE001 - a page that forbids storage
+        return {}
 
 
 def capabilities(states: list[dict[str, Any]], actions: list[dict[str, Any]]) -> dict[str, Any]:

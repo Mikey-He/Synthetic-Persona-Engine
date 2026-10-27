@@ -1,0 +1,14 @@
+Open Billing from the left menu
+Open Budgets & caps
+Create a new budget
+Enter Atlas monthly budget as the name
+Go to the next section
+Set Time range to Monthly
+In Projects, tick only Atlas and click OK
+Go to the next section
+Keep Specified amount and enter 1000 as the target amount
+Go to the next section
+Change the first alert rule to 80 percent, triggered on actual spend
+Make sure email alerts to billing admins and users is off
+Turn on email alerts to project owners
+Click Finish

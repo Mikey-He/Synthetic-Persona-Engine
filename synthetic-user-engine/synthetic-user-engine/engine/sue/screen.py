@@ -18,6 +18,10 @@ from urllib.parse import parse_qs, urlparse
 from .persona import EVERYDAY, KNOW, NONE, OTHER
 from .words import LETTERS, Hit, Vocabulary, fake, tokens, unreadable_text
 
+
+def _norm_text(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
 PAGE_SCRIPT = Path(__file__).with_name("page_script.js")
 
 # Colour vision (engine-design.md 4.9): the screenshot the model gets is filtered. Reduced is
@@ -460,9 +464,13 @@ class Screen:
                 hits += [Hit(w, fake(w), NONE, "vision") for w in tokens(n["orig"], LETTERS)]
             else:
                 hits += self._rewrite(n["orig"]).hits
+        on_page = {_norm_text(n["orig"]) for n in visible}
         for e in elements:  # icons have no text on the page; what they show counts like words
             if e["icon"] and not e["harness"]:
                 hits += self._rewrite(e["icon"]).hits
+            # A box named only by what it shows inside (its placeholder, "Name *") is read like words too.
+            elif e["tag"] in ("input", "textarea") and e.get("text") and not e["harness"] and _norm_text(e["text"]) not in on_page:
+                hits += self._rewrite(e["text"]).hits
         bar = self.strip.texts() if self.strip else []
         hits += [Hit(t, t, KNOW, "harness") for t in bar]
         hits += self._canvas.get("hits", [])

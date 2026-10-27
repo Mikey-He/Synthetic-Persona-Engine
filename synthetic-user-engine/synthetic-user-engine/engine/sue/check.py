@@ -59,6 +59,8 @@ def isolation_check(config: dict[str, Any]) -> dict[str, Any]:
     if target.get("kind") != "web":
         return entry("Runs cannot see each other's data", True, "each session on our platform is its own")
     saved = [c for c in target.get("success") or [] if c.get("type") in ("json", "text")]
+    if not saved and any(c.get("type") == "storage" for c in target.get("success") or []):
+        return entry("Runs cannot see each other's data", True, "graded on what this run's own fresh browser keeps")
     if not saved:
         return entry("Runs cannot see each other's data", True, "nothing is graded on saved data")
     how = ("a reset before each run" if target.get("reset") else "a clean-up after each run" if target.get("cleanup")
