@@ -227,8 +227,8 @@
       "group": "g-roles",
       "text": "Has managed the members of a project and their roles in a cloud platform or company system",
       "question": {
-        "en": "Have you managed who is in a project and what role they have, such as Owner or Editor, in a cloud platform or a company system?",
-        "zh": "你在云平台或公司系统里管过项目成员和他们的角色吗？比如 Owner、Editor。"
+        "en": "Have you managed who is in a project and what role each person has, in a cloud platform or a company system?",
+        "zh": "你在云平台或公司系统里管过项目里有哪些人、每个人是什么角色吗？"
       }
     },
     {
