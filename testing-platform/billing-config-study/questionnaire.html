@@ -239,12 +239,18 @@ function screens(){
   }
   HABITS.forEach(function(h){
     if(PLATFORM&&h.id==="H")return; // where they look first: the engine does not read it
+    // Questions about behaviour the study observes in the task (checking before confirming, checking defaults,
+    // noticing warnings) would cue it if asked first: the study page asks them after the task.
+    if(PLATFORM&&(h.id==="R2"||h.id==="D2"||h.id==="W"))return;
     s.push({id:"t-"+h.id,part:"habits",h:h});if(h.id==="R1"&&!PLATFORM)s.push({id:"follow",part:"habits"});
   });
   SENSES.forEach(function(q){s.push({id:"p-"+q.id,part:"senses",q:q});});
   if(!PLATFORM)s.push({id:"task",part:"task"},{id:"care",part:"task"});
-  s.push({id:"done",part:"task"});
-  if(asksMiss()){s.push({id:"miss",part:"task"});if(A.doneMiss===3&&!PLATFORM)s.push({id:"missother",part:"task"});}
+  // how they make sure it worked would cue looking for a confirmation in the task: the study page asks these after it
+  if(!PLATFORM){
+    s.push({id:"done",part:"task"});
+    if(asksMiss()){s.push({id:"miss",part:"task"});if(A.doneMiss===3)s.push({id:"missother",part:"task"});}
+  }
   s.push({id:"finish",part:"end"});
   return s;
 }

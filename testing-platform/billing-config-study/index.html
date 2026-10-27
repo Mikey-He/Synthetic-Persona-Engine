@@ -45,6 +45,10 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border
 .scale .end{color:var(--fg-2);font-size:13px}
 .scale .opt{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
 .scale input{width:18px;height:18px}
+.habit{margin:28px 0}
+.habit .q{font-weight:600;margin-bottom:10px}
+.habit label{display:flex;gap:10px;align-items:flex-start;margin:8px 0;cursor:pointer}
+.habit input{width:18px;height:18px;margin-top:2px;flex:none}
 .file{margin-top:28px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--fill)}
 .file code{font-size:13px}
 .status{margin-top:12px;min-height:1.5em}
@@ -74,9 +78,12 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border
 </section>
 
 <section id="after" class="page" hidden>
-  <h1>Three quick questions</h1>
-  <p class="muted">About the task you just did. Choose the number that fits best.</p>
+  <h1>A few last questions</h1>
+  <p class="muted">First, about the task you just did. Choose the number that fits best.</p>
   <div id="scales"></div>
+  <h2 style="margin-top:36px">How you usually work</h2>
+  <p class="muted">These are about other apps and websites in general, not this task.</p>
+  <div id="habits"></div>
   <div class="actions"><button class="btn" id="submit-after" disabled>Continue</button></div>
 </section>
 
@@ -105,6 +112,24 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border
     { key: "tired", q: "While doing the task, how mentally tired did you feel?", low: "Not tired at all", high: "Very tired" },
     { key: "rushed", q: "While doing the task, how rushed did you feel?", low: "Not rushed at all", high: "Very rushed" },
     { key: "focused", q: "While doing the task, how focused were you?", low: "Not focused at all", high: "Very focused" }
+  ];
+  // Asked after the task because, asked before it, they would cue what the study observes in the task
+  // (checking before confirming, checking defaults, noticing warnings, looking for a confirmation). Same
+  // answers and stored places as the questionnaire's R2, D2, W, done and miss (tools/questionnaire.html),
+  // so the Persona Builder reads them as it always does.
+  var HABITS = [
+    { key: "R2", q: "Before you confirm an important setting, what do you do?",
+      o: ["Make sure I understand every item", "Confirm once I roughly understand", "Confirm once it looks about right, and fix it later if needed"] },
+    { key: "D2", q: "In a form with many options, do you check the defaults you weren't asked to change?",
+      o: ["No", "I glance at the obvious ones", "I check every one"] },
+    { key: "W", q: "Last time a yellow or red message appeared while you filled in a form or changed a setting, what did you do?",
+      o: ["Didn't really notice it and carried on", "Glanced at it and carried on", "Stopped and read it before going on"] },
+    { key: "done", many: true, q: "After you set something up, how do you usually make sure it really worked? Choose all that apply.",
+      o: [["action", "Once I click the last button"], ["toast", "I see a success message"], ["list", "I check the list or details page"],
+          ["external", "I wait for an email or notification"], ["test", "I make it actually trigger once"]] },
+    { key: "doneMiss", q: "If the confirmation you're waiting for never comes, what do you do?",
+      o: ["Let it go", "Go back and check", "Do it all again"],
+      when: function () { return (state.habits.done || []).some(function (w) { return w !== "action"; }); } }
   ];
   var $ = function (id) { return document.getElementById(id); };
   var state = load();
@@ -135,7 +160,7 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border
     var pid = $("pid").value.trim();
     if (!ID.test(pid)) { $("start-error").textContent = "Use letters, digits, - or _ only."; return; }
     state = {
-      step: "questionnaire", participantId: pid, consent: true,
+      step: "questionnaire", participantId: pid, consent: true, habits: {},
       session: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)),
       startedAt: new Date().toISOString(), questionnaire: null, events: [], product: null, postTask: {}
     };
@@ -204,9 +229,43 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border
       var hi = document.createElement("span"); hi.className = "end"; hi.textContent = x.high; opts.appendChild(hi);
       d.appendChild(opts); box.appendChild(d);
     });
+    drawHabits();
+  }
+  function drawHabits() {
+    state.habits = state.habits || {};
+    var box = $("habits"); box.textContent = "";
+    HABITS.forEach(function (x) {
+      if (x.when && !x.when()) { delete state.habits[x.key]; return; }
+      var d = document.createElement("div"); d.className = "habit";
+      var q = document.createElement("div"); q.className = "q"; q.textContent = x.q; d.appendChild(q);
+      x.o.forEach(function (o, i) {
+        var value = x.many ? o[0] : i, l = document.createElement("label"), r = document.createElement("input"), t = document.createElement("span");
+        r.type = x.many ? "checkbox" : "radio"; r.name = x.key;
+        r.checked = x.many ? (state.habits[x.key] || []).indexOf(value) >= 0 : state.habits[x.key] === value;
+        r.addEventListener("change", function () {
+          if (x.many) {
+            var list = (state.habits[x.key] || []).filter(function (v) { return v !== value; });
+            if (r.checked) list.push(value);
+            state.habits[x.key] = list;
+          } else state.habits[x.key] = value;
+          save(); drawHabits();
+        });
+        t.textContent = x.many ? o[1] : o;
+        l.appendChild(r); l.appendChild(t); d.appendChild(l);
+      });
+      box.appendChild(d);
+    });
     ready();
   }
-  function ready() { $("submit-after").disabled = !QUESTIONS.every(function (x) { return state.postTask[x.key] >= 1; }); }
+  function ready() {
+    var states = QUESTIONS.every(function (x) { return state.postTask[x.key] >= 1; });
+    var habits = HABITS.every(function (x) {
+      if (x.when && !x.when()) return true;
+      var v = state.habits[x.key];
+      return x.many ? v && v.length > 0 : v !== undefined;
+    });
+    $("submit-after").disabled = !(states && habits);
+  }
   $("submit-after").addEventListener("click", function () { go("done"); });
 
   // ---- the participant's file: what the engine reads (testing-platform/README.md) ----
@@ -216,11 +275,22 @@ input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border
       study: { id: STUDY.study, flow: STUDY.flow, task: STUDY.task },
       session: { id: state.session, participantId: state.participantId, consent: state.consent, startedAt: state.startedAt, endedAt: state.endedAt || null,
                  viewport: state.viewport || null, userAgent: navigator.userAgent },
-      questionnaire: state.questionnaire,
+      questionnaire: withHabits(state.questionnaire),
       postTask: state.postTask,
       events: state.events,
       product: state.product
     };
+  }
+  // The answers asked after the task go where the questionnaire keeps them.
+  function withHabits(q) {
+    if (!q) return q;
+    var out = JSON.parse(JSON.stringify(q)), a = out.answers, h = state.habits || {};
+    a.tend = a.tend || {};
+    ["R2", "D2", "W"].forEach(function (k) { if (h[k] !== undefined) a.tend[k] = h[k]; });
+    a.done = h.done || [];
+    a.doneMiss = h.doneMiss !== undefined ? h.doneMiss : null;
+    a.askedAfterTask = ["R2", "D2", "W", "done", "doneMiss"];
+    return out;
   }
   function fileName() { return "participant-" + state.participantId + ".json"; }
   $("download").addEventListener("click", function () {

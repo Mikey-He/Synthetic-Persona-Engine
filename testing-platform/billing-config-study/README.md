@@ -14,21 +14,27 @@ team. Persona Studio imports that file as it is.
    | --- | --- |
    | Which of these have you used / done / studied, then how much for each (X01 to X07) | What they know: each knowledge item of the task, through the experiences that teach it (flow.json) |
    | Is English your first language? If not, their English level and the 50-word test | English level and vocabulary size (a first language skips both: fluent) |
-   | R1, R2 | Willingness to try unfamiliar things (risk) |
+   | R1, and R2 after the task | Willingness to try unfamiliar things (risk) |
    | P1, P2 | Patience |
    | D1 | Care when finding (detailFind) |
-   | D2, D3 | Care when checking (detailCheck) |
-   | W | Attention to warnings |
+   | D3, and D2 after the task | Care when checking (detailCheck) |
+   | W, after the task | Attention to warnings |
    | E | How pressure builds after setbacks, and stress tolerance |
    | V, C, M, S | Reading small text, colour, clicking small targets, reading speed |
-   | How they make sure it worked, and what they do if no confirmation comes | confirmBy, ifConfirmMissing |
+   | How they make sure it worked, and what they do if no confirmation comes (after the task) | confirmBy, ifConfirmMissing |
 
    How an answer becomes a number is `synthetic-user-engine/synthetic-user-engine/engine/config.toml`
    (`[persona]`, `[persona.answers]`) and `tools/persona-builder.html`.
 3. **The task.** The task bar with "I'm finished" on top, the prototype below (`app/`, see its
    `SOURCE.md`). `harness.js` logs pages, screens, clicks, field changes, saves and pop-up messages.
-4. **Three questions** about the task just done, 1 to 5: how tired, how rushed, how focused. They set
-   fatigue, time pressure and distraction.
+4. **A few last questions.** About the task just done, 1 to 5: how tired, how rushed, how focused (fatigue,
+   time pressure, distraction). Then, about other apps in general, the five questions that would cue what
+   the study observes if asked first (Shining, 2026-10-28): checking before confirming (R2), checking defaults
+   (D2), noticing warnings (W), how they make sure it worked and what they do without a confirmation. Their
+   answers go where the questionnaire keeps them, so the Persona Builder reads them as before.
+
+   Rule for any question: if it measures a behaviour the study observes in the task (navigation errors,
+   hesitation, double checking, attention to warnings, deciding it is done), ask it after the task.
 5. **The file.** Download file (or Copy) gives `participant-<ID>.json`: the session, the questionnaire
    answers, the three answers, every event in order and what the prototype saved. "Start the next
    participant" clears the page for the next person.
