@@ -1,0 +1,2 @@
+# Fixture hashes cover exact bytes, so git must never rewrite line endings in these files.
+lib/fixtures/*.json -text

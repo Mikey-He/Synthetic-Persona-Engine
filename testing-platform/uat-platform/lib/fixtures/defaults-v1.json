@@ -1,0 +1,27 @@
+{
+  "defaultsVersion": "defaults-v1",
+  "provisional": ["scope.allProjects", "scope.savings", "amount.type", "recipients.monitoring.linked", "recipients.pubsubTopic", "scope.readOnlyForProjectUsers"],
+  "config": {
+    "name": "",
+    "kind": "alerts_only",
+    "scope": {
+      "allProjects": true,
+      "projectIds": [],
+      "filters": { "folders": [], "services": [], "labels": [] },
+      "savings": ["discounts", "promotions_and_others"],
+      "readOnlyForProjectUsers": false
+    },
+    "period": "monthly",
+    "amount": { "type": "specified" },
+    "thresholds": [
+      { "percent": 50, "trigger": "actual" },
+      { "percent": 90, "trigger": "actual" },
+      { "percent": 100, "trigger": "actual" }
+    ],
+    "recipients": {
+      "billingAdminsAndUsers": true,
+      "projectOwners": false,
+      "monitoring": { "linked": false, "channelIds": [] }
+    }
+  }
+}

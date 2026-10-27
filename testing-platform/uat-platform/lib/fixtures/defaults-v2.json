@@ -1,0 +1,27 @@
+{
+  "defaultsVersion": "defaults-v2",
+  "provisional": ["amount.target"],
+  "config": {
+    "name": "",
+    "kind": null,
+    "scope": {
+      "allProjects": true,
+      "projectIds": [],
+      "filters": { "folders": [], "services": [], "labels": [] },
+      "savings": ["savings_programs", "other_savings"],
+      "readOnlyForProjectUsers": false
+    },
+    "period": "monthly",
+    "amount": { "type": "specified", "target": 0 },
+    "thresholds": [
+      { "percent": 50, "trigger": "actual" },
+      { "percent": 90, "trigger": "actual" },
+      { "percent": 100, "trigger": "actual" }
+    ],
+    "recipients": {
+      "billingAdminsAndUsers": true,
+      "projectOwners": false,
+      "monitoring": { "linked": false, "channelIds": [] }
+    }
+  }
+}

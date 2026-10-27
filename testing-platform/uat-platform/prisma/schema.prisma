@@ -1,0 +1,197 @@
+// Tables follow docs/build-plan.md (Data model). Column names are snake_case
+// as written there. The connection string is DATABASE_URL, read in prisma.config.ts.
+// Every row hangs off a session: one attempt by one actor, human or synthetic.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  // CommonJS output also loads inside Playwright tests, not only in Next and Vitest.
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ActorType {
+  human
+  synthetic
+}
+
+enum Variant {
+  A
+  B
+}
+
+enum DatasetLabel {
+  pilot
+  calibration_A
+  evaluation_A
+  evaluation_B
+  synthetic
+}
+
+enum FamiliarityBand {
+  low
+  medium
+  high
+}
+
+enum TerminationReason {
+  completion_declared
+  abandoned
+  step_limit
+  time_limit
+  loop
+  technical_error
+}
+
+/// Pseudonymous. Never holds a name or an email.
+model Participant {
+  id              String          @id
+  familiarityBand FamiliarityBand @map("familiarity_band")
+  screening       Json?
+  consentedAt     DateTime?       @map("consented_at") @db.Timestamptz(3)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  sessions        Session[]
+}
+
+/// The token is opaque and never reveals the variant.
+model Session {
+  id                 String             @id @default(cuid())
+  token              String             @unique
+  actorType          ActorType          @map("actor_type")
+  participantId      String?            @map("participant_id")
+  participant        Participant?       @relation(fields: [participantId], references: [id])
+  agentRunId         String?            @map("agent_run_id")
+  agentRun           AgentRun?          @relation(fields: [agentRunId], references: [id])
+  variant            Variant
+  datasetLabel       DatasetLabel       @map("dataset_label")
+  fixtureVersion     String             @map("fixture_version")
+  fixture            FixtureVersion     @relation("SessionFixture", fields: [fixtureVersion], references: [id])
+  defaultsVersion    String             @map("defaults_version")
+  defaults           FixtureVersion     @relation("SessionDefaults", fields: [defaultsVersion], references: [id])
+  taskVersion        String             @map("task_version")
+  buildVersion       String             @map("build_version")
+  evaluatorVersion   String             @map("evaluator_version")
+  referenceCaptureId String?            @map("reference_capture_id")
+  viewport           Json?
+  zoom               Float?
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  startedAt          DateTime?          @map("started_at") @db.Timestamptz(3)
+  endedAt            DateTime?          @map("ended_at") @db.Timestamptz(3)
+  terminationReason  TerminationReason? @map("termination_reason")
+  draft              BudgetDraft?
+  budgets            Budget[]
+  events             Event[]
+  evaluations        Evaluation[]
+  surveyResponses    SurveyResponse[]
+  agentSteps         AgentStep[]
+}
+
+/// One live draft per session.
+model BudgetDraft {
+  sessionId String   @id @map("session_id")
+  session   Session  @relation(fields: [sessionId], references: [id])
+  draft     Json
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+}
+
+/// One row per save. Editing a budget writes a new version under the same id.
+model Budget {
+  id          String
+  version     Int
+  sessionId   String       @map("session_id")
+  session     Session      @relation(fields: [sessionId], references: [id])
+  config      Json
+  savedAt     DateTime     @default(now()) @map("saved_at") @db.Timestamptz(3)
+  evaluations Evaluation[]
+
+  @@id([id, version])
+  @@index([sessionId])
+}
+
+/// Append only. Rows are never updated or deleted.
+model Event {
+  id            Int      @id @default(autoincrement())
+  sessionId     String   @map("session_id")
+  session       Session  @relation(fields: [sessionId], references: [id])
+  seq           Int
+  clientTs      DateTime @map("client_ts") @db.Timestamptz(3)
+  serverTs      DateTime @default(now()) @map("server_ts") @db.Timestamptz(3)
+  type          String
+  target        String?
+  payload       Json?
+  screenshotRef String?  @map("screenshot_ref")
+
+  @@index([sessionId, seq])
+}
+
+/// One per synthetic session.
+model AgentRun {
+  id            String    @id @default(cuid())
+  modelId       String    @map("model_id")
+  promptVersion String    @map("prompt_version")
+  personaId     String    @map("persona_id")
+  calibrationId String?   @map("calibration_id")
+  temperature   Float?
+  startedAt     DateTime? @map("started_at") @db.Timestamptz(3)
+  sessions      Session[]
+}
+
+/// Includes attempts that changed nothing.
+model AgentStep {
+  id             Int     @id @default(autoincrement())
+  sessionId      String  @map("session_id")
+  session        Session @relation(fields: [sessionId], references: [id])
+  stepNo         Int     @map("step_no")
+  screenshotPath String? @map("screenshot_path")
+  action         Json
+  reason         String?
+  executed       Boolean
+  errorLabel     String? @map("error_label")
+  latencyMs      Int?    @map("latency_ms")
+
+  @@index([sessionId, stepNo])
+}
+
+/// Researcher view only. Never returned to a participant. budget_id is empty
+/// when an unsaved draft was scored.
+model Evaluation {
+  id                  String   @id @default(cuid())
+  sessionId           String   @map("session_id")
+  session             Session  @relation(fields: [sessionId], references: [id])
+  budgetId            String?  @map("budget_id")
+  budgetVersion       Int?     @map("budget_version")
+  budget              Budget?  @relation(fields: [budgetId, budgetVersion], references: [id, version])
+  criteria            Json
+  overallSuccess      Boolean  @map("overall_success")
+  resolvedRecipients  Json     @map("resolved_recipients")
+  recipientMechanisms Json     @map("recipient_mechanisms")
+  evaluatorVersion    String   @map("evaluator_version")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([sessionId])
+}
+
+/// Humans only.
+model SurveyResponse {
+  id         String   @id @default(cuid())
+  sessionId  String   @map("session_id")
+  session    Session  @relation(fields: [sessionId], references: [id])
+  instrument String
+  answers    Json
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([sessionId, instrument])
+}
+
+/// Frozen research files. Holds the fixture and the defaults record.
+model FixtureVersion {
+  id               String    @id
+  content          Json
+  contentHash      String    @map("content_hash")
+  frozenAt         DateTime  @default(now()) @map("frozen_at") @db.Timestamptz(3)
+  fixtureSessions  Session[] @relation("SessionFixture")
+  defaultsSessions Session[] @relation("SessionDefaults")
+}

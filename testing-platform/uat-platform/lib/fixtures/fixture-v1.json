@@ -1,0 +1,36 @@
+{
+  "fixtureVersion": "fixture-v1",
+  "today": "2026-09-20",
+  "currency": "USD",
+  "billingAccount": { "id": "billing-demo-001", "name": "Northstar Research" },
+  "projects": [
+    { "id": "atlas-demo", "name": "Atlas" },
+    { "id": "beacon-demo", "name": "Beacon" }
+  ],
+  "billingMembers": [
+    { "id": "alex-kim", "name": "Alex Kim", "email": "alex.kim@example.test", "role": "Billing Account Administrator", "isYou": true },
+    { "id": "jordan-lee", "name": "Jordan Lee", "email": "jordan.lee@example.test", "role": "Billing Account User", "isYou": false }
+  ],
+  "projectOwners": {
+    "atlas-demo": [ { "id": "sam-rivera", "name": "Sam Rivera", "email": "atlas-owner@example.test" } ],
+    "beacon-demo": [ { "id": "priya-shah", "name": "Priya Shah", "email": "beacon-owner@example.test" } ]
+  },
+  "folders": [],
+  "services": ["Compute Engine", "Cloud Storage", "BigQuery", "Cloud Run"],
+  "labels": [ { "key": "env", "values": ["prod", "dev"] }, { "key": "team", "values": ["research"] } ],
+  "monitoringChannels": { "atlas-demo": [], "beacon-demo": [] },
+  "pubsubTopics": [],
+  "startingBudgets": [],
+  "monthlyCosts": {
+    "atlas-demo": [
+      { "month": "2026-04", "usd": 612.40 }, { "month": "2026-05", "usd": 688.15 },
+      { "month": "2026-06", "usd": 731.02 }, { "month": "2026-07", "usd": 804.77 },
+      { "month": "2026-08", "usd": 776.30 }, { "month": "2026-09", "usd": 523.40, "partial": true }
+    ],
+    "beacon-demo": [
+      { "month": "2026-04", "usd": 1140.00 }, { "month": "2026-05", "usd": 1205.60 },
+      { "month": "2026-06", "usd": 1188.25 }, { "month": "2026-07", "usd": 1262.90 },
+      { "month": "2026-08", "usd": 1310.45 }, { "month": "2026-09", "usd": 902.15, "partial": true }
+    ]
+  }
+}
