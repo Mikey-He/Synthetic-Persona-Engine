@@ -9,6 +9,7 @@ import dataclasses
 import hashlib
 import json
 import math
+import random
 import time
 from collections import Counter
 from datetime import datetime
@@ -20,7 +21,7 @@ from playwright.sync_api import sync_playwright
 from .attention import chunks
 from .choose import is_consequential, is_loop, leads_somewhere, prominence
 from .completion import asks_list, asks_message, check_found, check_list, lacking_confirmation, save_refused, stops_after_last_action
-from .evidence import VOID, best_level, check_evidence, own_words
+from .evidence import SURE, VOID, best_level, check_evidence, own_words
 from .memory import SessionMemory, typed_value
 from .mind import Move, Outlook, appraise, scan, settle
 from .model import Model, ModelError, timed
@@ -114,7 +115,10 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
     readings = None
     if params.get("task_readings") and hasattr(model, "model") and hasattr(model.model, "client"):
         readings = load_readings(workflow["file"], persona.task, model.model.client, model.model_id)
-    reading_now = readings.draw(var.rng) if readings else {}  # not `chosen`: that is the move picked each step
+    # Its own generator, seeded by card and seed: the first draw of a fresh generator fell the same way for
+    # seeds 1 to 3 on every card, so all 18 runs of a study read the amount as $800 (2026-11-01).
+    reading_rng = random.Random(f"{persona.id}:{seed}")
+    reading_now = readings.draw(reading_rng) if readings else {}  # not `chosen`: that is the move picked each step
     started_with = readings.line(reading_now) if readings else None
     rethought: list[dict[str, Any]] = []
     if hasattr(model, "substitute"):
@@ -232,7 +236,7 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
                     slips["lapses"] += 1
                 looking_at = obs.focus.describe() if obs.focus else None
                 if readings and not saved:  # the screen shows what an ambiguity turns on: they may think again
-                    flipped = readings.rethink(var.rng, obs.product_text, where(obs.context)[1], var.score("detailCheck") / 10, reading_now)
+                    flipped = readings.rethink(reading_rng, obs.product_text, where(obs.context)[1], var.score("detailCheck") / 10, reading_now)
                     if flipped:
                         rethought.append({"step": step, **flipped})
                         print(f"      thinks again about {flipped['about']}: now {flipped['now'][:70]}")
@@ -308,7 +312,10 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
                         own = own_words(text, obs.hits, obs.visible_text, memory.learned)
                         if own:
                             verdicts = [*verdicts, own]
-                    m = Move(c, e, best_level(verdicts) if verdicts else VOID, move_key(obs.context, e, str(c.get("action")), c.get("value"), obs.scroll_stamp), verdicts,
+                    # Scrolling, going back and a key need no reading: they are moves anyone can make. Valued as unreadable,
+                    # scrolling was worth 0.5 at most, so a button below the fold was never reached and the form was left (2026-11-01).
+                    level = SURE if c.get("action") in ("scroll", "back", "press") and e is None else (best_level(verdicts) if verdicts else VOID)
+                    m = Move(c, e, level, move_key(obs.context, e, str(c.get("action")), c.get("value"), obs.scroll_stamp), verdicts,
                              final=is_consequential(e, final_labels), alike=similarity(e, vocab, task_set) if e else 0)
                     if c.get("action") not in ("scroll", "back", "press") and e is None:
                         m.dropped = "Element not on screen"
