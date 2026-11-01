@@ -103,3 +103,9 @@ def test_read_everything_and_nothing_good_enough_takes_the_likeliest_or_nothing(
         appraise(m, o, None, 1)
     assert settle([low, lower], o, rng) is low
     assert settle([lower], o, rng) is None
+
+
+def test_scrolling_in_a_form_is_looking_and_can_be_done_again():
+    down = move("scroll", 6, action="scroll")
+    assert appraise(down, outlook(in_form=True), 5, 6) > 0
+    assert appraise(move("Next", 6), outlook(in_form=True), 5, 6) == 0

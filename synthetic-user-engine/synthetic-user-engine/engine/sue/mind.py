@@ -130,14 +130,16 @@ def weight(move: Move, o: Outlook) -> float:
     return 1.0
 
 
-def freshness(last: int | None, now: int, o: Outlook) -> float:
+def freshness(last: int | None, now: int, o: Outlook, sticky: bool = True) -> float:
+    """sticky: a move done in a form stays done. Scrolling is looking, not doing: it recovers everywhere,
+    or a button that went out of view could never be reached again (P001 left Actions by the search box, 2026-11-01)."""
     if last is None:
         return 1.0
-    return 0.0 if o.in_form else 1 - math.exp(-(now - last) / o.params["memory_span"])
+    return 0.0 if o.in_form and sticky else 1 - math.exp(-(now - last) / o.params["memory_span"])
 
 
 def appraise(move: Move, o: Outlook, last: int | None, now: int) -> float:
-    hope, under, weigh, fresh = hope_of(move, o), understanding(move, o), weight(move, o), freshness(last, now, o)
+    hope, under, weigh, fresh = hope_of(move, o), understanding(move, o), weight(move, o), freshness(last, now, o, sticky=move.action != "scroll")
     # Looking around is not filling things in: less hope than this changes no value outside a form.
     if not o.in_form and move.action in CHANGES and hope < o.params["change_floor"]:
         weigh = 0.0
