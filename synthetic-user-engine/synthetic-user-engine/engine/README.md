@@ -117,6 +117,9 @@ The knowledge groups (which items move together when you set "Billing terminolog
 .venv/Scripts/python -m sue.compare --person <the person's session id> --engine <folder under runs>
 .venv/Scripts/python -m sue.run --card <card> --seed 3           # slips and in-between scores drawn from seed 3 (v3 cards)
 .venv/Scripts/python -m sue.batch --card <card> --runs 5 --like-session <session id>   # seeds 1-5, counted together
+# A study: every participant file in a folder, each at their own window, against their card (import the files in Persona Studio first)
+.venv/Scripts/python -m sue.study --flow ../data/workflows/<workflow>/flow.json --participants ../data/participants/<study> --seeds 1,2,3 [--only 001]
+.venv/Scripts/python -m sue.study --flow ../data/workflows/<workflow>/flow.json --participants ../data/participants/<study> --report runs/study-<a> runs/study-<b>   # one report from several study folders
 ```
 
 **Watch mode `--watch`.** One window with two columns. The left column streams the engine's browser live (the engine's own browser has no window), with a line above it saying what the engine is doing (reading the screen and swapping words, waiting for the model, checking evidence and choosing, acting). The pointer is drawn in this column, moves to its target and then clicks, leaving an orange ripple. The right column is the live log: each step's time, page, the model's candidates and reasons, how code rated each piece of evidence (sure, half or void), which rule decided, and what was done. Click any step on the right to see the screenshot they saw at that step; "Back to live" returns. When the run ends, the bottom of the right column shows why it stopped, the platform's grading, the missed defaults and where the files are; close the window to finish. The pointer is only ever drawn in the watch window, never in the screenshots the model gets. Without `--watch` there is no window and the files are the same.
@@ -129,6 +132,20 @@ The last three commands need the local platform running (`npm run open:a` in the
 - `sue.plumbing`: no model. A script that finds buttons by their text walks Version A's success path; everything else is real. It proves the pipeline works, not that the engine behaves like a person. The full card should pass the platform's grading and the blank card should be stopped.
 - `sue.smoke`: shows how each card sees each screen, without choosing or clicking.
 - `sue.compare`: lines up the engine's run and the person's session from the platform event logs, prints them side by side, computes content (recall, precision), order, first-touch order and saved settings, and writes `compare.json` into the run folder. Pilot sessions: Mikey `cmut8m8290000pk7stzauis43`.
+
+## State on 2026-11-01
+
+The decision layer was rebuilt as one formula (`sue/mind.py`, run by `sue/session.py`, numbers in `config.toml [mind]`). Every card of format v3 (Persona Studio, and every imported participant) runs on it; a v2 card still runs on the rule set in `sue/choose.py` through `sue/run.py`.
+
+Measured on the Billing Config study (6 participants, 3 runs each) and read the same way from both sides' event logs:
+
+- Agrees with the people on the route into the form, on the entry being where the most time and trouble go, and on task completion (17 of 18 runs; 5 of 6 people).
+- Does not show where the form confuses people: the people's top form problem is Amount (3 of 6 changed it); the engine almost never touches it. The old rule set did point at Amount, mostly by retyping $800 as $1,000 right after typing it.
+- Does not predict one person: the survey's "knows the entry" did not predict getting lost (P007 said yes and searched longest).
+- Known defects: a run can click FINISH on Define, save nothing and declare itself done (P001 run 1); a form opened after the save is counted as Define trouble.
+- Engine time is estimated from words read and actions, not measured.
+
+Not in this repository: the participants' files (`data/participants/`, real people, public repository), the cards Persona Studio built from them (`data/personas/studio-*.json`), the runs and the kept model readings (`runs/`), and `docs/`. Ask Mikey for the participant files and import them in Persona Studio to rebuild the cards; the study and `tests/test_events.py`'s participant cases need them.
 
 ## Modules
 
@@ -162,6 +179,14 @@ The last three commands need the local platform running (`npm run open:a` in the
 | `sue/draft.py` | A draft flow.json from a recording | 6.3 |
 | `sue/check.py` | The checks a workflow passes before it is used | 6.3 |
 | `sue/vision.py` | Text read off a canvas with OCR, and painted over | 6.3 |
+| `sue/mind.py` | The one mechanism a v3 card decides by: value = hope × understanding × purpose weight × freshness, then a chance of acting; every trait is a parameter of it | 4.10 |
+| `sue/session.py` | The run loop for v3 cards, built on `mind.py`; keeps every model reading on disk (`runs/readings/`) so repeats cost nothing | 4.10 |
+| `sue/participant.py` | A study page participant file (events and what the product saved) as the same moves an engine run makes | 5 |
+| `sue/parts.py` | A session cut into the parts of the task: moves, estimated time and repeats per part; which part a failed check points at | 5 |
+| `sue/events.py` | What went wrong, part by part, read the same way from a person's events and an engine run: lost the way, changed a value, went back, left unsaved, wrong when saved | 5 |
+| `sue/study.py` | Runs every participant's card and reports people against runs, person by person and as a group | 5 |
+| `sue/replay.py` | A person's session walked again through the engine's eyes, with no model, to find moves the card cannot read | 5 |
+| `sue/watch.py` | Watch-mode helpers for the live window | 8 |
 
 Phase 1 wired the knowledge list and session memory. Phase 2 wired the tendencies (risk, detail split into finding and checking a form, patience), "most alike", the field of view, reviewing after saving, the expectation missed and missed defaults. Phase 3 (2026-10-19) made the tendencies scores and added the states, slips and perception, seeded; questionnaire (v2) cards run exactly as before.
 

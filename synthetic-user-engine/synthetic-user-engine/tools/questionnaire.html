@@ -204,7 +204,6 @@ var HABITS=[
   {id:"D1",q:T("第一次打开一个新页面，你一般怎么看？","When you open a new page for the first time, how do you usually look at it?"),o:[T("看到像的就点","Click the first thing that looks right"),T("扫一眼主要的再点","Skim the main parts, then click"),T("整页看完再动手","Read the whole page first")]},
   {id:"D2",q:T("填一个选项很多的表单，没让你改的默认选项你会看吗？","In a form with many options, do you check the defaults you weren't asked to change?"),o:[T("不看","No"),T("看一眼显眼的","I glance at the obvious ones"),T("每个都看一遍","I check every one")]},
   {id:"D3",q:T("上次填一个选项很多的表单，遇到看不懂的选项，你是怎么做的？","Last time you filled in a form and met an option you didn't understand, what did you do?"),o:[T("不管它，保持原样","Left it as it was"),T("看了旁边的说明，但没去改它","Read the explanation next to it, but didn't change it"),T("点一下或改一下试试，看完再改回来","Tried changing it to see what happened, then changed it back")]},
-  {id:"H",q:T("在一个新网站上找某个功能，你一般先怎么找？","When you look for a feature on a new website, what do you try first?"),o:[T("先用搜索","Search"),T("先翻菜单","Look through the menus"),T("看情况，都可以","It depends")]},
   {id:"W",q:T("上次填表或做设置的时候，页面上出现了黄色或红色的提示，比如“这个设置会影响……”，你是怎么做的？","Last time a yellow or red message appeared while you filled in a form or changed a setting, for example \u201cThis setting will affect\u2026\u201d, what did you do?"),o:[T("没太注意，接着往下做","Didn't really notice it and carried on"),T("扫了一眼就继续","Glanced at it and carried on"),T("停下来读完再继续","Stopped and read it before going on")]},
   {id:"E",q:T("上次一个操作连着出错好几次，你当时是什么状态？","Last time something went wrong several times in a row, how were you?"),o:[T("跟平时一样，慢慢来","Same as usual; I took my time"),T("有点急，但还是一步步来","A bit stressed, but still went step by step"),T("很急，开始乱点","Very stressed; I started clicking around")]}
 ];
@@ -277,7 +276,6 @@ function screens(){
     s.push({id:"story",part:"habits"});
   }
   HABITS.forEach(function(h){
-    if(PLATFORM&&h.id==="H")return; // where they look first: the engine does not read it
     // Questions about behaviour the study observes in the task (checking before confirming, checking defaults,
     // noticing warnings) would cue it if asked first: the study page asks them after the task.
     if(PLATFORM&&(h.id==="R2"||h.id==="D2"||h.id==="W"))return;

@@ -77,7 +77,7 @@ def build(flow: dict[str, Any], kind: str) -> dict[str, Any]:
                     "lang": {"ui": "", "english": "fluent", "vocabSize": None, "vocabSource": "Self-test card"},
                     "calibrated": False},
         "tendency": {"risk": dict(medium), "patience": dict(medium), "detail": dict(medium), "detailFind": dict(medium),
-                     "detailCheck": dict(medium), "habit": "depends"},
+                     "detailCheck": dict(medium)},
         "perception": {"vision": {"level": "high", "source": "Self-test card"},
                        "motor": {"level": "high", "source": "Self-test card"},
                        "speed": {"level": "medium", "source": "Self-test card"}, "colorWeak": False,

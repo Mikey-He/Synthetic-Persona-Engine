@@ -1116,6 +1116,9 @@ def save_participant(body) -> dict:
     # card is v3, with what their answers decided item by item kept from the Persona Builder's card.
     run_card = keep_answers(built, card, parameters, parameters) if built else card
     run_card['persona'].update(id=cid, name=code)
+    seen = body.get('window')
+    if isinstance(seen, dict) and all(isinstance(seen.get(k), int) and seen[k] > 0 for k in ('width', 'height')):
+        run_card['persona']['window'] = {'width': seen['width'], 'height': seen['height']}  # the page they saw
     answers = clone_json(answers)
     answers.setdefault('answers', {})['name'] = code  # the code name only, never the person's name
     write_json(PERSONAS / f'{cid}.json', run_card)

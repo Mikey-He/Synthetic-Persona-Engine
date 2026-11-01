@@ -15,6 +15,7 @@ config["words"], config["run"], config["compare"]), plus config["workflow"].
 
 from __future__ import annotations
 
+import re
 import json
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,8 @@ def problems(flow: dict[str, Any]) -> list[str]:
     if not set(routes.get("list") or []) <= set(routes.get("path") or []):
         out.append("engine.routes.list: every list route must also be on the path")
     labels = e.get("labels") or {}
+    if "commit" in labels and not (isinstance(labels["commit"], list) and all(isinstance(x, str) and x for x in labels["commit"])):
+        out.append("engine.labels.commit: a list of button labels")
     for key in ("consequential", "advancing"):
         if not isinstance(labels.get(key), list) or not all(isinstance(x, str) and x for x in labels.get(key) or []):
             out.append(f"engine.labels.{key}: a list of button labels")
@@ -160,10 +163,21 @@ def apply(config: dict[str, Any], path: Path) -> dict[str, Any]:
         "help_items": items.get("help", []),
         "review_items": items.get("review", []),
     }
+    config["goal"]["path_pages"] = e["routes"].get("pages")
+    config["goal"]["list_pages"] = e["routes"].get("listPages")
     config["run"]["consequential_labels"] = labels["consequential"]
+    # The buttons that complete the task. Cancel is risky too, but it never saves anything.
+    config["run"]["commit_labels"] = labels.get("commit") or [
+        x for x in labels["consequential"] if not re.search(r"cancel|close|discard|取消|关闭", x, re.I)]
     config["words"]["data_terms"] = words.get("dataTerms", [])
     config["words"]["force_fake"] = words.get("forceFake", [])
     config["compare"]["field_labels"] = (e.get("compare") or {}).get("fieldLabels", [])
+    config["compare"]["entry"] = (e.get("compare") or {}).get("entry", [])
+    config["compare"]["parts"] = (e.get("compare") or {}).get("parts", [])
+    config["compare"]["field_parts"] = (e.get("compare") or {}).get("fieldParts", {})
+    config["compare"]["options"] = (e.get("compare") or {}).get("options", {})
+    config["compare"]["way"] = (e.get("compare") or {}).get("way", [])
+    config["compare"]["free_text"] = (e.get("compare") or {}).get("freeText", [])
     from .prompt import EXTRA_ACTIONS
     target = e.get("target") or {"kind": "uat"}
     if e.get("maxSteps"):

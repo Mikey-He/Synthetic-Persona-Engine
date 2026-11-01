@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 LEVELS = {"low": 0, "medium": 5, "high": 10}
 NO_STATE = {"fatigue": 0, "distraction": 0, "timePressure": {"score": 0, "pattern": "steady"},
             "stressTolerance": 5, "warningAttention": 10}
-NO_PERCEPTION = {"vision": "normal", "colorVision": "typical", "clickPrecision": "high", "readingSpeed": "average"}
+NO_PERCEPTION = {"colorVision": "typical", "clickPrecision": "high", "readingSpeed": "average"}
 
 
 def name_of(score: float) -> str:

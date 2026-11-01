@@ -48,15 +48,15 @@ def check_item(ref: str, persona: Persona, memory: SessionMemory) -> Verdict:
     return Verdict("item", ref, VOID, f"card: {it.result}")
 
 
-def _hit_level(hit: Hit) -> str:
-    if hit.level == KNOW:
+def _hit_level(hit: Hit, learned=()) -> str:
+    if hit.level == KNOW or hit.item_id in learned:  # learned during the run: understood from then on (4.5)
         return SURE
     if hit.level in _HALF_RESULTS:
         return HALF
     return VOID
 
 
-def check_word(ref: str, screen_hits: list[Hit], visible_text: str = "", on_element: str | None = None) -> Verdict:
+def check_word(ref: str, screen_hits: list[Hit], visible_text: str = "", on_element: str | None = None, learned=()) -> Verdict:
     """ref is text as he sees it on screen, often a whole element label. Every English
     word in it must be on screen, alone or inside a phrase (Target amount); the ref then
     counts at the level of its weakest word. A fake word, or a word that is not on
@@ -78,13 +78,15 @@ def check_word(ref: str, screen_hits: list[Hit], visible_text: str = "", on_elem
     key = _norm(ref)
     if key in by_shown:
         h = by_shown[key]
-        return Verdict("word", ref, _hit_level(h), f"{h.source}, {h.level}")
+        return Verdict("word", ref, _hit_level(h, learned), f"{h.source}, {h.level}")
     token_level: dict[str, str] = {}
     for h in screen_hits:
+        if h.source == "harness":  # the task bar's words say nothing about how he reads the product's
+            continue
         for t in tokens(h.shown):
             t = t.lower()
-            if t not in token_level or RANK[_hit_level(h)] > RANK[token_level[t]]:
-                token_level[t] = _hit_level(h)
+            if t not in token_level or RANK[_hit_level(h, learned)] > RANK[token_level[t]]:
+                token_level[t] = _hit_level(h, learned)
     words = [t.lower() for t in tokens(ref)]
     if not words:
         if key and visible_text and key in _norm(visible_text):
@@ -97,7 +99,7 @@ def check_word(ref: str, screen_hits: list[Hit], visible_text: str = "", on_elem
     return Verdict("word", ref, level, "counted at its weakest word")
 
 
-def own_words(element_text: str, screen_hits: list[Hit], visible_text: str = "") -> Verdict | None:
+def own_words(element_text: str, screen_hits: list[Hit], visible_text: str = "", learned=()) -> Verdict | None:
     """The words on the element itself always count as evidence (2026-10-04): whether he
     can read the button he is about to press is something code can look up, whatever
     the model wrote. The model sometimes leaves the evidence out, or cites words from
@@ -112,9 +114,9 @@ def own_words(element_text: str, screen_hits: list[Hit], visible_text: str = "")
              if h.item_id and h.shown.strip() and _norm(h.shown) in text]
     if named:
         main = min(named, key=lambda x: (x[0], x[1]))[2]
-        level = _hit_level(main)
+        level = _hit_level(main, learned)
         return Verdict("word", main.shown, level, "the element's main name is an item word (added by code)") if level != VOID else None
-    v = check_word(element_text, screen_hits, visible_text, element_text)
+    v = check_word(element_text, screen_hits, visible_text, element_text, learned)
     if v.level == VOID:
         return None
     return Verdict("word", element_text, v.level, "the element's own words (added by code)")
@@ -130,7 +132,7 @@ def check_evidence(evidence: list[dict], persona: Persona, memory: SessionMemory
         if kind == "item":
             out.append(check_item(ref, persona, memory))
         elif kind == "word":
-            out.append(check_word(ref, screen_hits, visible_text, element_text))
+            out.append(check_word(ref, screen_hits, visible_text, element_text, memory.learned))
         else:
             out.append(Verdict(kind, ref, VOID, "unknown evidence type"))
     return out

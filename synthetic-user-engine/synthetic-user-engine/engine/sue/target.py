@@ -79,6 +79,9 @@ class Target(Protocol):
         """{"evaluation": {"overall": bool, "criteria": {name: bool}}, "saves": ..., "saved": [...]}.
         report: what the person reported and the product gave them (answer, downloads)."""
 
+    def note_save(self, page) -> None:
+        """Right after a final button: remember what it wrote, if the product keeps it in the browser."""
+
     def cleanup(self, page) -> None:
         """After the run: put the product back."""
 
@@ -137,7 +140,7 @@ def secret(name: str) -> str:
     return value
 
 
-NUMBER = re.compile(r"^\$?\s*-?[\d,]*\.?\d+$")
+NUMBER = re.compile(r"^\$?\s*-?(?:[\d,]*\.?\d+|[\d,]+\.)$")
 
 
 def _amount(value: Any) -> Any:
@@ -204,10 +207,14 @@ def holds(row: dict[str, Any], want: dict[str, Any]) -> dict[str, Any]:
     return wrong
 
 
-def json_check(data: Any, check: dict[str, Any]) -> tuple[bool, str]:
-    """where picks the new row (empty: any row); expect and includes say what it must hold; anyOf
-    lists alternatives, each an {expect, includes}, of which one must hold (two right answers)."""
+def json_check(data: Any, check: dict[str, Any], last: Any = None) -> tuple[bool, str]:
+    """where picks the new row (empty: any row); row "last" judges only the last one, so a pass cannot
+    be put together from different rows; expect and includes say what it must hold; anyOf lists
+    alternatives, each an {expect, includes}, of which one must hold (two right answers). last: the
+    row the run saved last, known when an older row may have been edited in place; else the final row."""
     rows = rows_of(data, check.get("list"))
+    if check.get("row") == "last":
+        rows = [last] if last is not None and last in rows else rows[-1:]
     where = check.get("where") or {}
     hits = [r for r in rows if isinstance(r, dict) and all(same(dig(r, k), v) for k, v in where.items())]
     if "count" in check and len(hits) != check["count"]:
@@ -286,6 +293,9 @@ def target_problems(target: Any) -> list[str]:
         out.append("engine.target.login: mode session, or url and the names of the user and password variables in engine/.env")
     out += step_problems(target.get("setup"), "engine.target.setup")
     out += step_problems(target.get("cleanup"), "engine.target.cleanup")
+    block = target.get("block")
+    if block is not None and not (isinstance(block, list) and all(isinstance(b, str) for b in block)):
+        out.append("engine.target.block: a list of address patterns the engine's browser does not load")
     reset = target.get("reset")
     if reset is not None and not (isinstance(reset, dict) and isinstance(reset.get("url"), str)):
         out.append("engine.target.reset: url (and method), called before every run")
@@ -306,6 +316,8 @@ class WebTarget:
 
     def __init__(self, spec: dict[str, Any], settle_ms: int = 400, folder: str | os.PathLike | None = None):
         """folder: where the flow lives (its saved sign-in, its files)."""
+        self.last_saved: dict[str, Any] = {}  # per storage key, the row a final button wrote last
+        self.rows_seen: dict[str, list] = {}
         self.spec = spec
         self.start_url = os.environ.get(spec["startEnv"], spec["start"]) if spec.get("startEnv") else spec["start"]
         self.settle_ms = settle_ms
@@ -417,7 +429,20 @@ class WebTarget:
             except Exception as error:  # noqa: BLE001 - any browser failure in a scripted step
                 raise TargetError(f"{what} step {n} ({a}) did not work: {str(error).splitlines()[0]}") from None
 
+    def note_save(self, page) -> None:
+        for key in {c["key"] for c in self.spec["success"] if c.get("type") == "storage"}:
+            rows = self._stored(page, key)
+            if not isinstance(rows, list):
+                continue
+            changed = [r for r in rows if r not in self.rows_seen.get(key, [])]
+            if changed:
+                self.last_saved[key] = changed[-1]
+            self.rows_seen[key] = rows
+
     def prepare(self, page) -> None:
+        self.last_saved, self.rows_seen = {}, {}
+        for pattern in self.spec.get("block") or []:  # e.g. a product's own analytics, which should not record the engine
+            page.context.route(pattern, lambda route: route.abort())
         self._reset(page)
         self._sign_in(page)
         if self.spec.get("setup"):
@@ -455,7 +480,7 @@ class WebTarget:
         if kind == "storage":
             # What a prototype without a server keeps in the browser (localStorage), on the product's own origin.
             # Each run has a fresh browser, so only this run's data is there.
-            return json_check(self._stored(page, check["key"]), check)
+            return json_check(self._stored(page, check["key"]), check, self.last_saved.get(check["key"]))
         if kind == "json":
             response = page.request.get(self.url(check["url"]))
             if not response.ok:
@@ -502,8 +527,14 @@ class WebTarget:
                 ok, why = False, f"could not check: {error}"
             criteria[check["name"]] = ok
             details[check["name"]] = why
+        stored = {}  # what the product saved, as a person's participant file holds it, to compare the two
+        for key in {c["key"] for c in self.spec["success"] if c.get("type") == "storage"}:
+            try:
+                stored[key] = self._stored(page, key)
+            except Exception:  # noqa: BLE001 - the grading above already says why it could not be read
+                stored[key] = None
         return {"evaluation": {"overall": bool(criteria) and all(criteria.values()), "criteria": criteria,
-                               "details": details}, "saves": None, "saved": []}
+                               "details": details}, "saves": None, "saved": [], "stored": stored, "last_saved": dict(self.last_saved)}
 
 
 def answer_matches(said: str, expected: str) -> bool:

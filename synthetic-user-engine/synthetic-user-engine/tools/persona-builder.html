@@ -303,8 +303,7 @@ var VOCAB_BANDS=[
 var VOCAB_FAKES=["brastle","plintery","mornacle","sleptive","fendrous","quantrel","obsprate","trelmish","conflenish","dovicant"];
 /* Two questions per tendency; the one about the last real time wins when they disagree. */
 var TQS=[{id:"R1",dim:"risk",last:true},{id:"R2",dim:"risk"},{id:"P1",dim:"patience",last:true},{id:"P2",dim:"patience"},
-         {id:"D1",dim:"detail"},{id:"D2",dim:"detail"},{id:"D3",dim:"detail_check",last:true},{id:"H",dim:"habit"}];
-var HABITS=["search","menus","depends"];
+         {id:"D1",dim:"detail"},{id:"D2",dim:"detail"},{id:"D3",dim:"detail_check",last:true}];
 var DONE=["action","toast","list","external","test"];
 var DONE_TEXT={action:"Once I click the last button",toast:"A success message",list:"Check the list or details page",external:"Wait for an email or notification",test:"Make it actually trigger once"};
 var MISS=["let_go","check","redo","other"];
@@ -331,7 +330,7 @@ function normalize(raw){
   Object.keys(a.background||{}).forEach(function(k){out.background[sourceId(k)]=a.background[k];});
   Object.keys(a.screen||{}).forEach(function(k){out.screen[sourceId(k)]=(a.screen[k]||[]).map(groupId);});
   Object.keys(a.screenOther||{}).forEach(function(k){out.screenOther[sourceId(k)]=a.screenOther[k];});
-  var l=a.lang||{}; out.lang={ui:LEGACY_LANG[l.ui]||l.ui||"",english:LEGACY_EN[l.english]||l.english||""};
+  var l=a.lang||{}; out.lang={ui:LEGACY_LANG[l.ui]||l.ui||"",english:LEGACY_EN[l.english]||l.english||"",native:l.native===true};
   return out;
 }
 function parseAnswers(text){
@@ -416,6 +415,8 @@ function fake(word){
 }
 function vocabResult(){
   if(CARD_TYPE!=="normal")return {size:null,src:"Self-test card"};
+  // A first language skips the test, and has at least what the test can measure.
+  if(P.lang&&P.lang.native)return {size:VOCAB_BANDS[VOCAB_BANDS.length-1].to,src:"First language: the top of the word test"};
   var a=P.vocab||{}, all=[].concat.apply([],VOCAB_BANDS.map(function(b){return b.words;})).concat(VOCAB_FAKES);
   var done=all.filter(function(w){return a[w]!=null;}).length;
   if(done<all.length)return {size:null,src:done?("Answered "+done+"/"+all.length+"; using the English level"):"Not taken; using the English level"};
@@ -460,7 +461,6 @@ function detailPart(part){
   var s=situation(),lv=r.lv; if(s.urgency==="urgent")lv--; if(s.stakes==="high")lv++;
   return {base:r.lv,lv:Math.max(0,Math.min(2,lv)),src:r.src,flag:r.flag};
 }
-function habitOf(){var v=(P.tend||{}).H;return CARD_TYPE!=="normal"||v==null?"depends":HABITS[v];}
 var PERC={vision:{q:"V",lv:[2,1,0],def:2},motor:{q:"M",lv:[2,1,0],def:2},speed:{q:"S",lv:[2,1,0],def:1}};
 function percLevel(k){var d=PERC[k],a=(P.perc||{})[d.q];if(CARD_TYPE!=="normal")return {lv:d.def,src:"Self-test card"};if(a==null)return {lv:d.def,src:"Not answered"};return {lv:d.lv[a],src:"Questionnaire"};}
 function careIds(){return (P.care||[]).filter(function(id){return byId(FLOW.keySettings,id);});}
@@ -477,7 +477,6 @@ function buildCard(){
   var t={};
   ["risk","patience","detail"].forEach(function(d){var r=finalLevel(d);t[d]={level:LV[r.lv],usual:LV[r.base],source:r.src};});
   [["find","detailFind"],["check","detailCheck"]].forEach(function(x){var r=detailPart(x[0]);t[x[1]]={level:LV[r.lv],usual:LV[r.base],source:r.src};});
-  t.habit=habitOf();
   var perc={};Object.keys(PERC).forEach(function(k){var r=percLevel(k);perc[k]={level:LV[r.lv],source:r.src};});
   perc.colorWeak=CARD_TYPE==="normal"&&(P.perc||{}).C>=1; perc.screen=FLOW.screenSize||""; // C: 1 not easily, 2 cannot rely on colour
   return {format:"sue-persona",version:2,flow:FLOW.name,builtAt:new Date().toISOString(),answersFilledAt:META.filledAt||null,
@@ -532,8 +531,7 @@ function render(){
     tile("Risk tolerance",cap(t.risk.level),t.risk.source,TDO.risk[lvi(t.risk.level)],/disagree/.test(t.risk.source)),
     tile("Patience",cap(t.patience.level),t.patience.source,TDO.patience[lvi(t.patience.level)],/disagree/.test(t.patience.source)),
     tile("Detail when finding",cap(t.detailFind.level),t.detailFind.source,TDO.find[lvi(t.detailFind.level)]),
-    tile("Detail when checking a form",cap(t.detailCheck.level),t.detailCheck.source,TDO.check[lvi(t.detailCheck.level)],/disagree/.test(t.detailCheck.source)),
-    tile("Habit",cap(t.habit),"When search and menus both work","")
+    tile("Detail when checking a form",cap(t.detailCheck.level),t.detailCheck.source,TDO.check[lvi(t.detailCheck.level)],/disagree/.test(t.detailCheck.source))
   ].join("");
   var g=card.goal, sig=g.productSignals, works=g.confirmBy.filter(function(k){return k==="action"||sig[k];});
   $("goal").innerHTML='<div><span class="k">Confirms done by</span><span>'+esc(g.confirmBy.map(function(k){return DONE_TEXT[k];}).join("; "))+'</span></div>'+

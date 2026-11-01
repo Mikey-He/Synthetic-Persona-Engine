@@ -65,6 +65,8 @@ def problems(flow: dict) -> list[str]:
                 out.append(f"item {i['id']}: unknown experience {x}")
         if i.get("kind") == "word" and i.get("common") not in ("common", "rare", "none"):
             out.append(f"item {i['id']}: common must be common, rare or none")
+        if i.get("kind") == "concept" and i.get("everyday"):
+            out.append(f"item {i['id']}: a concept has no everyday meaning; a word on screen with one is kind word")
     out += knowledge_group_problems(flow)
     out += engine_problems(flow)
     return out

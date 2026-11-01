@@ -23,8 +23,8 @@ from typing import Any
 from playwright.sync_api import sync_playwright
 
 from .attention import Attention
-from .choose import ABANDON, ACT, BACK, LOOK, MISSED_DEFAULT, Decision, Policy, decide, is_consequential, is_toggle, prominence, score
-from .completion import (asks_list, check_found, check_list, missing_confirmation, review_link, stops_after_last_action,
+from .choose import ABANDON, ACT, BACK, LOOK, MISSED_DEFAULT, ONE_LOOK, Decision, Policy, decide, hope_of, is_consequential, is_loop, is_toggle, list_is_open, prominence, score
+from .completion import (asks_list, asks_message, check_found, check_list, lacking_confirmation, missing_confirmation, review_link, save_refused, stops_after_last_action,
                          ways_text)
 from .config import load_config, load_env, require_env
 from .evidence import check_evidence, own_words
@@ -32,7 +32,7 @@ from .memory import SessionMemory
 from .model import Model, ModelError, gemini_for, timed
 from .persona import ICON, KNOW, NONE, WORD, Persona, load_card
 from .prompt import (CHECK, FIX, OUTCOME_KEYS, PROMPT_VERSION, PROMPT_VERSION_GENERAL, TASK, ReplyError, build_turn,
-                     list_key, parse_reply, system as system_text)
+                     list_key, MESSAGE_KEY, parse_reply, system as system_text)
 from .runlog import RunLog
 from .screen import RewriteError, Screen, Strip, open_browser
 from .similarity import similarity, task_values, task_words
@@ -108,6 +108,7 @@ def _candidate_rows(scored) -> list[dict[str, Any]]:
             "action": s.candidate.get("action"),
             "value": s.candidate.get("value"),
             "purpose": s.purpose,
+            "hope": s.candidate.get("hope"),
             "why": s.candidate.get("why"),
             "evidence": [v.__dict__ for v in s.verdicts],
             "level": s.level,
@@ -115,6 +116,11 @@ def _candidate_rows(scored) -> list[dict[str, Any]]:
         }
         for s in scored
     ]
+
+
+def attention_done(attention: Attention, obs) -> bool:
+    """Whether this is already the last piece, with nothing further to read on to."""
+    return obs.focus.index + 1 >= obs.focus.total
 
 
 def run(card: str, config: dict[str, Any], target: Target, model: Model, *, headed: bool = False,
@@ -125,6 +131,9 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
     if persona.flow and persona.flow != workflow["name"]:
         raise ValueError(f"{card} was built for the workflow \"{persona.flow}\", but the engine is set to "
                          f"\"{workflow['name']}\" ({workflow['file']}). Pass --flow with that workflow's flow.json.")
+    if persona.version >= 3 and config.get("mind"):  # one mechanism (engine-design.md 4.10); only v2 cards still use the rules below
+        from .session import run_session
+        return run_session(card, config, target, model, headed=headed, watch=watch, max_steps=max_steps, seed=seed, live=live)
     created, answer_key = workflow["created"], list_key(workflow["created"])
     # What else this workflow needs (engine-design.md 6.3): extra actions, and a result that is an
     # answer found or a page reached rather than something saved. Version A has neither.
@@ -132,6 +141,7 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
     found_key = OUTCOME_KEYS.get(aim.get("kind"))
     prompt_version = PROMPT_VERSION if not extras and not found_key else PROMPT_VERSION_GENERAL
     confirms_by_list = asks_list(persona) and not found_key
+    confirms_by_message = asks_message(persona) and not found_key
     vocab = build_vocabulary(persona, config)
     platform, rules, goal = config["platform"], config["run"], config["goal"]
     max_steps = max_steps or rules["max_steps"]
@@ -172,6 +182,7 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
         memory_known(persona, i) for i in entry_items)
     # Saved, but the confirmation he waits for is not in the product (4.6).
     missed = missing_confirmation(persona)
+    lacking = lacking_confirmation(persona)
     let_go = persona.goal.get("ifConfirmMissing") == "let_go"
 
     session = target.start(model_id=model.model_id, prompt_version=prompt_version, persona_id=f"{card}-{persona.id}")
@@ -180,6 +191,8 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
     if hasattr(model, "substitute"):
         model.substitute = target.substitute
     policy.consequential = [target.substitute(x) for x in policy.consequential]
+    commit = [target.substitute(x) for x in rules.get("commit_labels", policy.consequential)]
+    path_pages, list_pages = goal.get("path_pages"), goal.get("list_pages")
     strip = Strip(persona.task, platform["harness_button_text"], platform["viewport_width"]) if strip_h else None
     reported: str | None = None  # the answer he found, when the task asks for one
     log = RunLog(config["paths"]["runs"], card)
@@ -207,6 +220,18 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
     pending: dict[str, str] | None = None  # the last action, waiting to see what it changed
     actions = 0
     declare_now = False
+    last_button: str | None = None  # the final button he just pressed, to see whether it took
+    # Patience does not end a run in a product routed by fragment yet: real people went far off the
+    # route and still saved. What it would have done is recorded (2026-10-31).
+    off_path_pages, patience_would_stop = 0, None
+    # An open list he has ticked something in: he finishes it before looking elsewhere, as all six
+    # people did every time. Closing it any other way loses what he ticked (2026-10-31).
+    unfinished_list, list_stamp = None, None
+    # How they choose (engine-design.md 4.3, 2026-11-01). A v2 card takes the model's order, as it always did.
+    choosing = persona.version >= 3 and bool(config.get("choice"))
+    orientation = persona.orientation()
+    unsure = 0.0
+    looking_on = False  # seen it saved; looks around a little to be sure
     reviewing, reviewed = False, False
     revert: str | None = None  # a checkbox he ticked only to see what it does, to put back
     confirming, confirm_budget, confirm_used = False, 0, 0  # looking around for a confirmation that never comes
@@ -226,7 +251,7 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
         browser, page = open_browser(pw, config, headless=not headed or watch, strip=strip, state=target.storage_state())
         show = Dashboard(log.dir, pw, page, viewport) if watch else LiveFeed(log.dir, page, viewport) if live else None
         screen = Screen(page, vocab, config, show=show, reveal_hover=policy.check in ("medium", "high"), strip=strip)
-        screen.vision_px, screen.color = var.vision_px(), traits.color
+        screen.color = traits.color
         screen.download_dir = log.dir
         say = show.phase if show else (lambda text: None)
         say("Opening the product")
@@ -271,21 +296,32 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                 # Risk is drawn every step; how carefully he reads and checks is held for the
                 # screen part (route and open sections) once he has looked at it.
                 policy.risk = var.level("risk")
-                attention.by_group = var.level("detailFind", held_for=last_context) != "high"
+            if choosing:
+                unsure = var.unsure(orientation)
+                policy.spread, policy.rng, policy.now = var.spread(unsure), var.rng, step
+                policy.memory_span = config["choice"]["memory_span"]
+                policy.about_as_good, policy.change_floor = config["choice"]["about_as_good"], config["choice"]["change_floor"]
+                # Low and medium read alike, so a score of 5 or under draws nothing here.
+                attention.by_group = var.score("detailFind") <= 5 or var.level("detailFind", held_for=last_context) != "high"
             screen.hide_warnings = not var.notices_warnings()
+            screen.learned = set(memory.learned)
             if wrong + backs > patience_limit and not confirming:
                 stop = ("abandoned", f"Out of patience: {wrong} wrong turns and {backs} backs, over their limit of {patience_limit}")
                 break
             step_start = time.monotonic()
             looks: list[dict[str, Any]] = []
             first = True
+            noted = None  # what looked right in a piece they read on from: they come back to it
             while True:  # he looks around the screen until there is something he would do
                 say(f"Step {step}: reading the screen, swapping words they cannot read, covering what they have not looked at")
                 try:
                     # Back on the list after a save, someone who confirms by the list looks at the
                     # whole list first, not piece by piece (2026-10-04).
-                    saved_back = first and bool(pending and pending.get("consequential")) and confirms_by_list
-                    focus = ((lambda ctx, els: None if ctx.split("|")[0] in goal["list_routes"] else attention.focus(ctx, els))
+                    after_final = first and bool(pending and pending.get("commit"))
+                    saved_back = after_final and (confirms_by_list or confirms_by_message)
+                    asking_message = after_final and confirms_by_message  # only this look: a message goes away
+                    # A message goes away and sits anywhere, so someone waiting for one takes in the whole screen.
+                    focus = ((lambda ctx, els: None if confirms_by_message or ctx.split("|")[0] in goal["list_routes"] else attention.focus(ctx, els))
                              if saved_back else attention.focus)
                     obs = screen.observe(step, gray_icon_ids(persona, memory), focus=focus)
                 except RewriteError as error:
@@ -295,17 +331,36 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                     first = False
                     if pending:
                         moved_page = obs.route != pending["route"]
+                        new_page = obs.page != pending["page"]
+                        if new_page and pending.get("frame_key"):
+                            memory.forget(pending["frame_key"])  # it took him somewhere: going again is a new move
+                        if new_page and path_pages is not None and obs.page not in path_pages:
+                            off_path_pages += 1
+                            if off_path_pages > patience_limit and patience_would_stop is None:
+                                patience_would_stop = step
                         if moved_page and obs.route not in goal["path_routes"]:
                             wrong += 1
                             memory.dead_end(pending["label"], obs.route)
-                        if pending.get("consequential") and missed and not confirming and obs.route in goal["list_routes"]:
-                            # Saved and back on the list, and none of his confirmations exists here.
+                        if pending.get("commit"):
+                            target.note_save(screen.page)
+                        # Out of the form, by its final button or by a link: a form opened later is a new one.
+                        if pending.get("in_form") and not obs.context.split("|")[1]:
+                            memory.new_form()
+                        elif pending.get("commit") and obs.warnings:  # still in the form, and told what is wrong
+                            memory.save_refused()
+                        if (pending.get("commit") and (missed or lacking) and not confirming and obs.route in goal["list_routes"]
+                                and (list_pages is None or obs.page in list_pages)
+                                and not save_refused(bool(obs.warnings) and screen.has_control(pending["label"]), obs.warnings)):
+                            # Saved and back on the list, and a confirmation he wants does not exist here.
+                            missed = missed or lacking
                             confirming, confirm_used = True, 0
                             confirm_budget = 0 if let_go else patience_limit
                             history.append("Saved and back on the list. The confirmation they wait for ("
                                            + ways_text(missed) + ") did not appear")
                         outcome = (f"the page changed to {obs.route}" + (" (off the route)" if obs.route not in goal["path_routes"] else "")
-                                   if moved_page else "something on the page changed" if obs.signature != pending["signature"]
+                                   if moved_page else "another page opened" if new_page
+                                   else ("the view moved" if obs.scroll_stamp != pending["stamp"] else "nothing moved") if "stamp" in pending
+                                   else "something on the page changed" if obs.signature != pending["signature"]
                                    else "nothing on the page changed")
                         history.append(f"{pending['did']} → {outcome}")
                         pending = None
@@ -327,13 +382,16 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
 
                 finish_button = next((e for e in obs.elements if e["harness"]
                                       and e["original"].strip() == platform["harness_button_text"]), None)
+                if declare_now and save_refused(bool(obs.warnings) and screen.has_control(last_button), obs.warnings):
+                    declare_now = False  # the product refused it and he can see that: not done, he goes on
                 if declare_now and finish_button:
                     # He stops right after the final consequential action (done once the last button is clicked).
                     stop = finish(step, obs, shot, finish_button, "Done once the last button is clicked; declares finished", {})
                     break
 
                 if confirming and confirm_used >= confirm_budget and finish_button:
-                    why = ("The confirmation did not come; they said they would let it go, so it counts as done" if let_go else
+                    why = ("Looked around after seeing it saved; satisfied" if looking_on else
+                           "The confirmation did not come; they said they would let it go, so it counts as done" if let_go else
                            f"The confirmation they wait for ({ways_text(missed)}) is not in the product; "
                            f"looked for {confirm_used} steps without finding it, so treats it as done")
                     stop = finish(step, obs, shot, finish_button, why, {})
@@ -366,16 +424,19 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                 seen = obs.seen
                 last_context = obs.context
                 policy.check = var.level("detailCheck", held_for=obs.context)
+                policy.warned = bool(obs.warnings)
                 screen.reveal_hover = policy.check in ("medium", "high")  # from his next look on
                 missed_now = var.lapse(seen, lambda e: prominence(e, policy.weights, policy.viewport))
                 if missed_now:
                     seen = [e for e in seen if e is not missed_now]
                     slips["lapses"] += 1
                 looking_at = obs.focus.describe() if obs.focus else None
-                situation = ("They have saved, but the confirmation they wait for (" + ways_text(missed)
+                situation = ("They have saved and seen it; they look around a little more to be sure" if looking_on else
+                             "They have saved, but the confirmation they wait for (" + ways_text(missed)
                              + ") has not appeared; they look around the page for it" if confirming else None)
                 turn = build_turn(persona, seen, obs.scroll, ask_list=confirms_by_list, extras=extras, outcome=aim,
                                   history=history[-history_n:], looking_at=looking_at, situation=situation, created=created,
+                                  ask_message=asking_message, learned=memory.learned,
                                   article=workflow.get("article"))
                 say(f"Step {step}: waiting for the model's candidates (looking at {looking_at or 'the whole screen'})")
                 candidates, observations, error, latency, attempts = None, {}, None, None, 0
@@ -387,6 +448,8 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                         break
                     except ModelError as e:
                         error, detail = e.label, str(e)[:300]
+                        if error == "no_credits":  # no retry can help
+                            break
                     except ReplyError:
                         error = "invalid_json"
                 record: dict[str, Any] = {
@@ -398,6 +461,7 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                     "state": {"learned_now": learned_now, "learned": dict(memory.learned), "tried": len(memory.tried),
                               "wrong": wrong, "backs": backs},
                     "prompt": turn, "looks": looks,
+                    "words_seen": len(obs.product_text.split()),  # for the time a person would take (sue.parts)
                 }
                 if candidates is None:
                     record.update(rule="The model's reply was unusable and the retries ran out", candidates=[], action=None,
@@ -408,7 +472,8 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                     break
 
                 # Step 9 first: does what he sees confirm he is done, by his own way of confirming?
-                check = check_list(persona, observations, obs.route, obs.hits, obs.visible_text, goal["list_routes"], answer_key)
+                on_list = obs.route if list_pages is None or obs.page in list_pages else ""
+                check = check_list(persona, observations, on_list, obs.hits, obs.product_text, goal["list_routes"], answer_key)
                 completion = {"asked": check.asked, "answer": check.answer, "quote": check.quote, "done": check.done,
                               "why": check.why}
                 knows = lambda i: memory.knows(i) or bool(persona.item(i) and persona.item(i).result == KNOW)  # noqa: E731
@@ -423,13 +488,21 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                                   completion=completion)
                     break
                 if found_key and not check.done:  # an answer to find, a page to reach: he stops when he sees it
-                    check = check_found(observations, found_key, obs.hits, obs.visible_text,
+                    check = check_found(observations, found_key, obs.hits, obs.product_text,
                                         "the answer" if aim["kind"] == "answer" else "the page the task asks for")
                     completion = {"asked": check.asked, "answer": check.answer, "quote": check.quote, "done": check.done,
                                   "why": check.why}
                     if check.done:
                         reported = check.quote
-                if check.done and finish_button:
+                if asking_message and not check.done:
+                    check = check_found(observations, MESSAGE_KEY, obs.hits, obs.product_text, "the success message")
+                    completion = {"asked": check.asked, "answer": check.answer, "quote": check.quote, "done": check.done,
+                                  "why": check.why}
+                if check.done and choosing and not confirming and var.looks_after():
+                    confirming, confirm_used, looking_on = True, 0, True
+                    confirm_budget = 0 if let_go else patience_limit
+                    history.append("Saved: they saw it. They look around a little to be sure")
+                if check.done and finish_button and not confirming:
                     stop = finish(step, obs, shot, finish_button, f"Confirmed done: {check.why}", {
                         "model": {"latency_ms": latency, "attempts": attempts, "error": None},
                         "prompt": turn, "completion": completion, "looking_at": looking_at, "looks": looks,
@@ -444,17 +517,25 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                 for i, c in enumerate(candidates):
                     element = by_id.get(c.get("element"))
                     on_element = element["text"] if element and c.get("action") not in ("scroll", "back") else None
-                    verdicts = check_evidence(c.get("evidence"), persona, memory, obs.hits, obs.visible_text, on_element)
+                    # A native dropdown's options are on his list: citing one is citing the dropdown.
+                    named = on_element and " ".join([on_element, *(element.get("options") or [])])
+                    verdicts = check_evidence(c.get("evidence"), persona, memory, obs.hits, obs.visible_text, named or on_element)
                     if on_element and not element["harness"]:
-                        own = own_words(on_element, obs.hits, obs.visible_text)
+                        own = own_words(on_element, obs.hits, obs.visible_text, memory.learned)
                         if own and not any(v.ref == own.ref and v.level == own.level for v in verdicts):
                             verdicts.append(own)
-                    s = score(c, element, verdicts, obs.signature, order=i, place=obs.context)
+                    # A scroll is a new move from a new position, even when the page's words stay the same.
+                    moves_from = obs.signature + "|" + obs.scroll_stamp if c.get("action") == "scroll" else obs.signature
+                    s = score(c, element, verdicts, moves_from, order=i, place=obs.context)
                     if element and missed_now and element["id"] == missed_now["id"]:
                         s.dropped = DISTRACTED
                     elif element and element["id"] not in seen_ids and not element["harness"]:
                         s.dropped = "They have not looked at this element yet (it is elsewhere)"
                     scored.append(s)
+                if obs.context == unfinished_list:
+                    for s in scored:
+                        if s.element and s.element.get("expanded") is True and not s.dropped:
+                            s.dropped = "Ticked something in this list; finishes it before closing it"
                 known_help = {i for i in help_items if memory.knows(i) or (persona.item(i) and persona.item(i).result == KNOW)}
                 decision = decide(
                     scored, memory, policy, context=obs.signature, whole_screen=obs.focus is None, piece=seen,
@@ -472,7 +553,29 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                         missed_defaults.append({"step": step, "route": obs.route, "text": s.element.get("text"),
                                                 "original": s.element.get("original"), "why": s.candidate.get("why")})
 
+                # They read on from something that looked right. Nothing better here: they go back to it,
+                # as a person does; forgetting it sent runs to a link at hope 3 past + CREATE BUDGET at hope 9.
+                if noted and decision.kind in (ACT, LOOK) and (decision.kind == LOOK or hope_of(decision.chosen) < hope_of(noted)):
+                    again = next((e for e in obs.elements if not e["harness"] and e.get("original") == noted.element.get("original")), None)
+                    if again:
+                        decision = Decision(ACT, dataclasses.replace(noted, element=again, candidate={**noted.candidate, "element": again["id"]}),
+                                            "Read on; nothing looked better; goes back to what they noted", scored)
+                        record["rule"] = decision.rule
+                        break
+                # Something here looks right, but not sure this is the place: reads on first. Outside a form,
+                # where the question is where to go, not what to fill in.
+                if (choosing and decision.kind == ACT and obs.focus and not obs.context.split("|")[1]
+                        and decision.chosen.element and not attention_done(attention, obs) and var.reads_on(unsure)):
+                    noted = decision.chosen
+                    decision.kind, decision.rule = LOOK, "Not sure this is the place; reads on first"
+                    record["rule"] = decision.rule
                 if decision.kind != LOOK:
+                    break
+                if obs.context == unfinished_list and obs.scroll_stamp != list_stamp:
+                    # Its button is out of view. If the scroll moves nothing, he carries on as usual.
+                    list_stamp = obs.scroll_stamp
+                    decision.kind, decision.rule = "scroll", "Ticked something in this list and its button is out of view; scrolls to it"
+                    record["rule"] = decision.rule
                     break
                 can_scroll = obs.scroll.get("y", 0) < obs.scroll.get("max", 0)
                 moved = attention.advance(obs.context, obs.elements, can_scroll)
@@ -491,7 +594,7 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
 
             if stop[0] in ("technical_error", "completion_declared"):
                 break
-            var.read(len(looks) + 1)  # reading builds up fatigue and, rising over time, pressure
+            var.read(len(looks) + 1)  # reading builds up fatigue
             if obs.unnoticed:
                 slips["unnoticed_warnings"] += 1
             if decision.kind == LOOK:  # looked everywhere he could; nothing left to look at
@@ -523,24 +626,37 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                 # A near miss on a small target (4.9): he believes he clicked it, but nothing is
                 # remembered as tried or touched, so he can try it again.
                 miss = var.miss_offset(element) if action in ("click", "select") else None
+                if miss and screen.lands_on_it(element, miss):
+                    miss = None  # a slip that still lands on the control or its label is a hit
                 if miss:
                     slips["misclicks"] += 1
+            if decision.rule == ONE_LOOK:
+                memory.peeked.add(obs.route.split("?")[0])
             if decision.kind not in ("scroll", BACK) and not miss:
                 memory.record(chosen.key, step)
                 if element and action == "click":
                     memory.touch(obs.context, element.get("original"))
                     if is_toggle(element):
                         memory.flip(obs.route.split("?")[0], element.get("original"))
+                        if chosen.purpose in (TASK, FIX):
+                            memory.settle(obs.route.split("?")[0], element.get("original"), not element.get("checked"))
+                        if list_is_open(obs.elements):
+                            unfinished_list, list_stamp = obs.context, None
                         # Put back only a box he had not touched before: a second click is itself the putting back.
                         if chosen.purpose == CHECK and memory.flipped(obs.route.split("?")[0], element.get("original")) == 1:
                             revert = (element.get("original") or "").strip().lower()
-                last_keys.append(chosen.key)
+                last_keys.append(chosen.key[1:])  # without the screen: going round changes what is on it
+                if action == "type":
+                    memory.type_in(obs.route.split("?")[0], (element or {}).get("original"), value)
             on_what = f' "{(element or {}).get("text", "")[:40]}"' if element else ""
             say(f"Step {step}: {decision.rule}; {action}{on_what}")
             try:
                 # Dragging: the value names the element it is dropped on.
                 drop = {e["id"]: e for e in obs.elements}.get(value) if action == "drag" else value
-                note = screen.perform(action, element, drop, miss=miss)
+                rect = obs.focus.rect if obs.focus else None
+                wheel_at = ((rect["x"] + rect["w"] / 2, rect["y"] + rect["h"] / 2) if rect
+                            else (viewport[0] / 2, viewport[1] / 2)) if action == "scroll" else None
+                note = screen.perform(action, element, drop, miss=miss, at=wheel_at)
                 executed, error = True, None
             except Exception as e:  # noqa: BLE001 - any browser failure ends the run as a technical error
                 note, executed, error = f"Failed: {e}", False, "browser_error"
@@ -551,13 +667,18 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                     routes.pop()
             pending = {"did": did(action, element, value), "route": obs.route, "signature": obs.signature,
                        "label": (element or {}).get("original"),
-                       "consequential": is_consequential(element, policy.consequential)}
+                       "commit": is_consequential(element, commit), "page": obs.page, "in_form": bool(obs.context.split("|")[1]),
+                       "frame_key": chosen.key if decision.kind not in ("scroll", BACK) and not miss and element
+                       and (element.get("region") or {}).get("kind") in ("nav", "header", "aside") else None}
+            if action == "scroll":
+                pending["stamp"] = obs.scroll_stamp
+                attention.pos[obs.context] = 0  # after scrolling he reads from the top of what he sees, whoever chose it
             if confirming:
                 confirm_used += 1
             record["action"] = {
                 "type": action, "element": (element or {}).get("id"), "text": (element or {}).get("text"),
                 "original": (element or {}).get("original"), "value": value, "note": note, "misclick": bool(miss),
-                "box": (element or {}).get("box"),
+                "box": (element or {}).get("box"), "aria": (element or {}).get("aria"), "tag": (element or {}).get("tag"),
             }
             record["step_s"] = round(time.monotonic() - step_start, 1)
             record["variability"] = variability_log()
@@ -572,10 +693,11 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
             if not executed:
                 stop = ("technical_error", note)
                 break
-            declare_now = stops_after_last_action(persona) and is_consequential(element, policy.consequential)
+            declare_now = stops_after_last_action(persona) and is_consequential(element, commit)
+            last_button = (element or {}).get("original") if declare_now else None
             repeats = rules["loop_repeats"]
-            if len(last_keys) >= repeats and len(set(last_keys[-repeats:])) == 1:
-                stop = ("loop", f"Chose the same action {repeats} times in a row")
+            if is_loop(last_keys, repeats):
+                stop = ("loop", f"Went round the same actions for {repeats} moves")
                 break
 
         reason, why = stop
@@ -605,7 +727,14 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
             "stop": {"reason": reason, "why": why},
             "evaluation": result.get("evaluation"),
             "saves": result.get("saves"),
-            "saved_items": len(result.get("saved") or result.get("budgets") or []),
+            "saved_items": len(result.get("saved") or result.get("budgets") or
+                               next((v for v in (result.get("stored") or {}).values() if isinstance(v, list)), [])),
+            "off_path_pages": off_path_pages,
+            "patience_would_stop": patience_would_stop,  # the step patience would have ended it; it does not yet here
+            "stored": result.get("stored"),  # what the product saved in the browser (a web product's storage checks)
+            "last_saved": result.get("last_saved"),  # the row a final button wrote last
+            "orientation": round(orientation, 2),
+            "draws": var.rng.draws,  # random draws made: with none, repeats differ only by the model
             "rules": dict(rules_used),
             "learned": dict(memory.learned),
             "missed_defaults": missed_defaults,

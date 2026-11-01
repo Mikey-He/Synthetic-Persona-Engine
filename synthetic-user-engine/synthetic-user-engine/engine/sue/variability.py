@@ -10,13 +10,14 @@ state and slip below is off, so such a card makes exactly the decisions it made 
 States, from a card of format v3:
 - fatigue: carefulness and patience fall as reading effort builds up over the task;
 - time pressure: reads less, dares more, gives up sooner; steady, or rising after setbacks
-  or over time (stress tolerance slows the rise after setbacks);
+  (stress tolerance slows the rise);
 - distraction: each step, a chance of missing one less prominent element of the piece he
   is looking at;
 - attention to warnings: each step, a chance of not noticing error and warning text.
 
-Perception, also from v3: small text he cannot read, a colour filter, near-miss clicks on
-small targets, and reading speed (how much effort reading a piece costs).
+Perception, also from v3: a colour filter, near-miss clicks on small targets, and reading speed
+(how much effort reading a piece costs). Small text has no effect (removed 2026-10-31): no size is
+unreadable as such, and the people who said it is hard still used every small control.
 
 How strong each effect is per point lives in config.toml [variability]. Those numbers are
 placeholders until calibrated against people; the code only says in which direction a
@@ -31,8 +32,7 @@ from typing import Any, Callable
 LEVELS = ("low", "medium", "high")
 SCORE_OF = {"low": 0.0, "medium": 5.0, "high": 10.0}
 TRAITS = ("risk", "patience", "detailFind", "detailCheck")
-PATTERNS = ("steady", "rises_after_setbacks", "rises_over_time")
-VISION = ("normal", "mild", "reduced")
+PATTERNS = ("steady", "rises_after_setbacks")
 COLOR = ("typical", "reduced", "no_color_cues")
 CLICK = ("high", "medium", "low")
 READING = ("slow", "average", "fast")
@@ -63,7 +63,6 @@ class Traits:
     pattern: str = "steady"
     stress_tolerance: float = 5.0
     warnings: float = 10.0  # attention to warnings
-    vision: str = "normal"
     color: str = "typical"
     click: str = "high"
     reading: str = "average"
@@ -96,7 +95,6 @@ def traits_of(card_version: int, tendency: dict[str, Any], state: dict[str, Any]
         pattern=pick(tp.get("pattern"), PATTERNS, "steady"),
         stress_tolerance=num(s.get("stressTolerance"), 5.0),
         warnings=num(s.get("warningAttention"), 10.0),
-        vision=pick(p.get("vision"), VISION, "normal"),
         color=pick(p.get("colorVision"), COLOR, "typical"),
         click=pick(p.get("clickPrecision"), CLICK, "high"),
         reading=pick(p.get("readingSpeed"), READING, "average"),
@@ -114,6 +112,21 @@ def level_from(score: float, rng: random.Random) -> str:
     return LEVELS[lower + 1] if rng.random() < upper_share else LEVELS[lower]
 
 
+class CountingRandom(random.Random):
+    """The same numbers as random.Random, and how many were drawn: a card that draws none has nothing
+    for a seed to act on, so its repeats differ only by the model."""
+
+    draws = 0
+
+    def random(self) -> float:
+        self.draws += 1
+        return super().random()
+
+    def getrandbits(self, k: int) -> int:
+        self.draws += 1
+        return super().getrandbits(k)
+
+
 @dataclass
 class Variability:
     traits: Traits
@@ -124,6 +137,7 @@ class Variability:
     setbacks: int = 0
     log: dict[str, Any] = field(default_factory=dict)  # what this step drew, for the step record
     held: dict[tuple[str, str], str] = field(default_factory=dict)  # levels kept for a screen part
+    choice: dict[str, float] = field(default_factory=dict)  # config.toml [choice]
 
     # ---- states -----------------------------------------------------------------
 
@@ -132,8 +146,6 @@ class Variability:
         p = t.pressure
         if t.pattern == "rises_after_setbacks":
             p += self.setbacks * c["pressure_setback_gain"] * (1 - t.stress_tolerance / 10)
-        elif t.pattern == "rises_over_time":
-            p += self.effort * c["pressure_time_gain"]
         return _clamp(p)
 
     def tiredness(self) -> float:
@@ -156,8 +168,8 @@ class Variability:
 
     def level(self, name: str, held_for: str | None = None) -> str:
         """The level the rules use now. held_for: a screen part (route and open sections).
-        How carefully he goes over a part is decided when he first looks at it and kept while he
-        stays there (2026-10-19): drawn afresh every step, a default he skimmed past was nearly
+        How carefully he goes over a part is decided when he first looks at it and kept for the
+        rest of the run (2026-10-19): drawn afresh every step, a default he skimmed past was nearly
         always caught a step later, so a score of 2.5 almost never missed one (sweep on P3)."""
         s = self.score(name)
         key = (name, held_for) if held_for is not None else None
@@ -179,6 +191,24 @@ class Variability:
         limit = lo + (mid - lo) * s / 5 if s <= 5 else mid + (hi - mid) * (s - 5) / 5
         limit *= 1 - (self.pressure() / 10) * self.cfg["pressure_patience_cut"]
         return max(1, round(limit))
+
+    def unsure(self, orientation: float) -> float:
+        """How unsure of the way they are now, 0 to 1: not knowing where things are, or daring to click
+        in to see even when they do (risk above the middle, after fatigue and pressure)."""
+        daring = max(0.0, (self.score("risk") - 5) / 5) * self.choice["daring_weight"]
+        return _clamp((1 - orientation) + orientation * daring, 0.0, 1.0)
+
+    def spread(self, unsure: float) -> float:
+        c = self.choice
+        return c["spread_sure"] + (c["spread_unsure"] - c["spread_sure"]) * unsure
+
+    def reads_on(self, unsure: float) -> bool:
+        """Something here looks right, but they are not sure this is the place, so they read on first."""
+        return self.rng.random() < unsure * self.choice["read_on"]
+
+    def looks_after(self) -> bool:
+        """Seen it saved, and a careful person looks around a little to be sure."""
+        return self.rng.random() < (self.score("detailCheck") / 10) * self.choice["look_after"]
 
     def read(self, pieces: int) -> None:
         """He read this many pieces of screen this step."""
@@ -209,7 +239,8 @@ class Variability:
         """A near miss on a small target: where the click lands off the element, or None."""
         chance = self.cfg["click_miss"][self.traits.click]
         box = (element or {}).get("box")
-        if chance <= 0 or not box or min(box["w"], box["h"]) > self.cfg["small_target_px"]:
+        # Small both ways: a wide row is not hard to hit, and a side miss on it would land half its width away.
+        if chance <= 0 or not box or max(box["w"], box["h"]) > self.cfg["small_target_px"]:
             return None
         if self.rng.random() >= chance:
             return None
@@ -218,10 +249,6 @@ class Variability:
         offset = (side[0] * (box["w"] / 2 + gap), side[1] * (box["h"] / 2 + gap))
         self.log["misclick"] = {"aimed_at": element.get("original"), "offset": offset}
         return offset
-
-    def vision_px(self) -> float:
-        """Text smaller than this he cannot read (0: he reads every size)."""
-        return self.cfg["vision_px"].get(self.traits.vision, 0)
 
     def take_log(self) -> dict[str, Any]:
         out, self.log = self.log, {}
@@ -232,4 +259,4 @@ class Variability:
 
 
 def make(traits: Traits, config: dict[str, Any], seed: int) -> Variability:
-    return Variability(traits, config["variability"], random.Random(seed), dict(config["patience"]["limit"]))
+    return Variability(traits, config["variability"], CountingRandom(seed), dict(config["patience"]["limit"]), choice=config.get("choice") or {})

@@ -175,7 +175,7 @@ test('cards are v3 with every state and perception at its no-effect default, and
   const card=parameters.build(parameters.defaults(),originalBuilder(),flow).card;
   assert.equal(card.version,3);
   assert.deepEqual(card.state,{fatigue:0,distraction:0,timePressure:{score:0,pattern:'steady'},stressTolerance:5,warningAttention:10});
-  assert.deepEqual({...card.perception,screen:undefined},{vision:'normal',colorVision:'typical',clickPrecision:'high',readingSpeed:'average',screen:undefined});
+  assert.deepEqual({...card.perception,screen:undefined},{colorVision:'typical',clickPrecision:'high',readingSpeed:'average',screen:undefined});
   const old={format:'sue-studio-settings',version:2,parameters:{...parameters.defaults(),risk:0,patience:2,detailFind:1,detailCheck:2}};
   delete old.parameters.fatigue;delete old.parameters.distraction;delete old.parameters.timePressure;
   const p=parameters.fromJSON(JSON.stringify(old));
@@ -194,9 +194,9 @@ test('human factors migrate legacy settings, validate enums and stay separate fr
   assert.equal(JSON.stringify(modified.card.screens),JSON.stringify(original.card.screens));
   assert.equal(JSON.stringify(modified.card.goal),JSON.stringify(original.card.goal));
   // Connected factors reach the engine through perception and state; the rest are recorded only.
-  assert.equal(modified.card.perception.vision,'reduced');
+  assert.equal(modified.card.perception.vision,undefined);
   assert.equal(modified.card.state.timePressure.pattern,'rises_after_setbacks');
-  assert.ok(modified.card.persona.studioFactors.connected.includes('vision'));
+  assert.ok(modified.card.persona.studioFactors.recordedOnly.includes('vision'));
   assert.ok(modified.card.persona.studioFactors.recordedOnly.includes('financialRiskJudgment'));
   assert.equal(modified.card.persona.studioFactors.values.vision,'reduced');
   assert.deepEqual(parameters.fromJSON(JSON.stringify(parameters.settings(upgraded))),upgraded);

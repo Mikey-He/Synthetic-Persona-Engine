@@ -36,8 +36,8 @@ BY_LEVEL = {
 }
 
 # A rough label says nothing about personality: every tendency question gets the middle
-# answer, and the search habit is "it depends".
-TEND = {"R1": 1, "R2": 1, "P1": 1, "P2": 1, "D1": 1, "D2": 1, "D3": 1, "H": 2}
+# answer.
+TEND = {"R1": 1, "R2": 1, "P1": 1, "P2": 1, "D1": 1, "D2": 1, "D3": 1}
 
 
 def answers_for(level: int) -> dict:

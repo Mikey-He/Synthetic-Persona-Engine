@@ -57,9 +57,13 @@ def chunks(elements: list[dict[str, Any]], order: list[str], viewport: tuple[int
         r, els = item["region"], sorted(item["elements"], key=lambda e: (e["box"]["y"], e["box"]["x"]))
         top = max(0, min(e["box"]["y"] for e in els) - pad)
         bottom = min(viewport[1], max(e["box"]["y"] + e["box"]["h"] for e in els) + pad)
-        if r["kind"] == "popup":  # an opened part is read as a whole, including its text
-            top, bottom = max(0, r["y"] - pad // 2), min(viewport[1], r["y"] + r["h"] + pad // 2)
-        out.append(Chunk(r["kind"], {"x": r["x"], "y": top, "w": r["w"], "h": max(1, bottom - top)}, els))
+        left, right = r["x"], r["x"] + r["w"]
+        if r["kind"] == "popup":  # an opened part is read as a whole, including its text and a list that hangs out of it
+            top = max(0, min(r["y"] - pad // 2, top))
+            bottom = min(viewport[1], max(r["y"] + r["h"] + pad // 2, bottom))
+            left = max(0, min([left] + [e["box"]["x"] for e in els]))
+            right = min(viewport[0], max([right] + [e["box"]["x"] + e["box"]["w"] for e in els]))
+        out.append(Chunk(r["kind"], {"x": left, "y": top, "w": right - left, "h": max(1, bottom - top)}, els))
     for i, c in enumerate(out):
         c.index, c.total = i, len(out)
     return out

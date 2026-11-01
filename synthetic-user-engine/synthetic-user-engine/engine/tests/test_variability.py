@@ -3,7 +3,7 @@
 import io
 import random
 
-from sue.screen import color_filter, unreadable
+from sue.screen import color_filter
 from sue.variability import Traits, level_from, make, traits_of
 
 V2 = {"risk": {"level": "medium"}, "patience": {"level": "high"}, "detailFind": {"level": "high"},
@@ -51,7 +51,6 @@ def test_a_v2_card_takes_no_draws_and_keeps_its_patience_limits(config):
         assert var.lapse([{"id": "a", "box": {}}, {"id": "b", "box": {}}], lambda e: 0) is None
         assert var.notices_warnings() is True
         assert var.miss_offset({"box": {"x": 0, "y": 0, "w": 12, "h": 12}}) is None
-        assert var.vision_px() == 0
         assert var.rng.getstate() == before
 
 
@@ -106,11 +105,6 @@ def test_the_same_seed_gives_the_same_draws(config):
         return [(var.level("detailCheck"), var.notices_warnings(), bool(var.lapse([{"id": 1}, {"id": 2}], lambda e: 0)))
                 for _ in range(50)]
     assert draws(4) == draws(4) and draws(4) != draws(5)
-
-
-def test_text_too_small_to_read_turns_into_made_up_words():
-    out = unreadable("Budget 80% alert")
-    assert "Budget" not in out and "alert" not in out and "##%" in out
 
 
 def test_colour_filter_keeps_a_valid_png():

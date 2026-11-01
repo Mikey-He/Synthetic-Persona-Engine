@@ -36,7 +36,7 @@ class GeminiModel:
         self.model_id = model_id
         self.temperature = temperature
         self.timeout_ms = timeout_s * 1000
-        self.schema = response_schema(created, extras, outcome)
+        self.schema = response_schema(created, extras, outcome, message=True)  # only asked of some people, so always allowed
         self.client = genai.Client(api_key=api_key)
 
     def propose(self, system: str, turn: str, screenshot: bytes) -> str:
@@ -54,7 +54,8 @@ class GeminiModel:
         try:
             response = self.client.models.generate_content(model=self.model_id, contents=contents, config=config)
         except errors.APIError as error:
-            raise ModelError("model_timeout", f"API error {error.code}: {error.message}") from error
+            label = "no_credits" if error.code == 402 else "model_timeout"
+            raise ModelError(label, f"API error {error.code}: {error.message}") from error
         except Exception as error:  # noqa: BLE001 - network timeouts surface as several exception types
             raise ModelError("model_timeout", str(error)) from error
         if not response.text:

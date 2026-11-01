@@ -259,12 +259,8 @@
       [
         "rises_after_setbacks",
         "Rises after setbacks"
-      ],
-      [
-        "rises_over_time",
-        "Rises over time"
       ]
     ],
-    "help": "Desired pressure pattern. The current engine has no dynamic pressure model."
+    "help": "How time pressure changes during the task: it stays steady, or rises after wrong turns and going back."
   }
 ]

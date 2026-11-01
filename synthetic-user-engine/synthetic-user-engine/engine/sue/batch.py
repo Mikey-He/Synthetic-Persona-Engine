@@ -27,6 +27,7 @@ from .compare import compare_sessions, save_compare, window
 from .config import load_config, load_env, require_env
 from .model import gemini_for
 from .run import run
+from .screen import Strip
 from .target import make_target
 
 METRICS = ("content", "precision", "direction", "order", "settings")
@@ -99,6 +100,17 @@ def report(agg: dict[str, Any], person: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def set_window(config: dict[str, Any], target, card: str) -> None:
+    """The window for a card made from a participant's file: the page they saw, plus the task bar the
+    engine draws below it. Other cards get the configured default."""
+    platform = config["platform"]
+    default = platform.setdefault("default_window", (platform["viewport_width"], platform["viewport_height"]))
+    path = Path(config["paths"]["personas"]) / f"{card}.json"
+    seen = (json.loads(path.read_text(encoding="utf-8")).get("persona") or {}).get("window") if path.exists() else None
+    bar = Strip.HEIGHT if getattr(target, "harness", None) == "strip" else 0
+    platform["viewport_width"], platform["viewport_height"] = (seen["width"], seen["height"] + bar) if seen else default
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Several seeded runs of the same cards, counted together")
     parser.add_argument("--card", action="append", required=True, help="a card in data/personas; repeat for more cards")
@@ -133,6 +145,8 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     results, notes = [], []
     for card in args.card:
+        if not size:  # the page this person saw, when the card says; a window asked for explicitly wins
+            set_window(config, target, card)
         runs = []
         for seed in range(1, args.runs + 1):
             print(f"\n##### {card}, run {seed} of {args.runs} (seed {seed})")

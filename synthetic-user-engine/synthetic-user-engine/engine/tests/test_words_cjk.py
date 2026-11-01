@@ -6,7 +6,7 @@ import pytest
 
 from sue.evidence import HALF, SURE, VOID, check_word
 from sue.persona import KNOW, NONE, OTHER, Word
-from sue.words import CJK_CHAR, CommonWords, Vocabulary, build_vocabulary, fake, segment, tokens, unreadable_text
+from sue.words import CJK_CHAR, CommonWords, Vocabulary, build_vocabulary, fake, segment, tokens
 
 from conftest import COMMON
 
@@ -53,12 +53,6 @@ def test_tokens_split_mixed_english_and_chinese():
     assert tokens("设置预算提醒 for Cost table") == ["设置", "预算", "提醒", "for", "Cost", "table"]
     assert tokens("I'm 好") == ["I'm", "好"]
     assert "".join(segment("请输入项目名称")) == "请输入项目名称"
-
-
-def test_unreadable_text_fakes_chinese_and_keeps_english_as_before():
-    assert unreadable_text("Budget 12") == fake("Budget") + " ##"
-    out = unreadable_text("预算 12")
-    assert out[2:] == " ##" and not set(out[:2]) & set("预算")
 
 
 def test_blank_card_fakes_every_chinese_word(config, cards):

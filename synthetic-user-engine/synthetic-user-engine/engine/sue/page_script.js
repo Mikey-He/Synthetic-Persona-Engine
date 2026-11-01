@@ -128,8 +128,9 @@
       const range = document.createRange();
       range.selectNodeContents(n);
       const style = getComputedStyle(textParent(n));
-      const visible = style.visibility !== "hidden" && inViewport(range.getClientRects());
-      return { orig: original(n), cur: n.nodeValue, visible, harness: !!(root && containsDeep(root, n)), size: parseFloat(style.fontSize) || 0 };
+      const parent = textParent(n);  // text inside a closed section has rectangles too, and no one sees it
+      const visible = style.visibility !== "hidden" && inViewport(range.getClientRects()) && (!parent.checkVisibility || parent.checkVisibility());
+      return { orig: original(n), cur: n.nodeValue, visible, harness: !!(root && containsDeep(root, n)) };
     });
   }
 
@@ -138,6 +139,9 @@
     values.forEach((value, i) => {
       const n = nodes[i];
       if (value === null || !n || !n.isConnected) return;
+      // An option with no value of its own saves its text: the product must still get the real word.
+      const owner = n.parentNode;
+      if (owner && owner.tagName === "OPTION" && !owner.hasAttribute("value")) owner.setAttribute("value", original(n));
       if (n.nodeValue !== value) n.nodeValue = value;
       n.__sueApplied = value;
     });
@@ -186,6 +190,7 @@
   function popupRoots() {
     const out = queryAll('[aria-expanded="true"]').map((b) => parentOf(b)).filter(Boolean);
     queryAll("[role=dialog]").forEach((d) => out.push(d));
+    queryAll("[role=status],[role=alert]").forEach((d) => { if (d.getClientRects().length) out.push(d); });
     return out;
   }
   function regionOf(el, popups) {
@@ -268,6 +273,20 @@
       "pointer-events:none;z-index:2147483646;border-radius:6px;box-shadow:0 0 0 200vmax rgba(255,255,255,.96)";
   }
 
+  // The middle of what can be seen of a box: inside the window and every clipping parent. Null when
+  // nothing of it can.
+  function visiblePart(el, r) {
+    let left = Math.max(r.left, 0), top = Math.max(r.top, 0), right = Math.min(r.right, innerWidth), bottom = Math.min(r.bottom, innerHeight);
+    for (let n = parentOf(el); n && n !== document.body && n !== document.documentElement; n = parentOf(n)) {
+      if (!n.getBoundingClientRect) continue;
+      const s = getComputedStyle(n);
+      if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+      const c = n.getBoundingClientRect();
+      left = Math.max(left, c.left); top = Math.max(top, c.top); right = Math.min(right, c.right); bottom = Math.min(bottom, c.bottom);
+    }
+    return right - left >= 1 && bottom - top >= 1 ? { x: (left + right) / 2, y: (top + bottom) / 2 } : null;
+  }
+
   // Clickable elements a person could see in the viewport, with what they show.
   // Hidden accessibility text (aria-label, title) is never read as text: a person does
   // not see it. Only a button with no text at all is named by it, standing for its icon.
@@ -275,6 +294,8 @@
     const root = harnessRoot(selector, buttonText);
     const popups = popupRoots();
     const out = [];
+    // A control that has left the list must not keep its number: another now has it.
+    queryAll("[data-sue-i]").forEach((el) => el.removeAttribute("data-sue-i"));
     for (const el of queryAll(CLICKABLE + ",label")) {
       // A label is read with its field, unless the field cannot be seen (a file upload drawn as a
       // button): then the label is what a person clicks.
@@ -284,10 +305,13 @@
       if (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) continue;
       const style = getComputedStyle(el);
       if (style.visibility === "hidden" || style.display === "none") continue;
-      const cx = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
-      const cy = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
+      // Tested and clicked at the middle of the part that can be seen: a control cut off by the
+      // window or by a scrolling panel is clicked on what shows of it.
+      const part = visiblePart(el, r);
+      const cx = part ? part.x : Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
+      const cy = part ? part.y : Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
       const hit = deepFromPoint(cx, cy);
-      if (!hit || !(hit === el || containsDeep(el, hit) || containsDeep(hit, el))) continue;
+      if (!hit || !(hit === el || containsDeep(el, hit) || (part && containsDeep(hit, el)))) continue;
 
       const isField = ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName);
       const label = isField && el.labels && el.labels[0] ? el.labels[0] : null;
@@ -314,14 +338,21 @@
         checked: ["checkbox", "radio"].includes(el.type) ? el.checked : el.getAttribute("aria-checked") === "true" ? true : null,
         disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
         expanded: el.hasAttribute("aria-expanded") ? el.getAttribute("aria-expanded") === "true" : null,
+        // A list to choose from, not a section that folds: it says so, or it is a field with its own label.
+        dropdown: el.hasAttribute("aria-haspopup") || el.getAttribute("role") === "combobox"
+          || !!(el.hasAttribute("aria-expanded") && el.parentElement && el.parentElement.querySelector(":scope > label")),
         kl: kl ? kl.dataset.kl : null,
         explains: (closestDeep(el, "[data-kl-explains]") || {}).dataset?.klExplains || null,
         harness: !!(root && containsDeep(root, el)),
         region: regionOf(el, popups),
         // A native dropdown opens outside the page, where no screenshot sees it: its options are listed.
         options: el.tagName === "SELECT" ? [...el.options].map((o) => o.text) : undefined,
+        optionNames: el.tagName === "SELECT" ? [...el.options].map((o) => originalText(o)) : undefined,
         selected: el.tagName === "SELECT" && el.selectedIndex >= 0 ? el.options[el.selectedIndex].text : undefined,
         box: { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) },
+        aim: { x: Math.round(cx), y: Math.round(cy) },
+        // How the person's log names this control; for the comparison only, the model never sees it.
+        aria: isField ? "" : clean(el.getAttribute("aria-label") || ""),
         font: { size: parseFloat(style.fontSize), weight: style.fontWeight, color: style.color },
         background: style.backgroundColor,
       });
@@ -443,6 +474,34 @@
     }
     return hidden;
   }
+  // Whether a control with this name is on the page, scrolled into view or not.
+  function controlShown(selector, buttonText, name) {
+    const root = harnessRoot(selector, buttonText), want = clean(name).toLowerCase();
+    return queryAll(CLICKABLE).some((el) => !(root && containsDeep(root, el)) && el.getClientRects().length
+      && getComputedStyle(el).visibility !== "hidden" && clean(textOf(el)).toLowerCase() === want);
+  }
+  // Whether a point falls on this control or the label that belongs to it: such a slip is still a hit.
+  function sameControlAt(index, x, y) {
+    const el = queryAll(`[data-sue-i="${index}"]`)[0], hit = deepFromPoint(x, y);
+    if (!el || !hit) return false;
+    const label = closestDeep(hit, "label");
+    return hit === el || containsDeep(el, hit) || !!(label && (label === el || containsDeep(label, el)));
+  }
+  // Where everything that scrolls now stands: a scroll that moved only a list inside the page still moved.
+  function scrollStamp() {
+    return queryAll("*").filter((el) => el.scrollTop > 0).map((el) => Math.round(el.scrollTop)).join(",");
+  }
+  // Warning and error text he can see now: what hideWarnings left on the page.
+  function warningsShown() {
+    const shown = new Set();
+    for (const n of textNodes()) {
+      const el = textParent(n);
+      if (!el || closestDeep(el, "label") || closestDeep(el, CLICKABLE)) continue;
+      const w = warningRoot(el);
+      if (w && !w.hasAttribute("data-sue-unnoticed") && w.getClientRects().length) shown.add(w);
+    }
+    return [...shown].map((w) => originalText(w));
+  }
 
   // ---- item marks from the flow's locators (engine-design.md 6.3) ----------------------
   // A product that is not our platform carries no data-kl marks. The flow says how to find
@@ -480,7 +539,15 @@
   // A field's name as a person reads it: its label's text; when the label is empty, the placeholder
   // shown in the box; else its accessible name. The recorder and the engine name it the same way.
   function fieldName(el, original) {
-    const read = (x) => clean(original ? originalText(x) : x.innerText);
+    // What he reads leaves out the options of a dropdown inside its label; the log's name keeps them,
+    // as the person's log does.
+    const shownText = (x) => {
+      if (!x.querySelector || !x.querySelector("select")) return x.innerText;
+      const copy = x.cloneNode(true);
+      copy.querySelectorAll("select").forEach((s) => s.remove());
+      return copy.textContent;
+    };
+    const read = (x) => clean(original ? originalText(x) : shownText(x));
     const fromLabel = el.labels && el.labels[0] ? read(el.labels[0]) : "";
     if (fromLabel) return fromLabel;
     if (["button", "submit", "reset"].includes(el.type)) return clean(el.value);
@@ -677,7 +744,7 @@
   window.__sue = {
     collect, apply, grayIcons, elements, openExplanations, scrollState, marks, formState, expanded, labelForLog,
     clearLabelForLog,
-    focus, reveal, hideWarnings,
+    focus, reveal, hideWarnings, warningsShown, controlShown, sameControlAt, scrollStamp,
     mark, describe, controlOf, inventory, norm, quiet, target, targetAt, probe,
   };
 })();

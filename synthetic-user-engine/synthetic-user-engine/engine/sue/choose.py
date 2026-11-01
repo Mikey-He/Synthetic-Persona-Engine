@@ -19,12 +19,13 @@ What decides, in order:
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from .evidence import HALF, SURE, VOID, Verdict, best_level
-from .memory import SessionMemory, action_key
+from .memory import SessionMemory, action_key, typed_value
 from .prompt import CHECK, EXPLORE, FIX, RETREAT, TASK
 
 NO_ELEMENT_ACTIONS = {"scroll", "back", "press"}
@@ -70,6 +71,15 @@ class Policy:
     advancing: list[str] = field(default_factory=list)  # Next: moves on from a section
     weights: dict[str, float] = field(default_factory=lambda: {"area": 1.0, "top": 0.5, "filled": 2.0})
     viewport: tuple[int, int] = (1440, 900)
+    # How they choose among what they would do (2026-11-01). None: the model's order, as a v2 card
+    # always ran. Else how flat the draw is; rng draws it; memory_span and now make memory fade.
+    spread: float | None = None
+    rng: Any = None
+    memory_span: float | None = None
+    now: int = 0
+    warned: bool = False  # the page shows them a warning they noticed: it is the reason to change something
+    about_as_good: float = 3.0  # in a form, moves within this much hope of the best are taken in reading order
+    change_floor: float = 5.0  # outside a form, less hope than this is not worth changing a value for
 
 
 def prominence(element: dict[str, Any] | None, weights: dict[str, float], viewport: tuple[int, int]) -> float:
@@ -107,6 +117,12 @@ def is_toggle(element: dict[str, Any] | None) -> bool:
     return element.get("type") == "checkbox" or element.get("role") in ("checkbox", "switch")
 
 
+# One look before the final button, for someone who reads what is around them: real P002 and P006
+# opened Preview. Once per form, and only a labelled button (2026-10-31).
+ONE_LOOK = "Everything else is done; takes one look at a button they can read"
+NOT_CAREFUL = "Not a careful form checker; does not look into unclear things"
+
+
 def removes_default(element: dict[str, Any] | None, memory: SessionMemory, place: str | None) -> bool:
     """Unticking a box that was ticked when he got there, or deleting a row that was there:
     taking away a default. Something he ticked himself is not a default."""
@@ -115,7 +131,48 @@ def removes_default(element: dict[str, Any] | None, memory: SessionMemory, place
     mine = place is not None and memory.has_touched(place, element.get("original"))
     if is_toggle(element) and element.get("checked") and not mine:
         return True
-    return bool(re.match(r"(delete|remove)\b", (element.get("original") or "").strip(), re.I))
+    # A row in the open form; a budget he saved, on the list, was never a default.
+    in_form = place is None or bool((place.split("|") + [""])[1])
+    return in_form and bool(re.match(r"(delete|remove)\b", (element.get("original") or "").strip(), re.I))
+
+
+def hope_of(s: "Scored") -> float:
+    """How hopeful the move looks to this person; a move the model gave no hope for counts as even."""
+    return float(s.candidate.get("hope") if isinstance(s.candidate.get("hope"), (int, float)) else 5)
+
+
+def draw(moves: list["Scored"], spread: float, rng) -> "Scored":
+    """One move, with a chance that grows with how hopeful it looks to this person (a soft choice, as in
+    SNIF-ACT). A small spread all but always takes the best; a large one makes several likely."""
+    top = max(hope_of(s) for s in moves)
+    weights = [math.exp((hope_of(s) - top) / spread) for s in moves]
+    return rng.choices(moves, weights=weights)[0]
+
+
+def next_in_form(moves: list["Scored"], about_as_good: float) -> "Scored":
+    """In a form people go down the page: of the moves that look about as good, the first in reading
+    order. All six people filled Scope top down; the hope of each field is only the model's guess."""
+    top = max(hope_of(s) for s in moves)
+
+    def place(s: "Scored") -> tuple[float, float]:
+        box = (s.element or {}).get("box")
+        return (box["y"], box["x"]) if box else (math.inf, math.inf)
+
+    return min((s for s in moves if hope_of(s) >= top - about_as_good), key=place)
+
+
+def is_loop(moves: list[tuple], repeats: int) -> bool:
+    """The last moves go round: the same one, or a round of two or three, over at least repeats moves.
+    Compared without the screen, since each round changes what is on it (2026-10-31)."""
+    if len(moves) < repeats:
+        return False
+    last = moves[-repeats:]
+    return any(all(last[i] == last[i - period] for i in range(period, repeats)) for period in (1, 2, 3))
+
+
+def list_is_open(elements: list[dict[str, Any]]) -> bool:
+    """A list to choose from is open, not just a section of the form: it holds what he ticks until he confirms it."""
+    return any(e.get("expanded") is True and e.get("dropdown") for e in elements)
 
 
 def in_popup(element: dict[str, Any] | None) -> bool:
@@ -137,7 +194,12 @@ def score(candidate: dict[str, Any], element: dict[str, Any] | None, verdicts: l
     Buttons in the frame around every page (menu, header) are remembered by where they
     are, not by page."""
     label = element.get("original") if element else None
-    ctx = place.split("|")[0].split("?")[0] if (place is not None and candidate.get("purpose") == CHECK) else context
+    if label and candidate.get("purpose") == CHECK and element.get("expanded") is not None:
+        label = " ".join(label.split()[:2])  # a section header goes on with its summary once closed: still the same one
+    ctx = context
+    if place is not None and candidate.get("purpose") == CHECK:
+        parts = place.split("|")  # the route, the open sections and, in a product routed by fragment, the page
+        ctx = parts[0].split("?")[0] + (f"#{parts[2]}" if len(parts) > 2 else "")
     chrome = (element or {}).get("region", {}).get("kind") if element else None
     if chrome in ("nav", "header", "aside") and element.get("tag") != "a":
         # A control in the frame around every page (the account switcher) is the same
@@ -181,6 +243,7 @@ def decide(
     product. He looks around the menus for it and changes nothing."""
     piece = piece or []
     sim = sim or (lambda e: 0)
+    in_form = bool((place or "").split("|")[1:2] and place.split("|")[1])  # a section of the page is open
     help_ids = help_ids or set()
     cons = lambda s: is_consequential(s.element, policy.consequential)  # noqa: E731
     # Moving on: Next, or scrolling on past what he is looking at.
@@ -188,6 +251,9 @@ def decide(
     alike = lambda s: sim(s.element) if s.element else 0  # noqa: E731
     dead = lambda e: bool(e) and memory.is_dead_end(e.get("original"))  # noqa: E731
     dares = (SURE, HALF) if policy.risk == "high" else (SURE,)
+    # A dropdown he can read, not yet open: opening one changes nothing, so anyone may look (2026-10-31).
+    # Not a section that folds: real people opened those at most once in a session.
+    opens = lambda s: s.level == SURE and (s.element or {}).get("expanded") is False and bool((s.element or {}).get("dropdown"))  # noqa: E731
     # Typing a number the task names (1,000, 80) matches the task literally (2026-10-04).
     from .similarity import number
     names_value = lambda s: s.candidate.get("value") is not None and number(s.candidate.get("value")) in (task_values or set())  # noqa: E731
@@ -207,12 +273,29 @@ def decide(
             s.dropped = "Code decides when they are done, by how they confirm; not the model"
         elif cons(s) and s.level not in dares:
             s.dropped = "Consequential action they are not sure of; not clicked"
-        elif s.purpose == CHECK and policy.check != "high":
-            s.dropped = "Not a careful form checker; does not look into unclear things"
+        elif s.purpose == CHECK and policy.check != "high" and not opens(s):
+            s.dropped = NOT_CAREFUL
+        elif (s.purpose == CHECK and action == "click" and s.element
+              and ((s.element.get("tag") in ("input", "textarea") and not is_toggle(s.element)) or s.element.get("expanded") is True)):
+            s.dropped = "Clicking into it shows nothing new"
+        elif (s.purpose == CHECK and page is not None and is_toggle(s.element)
+              and memory.flipped(page, s.element.get("original")) >= 1):
+            s.dropped = "Already set this box; flipping it to look would undo it"
+        elif (page is not None and is_toggle(s.element) and memory.is_settled(page, s.element.get("original"), s.element.get("checked"))
+              and not (s.purpose == FIX and memory.flipped(page, s.element.get("original")) < 3)):
+            # No real person undid a box they had set without meaning to: the model only says "toggle it"
+            # (2026-10-31). Saying it is wrong is another matter: people do correct their own slip (2026-11-01).
+            s.dropped = "Set this box on purpose; leaves it"
+        elif s.purpose == CHECK and action in ("choose", "type") and s.level not in dares:
+            s.dropped = "Would change a value they are not sure of, only to look"
+        elif policy.spread is not None and not in_form and action in ("choose", "type") and hope_of(s) < policy.change_floor:
+            # Looking around is not filling things in: a run renamed the account and saved it, at hope 4.
+            s.dropped = "Came to look; does not change anything on so little hope"
         elif (policy.check == "low" and s.candidate.get("action") == "click"
               and s.purpose in (TASK, FIX) and removes_default(s.element, memory, place)):
             s.dropped = MISSED_DEFAULT
         elif (s.purpose == FIX and policy.check == "low" and alike(s) == 0 and not names_value(s)
+              and s.element is not None and not policy.warned
               and not (s.candidate.get("action") == "type" and not ((s.element or {}).get("value") or "").strip())):
             # (typing into an empty box is filling it in, not changing a default)
             s.dropped = "Rough form checker: changes only what literally matches the task"
@@ -228,7 +311,20 @@ def decide(
     untried = [s for s in scored if s.dropped is None]
     retry = list(untried)
     for s in untried:
-        if memory.was_tried(s.key):
+        if s.candidate.get("action") == "type" and s.element and page is not None:
+            # What decides is what the box holds: a new empty form is filled in again, however alike
+            # the screen, and a value he typed and replaced is not typed back (2026-10-31).
+            holding, value = typed_value(s.element.get("value")), s.candidate.get("value")
+            if not holding:
+                continue
+            if holding == typed_value(value):
+                s.dropped = "The box already holds this"
+            elif in_form and memory.has_typed(page, s.element.get("original"), value):  # a search box is searched again
+                s.dropped = "Already typed this here and changed it"
+            continue
+        # Fading is about where he has been. In a form what he has done stays done, or the rest of it,
+        # which the final button waits for, would never be over.
+        if memory.still_remembers(s.key, policy.now, None if in_form else policy.memory_span, policy.rng):
             s.dropped = "Already tried on this screen"
     alive = [s for s in untried if s.dropped is None]
     for s in alive:
@@ -241,8 +337,18 @@ def decide(
     # 2. What he would do right here.
     here = [s for s in alive
             if (s.purpose in (TASK, FIX) and (s.level in dares or s.undo or fills_named(s)))
-            or (s.purpose == CHECK and policy.check == "high")
-            or (s.purpose == RETREAT and s.level == SURE and in_popup(s.element))]
+            or (s.purpose == CHECK and (policy.check == "high" or opens(s)))
+            or (s.purpose == RETREAT and s.level == SURE and in_popup(s.element))
+            # Choosing by hope: where to go is what he is unsure of, so outside a form going to look elsewhere
+            # competes with the task. In a form he works through it; he leaves only when nothing is left.
+            or (policy.spread is not None and not in_form and s.purpose == EXPLORE and s.level in dares)]
+    if here and policy.check == "medium" and page is not None and page not in memory.peeked and all(cons(s) for s in here):
+        looks = [s for s in scored if s.dropped == NOT_CAREFUL and s.level == SURE and s.candidate.get("action") == "click"
+                 and s.element and not s.element.get("icon") and s.element.get("expanded") is None
+                 and leads_somewhere(s.element) and not memory.was_tried(s.key)]
+        if looks:
+            looks[0].dropped = None
+            return pick(looks[0], ONE_LOOK)
     if here:
         careful = policy.check in ("medium", "high")
 
@@ -252,10 +358,19 @@ def decide(
 
         here.sort(key=order)
         best = here[0]
+        if policy.spread is not None and policy.rng is not None:
+            # Still in turn: the final buttons last, a careful person's Next after the rest, closing after moving.
+            turn = lambda s: order(s)[:3]  # noqa: E731
+            in_turn = [s for s in here if turn(s) == turn(here[0])]
+            best = next_in_form(in_turn, policy.about_as_good) if in_form else draw(in_turn, policy.spread, policy.rng)
+            here.remove(best)
+            here.insert(0, best)
         if best.purpose == CHECK:
-            rule = "Careful form checker: opens what is unclear to look"
+            rule = "Careful form checker: opens what is unclear to look" if policy.check == "high" else "Opens a dropdown they can read, to look"
         elif best.undo and best.level not in dares:
             rule = "Puts back what they just tried (remembers touching it; no need to understand it)"
+        elif best.purpose == EXPLORE:
+            rule = "Not sure this is the way; tries somewhere else that looks promising"
         elif best.purpose == RETREAT:
             rule = "Done looking; closes what they just opened"
         elif fills_named(best) and best.level not in dares:
@@ -274,7 +389,7 @@ def decide(
     if scent:
         pool = [e for e in piece if leads_somewhere(e) and not e.get("harness") and not dead(e)
                 and not is_consequential(e, policy.consequential)
-                and not memory.was_tried(action_key(context, e.get("original"), "click", None))]
+                and not memory.was_tried(score({"action": "click"}, e, [], context).key)]
         if pool:
             e = min(pool, key=lambda e: (e["box"]["y"], e["box"]["x"]))
             s = score({"action": "click", "element": e["id"], "purpose": EXPLORE,
@@ -312,7 +427,7 @@ def decide(
                      key=lambda s: -prominence(s.element, policy.weights, policy.viewport))
     retreat = [s for s in alive if s.purpose == RETREAT and s.level == SURE]
     helps = [] if policy.risk == "high" else [
-        e for e in piece if e["id"] in help_ids and not memory.was_tried(action_key(context, e.get("original"), "open_help", None))
+        e for e in piece if e["id"] in help_ids and not memory.was_tried(score({"action": "open_help"}, e, [], context).key)
     ]
 
     def help_decision() -> Decision:
@@ -325,7 +440,9 @@ def decide(
     def most_prominent() -> Decision | None:
         pool = [e for e in piece if not e.get("harness") and not is_consequential(e, policy.consequential)
                 and leads_somewhere(e) and not dead(e) and roam(e)]
-        pool = [e for e in pool if not memory.was_tried(action_key(context, e.get("original"), "click", None))]
+        # Remembered the way score() remembers it, or a button in the frame is picked again and again.
+        pool = [e for e in pool if not memory.was_tried(score({"action": "click"}, e, [], context).key)
+                and not (place is not None and memory.has_touched(place, e.get("original")))]
         if not pool:
             return None
         e = max(pool, key=lambda e: prominence(e, policy.weights, policy.viewport))

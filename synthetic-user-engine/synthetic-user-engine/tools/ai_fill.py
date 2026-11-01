@@ -52,8 +52,6 @@ TEND = [
      ["No", "I glance at the obvious ones", "I check every one"]),
     ("D3", "Last time you filled in a form and met an option you didn't understand, what did you do?",
      ["Left it as it was", "Read the explanation next to it, but didn't change it", "Tried changing it to see what happened, then changed it back"]),
-    ("H", "When you look for a feature on a new website, what do you try first?",
-     ["Search", "Look through the menus", "It depends"]),
 ]
 PERC = [
     ("V", "Is small text on a computer, like the hints under a form field, hard for you to read?", ["Not hard", "Only when it's small and faint", "Anything smaller than normal text"]),

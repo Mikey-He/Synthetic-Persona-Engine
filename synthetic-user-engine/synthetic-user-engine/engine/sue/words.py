@@ -140,6 +140,11 @@ class CommonWords:
         """A fixed list where every word counts as common. For tests."""
         return cls({w: 1 for w in words}, 1)
 
+    def starts(self, prefix: str) -> bool:
+        """Whether a word he knows begins like this: what he reads in a label cut off with an ellipsis."""
+        p = prefix.lower()
+        return any(rank <= self.limit and word.startswith(p) for word, rank in self.ranks.items())
+
     def rank(self, token: str) -> int | None:
         found = [self.ranks[v] for v in _variants(token) if v in self.ranks]
         return min(found) if found else None
@@ -192,12 +197,6 @@ def tokens(text: str, english: re.Pattern[str] = TOKEN) -> list[str]:
     return [w for _, w in sorted(found)]
 
 
-_READABLE = re.compile(f"[A-Za-z]+|[{_CJK}]+")
-
-
-def unreadable_text(text: str) -> str:
-    """Text too small for him to read: every word becomes a made-up word, digits blur to #."""
-    return re.sub(r"\d", "#", _READABLE.sub(lambda m: fake(m.group(0)), text))
 
 
 @dataclass(frozen=True)
@@ -261,6 +260,8 @@ class Vocabulary:
         keep = [(t, "harness") for t in harness_terms] + [(t, "data") for t in data_terms]
         keep.sort(key=lambda x: -len(x[0]))
         self._keep = [(_bounded(t), source) for t, source in keep]
+        # The task he reads word for word: he can read its words on screen too.
+        self.task_words = {t.lower() for t in tokens(getattr(persona, "task", "") or "")}
         words = sorted(persona.words, key=lambda w: -len(w.original))
         self._words = [(_bounded(w.original, re.IGNORECASE), w) for w in words]
 
@@ -283,7 +284,8 @@ class Vocabulary:
                     spans.append((m.start(), m.end(), shown, Hit(m.group(), shown, w.level, "item", w.id, w.gloss)))
         for m in TOKEN.finditer(text):
             if free(m.start(), m.end()):
-                hit = self._offlist(m.group())
+                cut = text[m.end():m.end() + 1] == "…" or text[m.end():m.end() + 3] == "..."
+                hit = self._cut_off(m.group()) if cut else self._offlist(m.group())
                 spans.append((m.start(), m.end(), hit.shown, hit))
         for pattern in self._phrases:
             for m in pattern.finditer(text):
@@ -312,6 +314,14 @@ class Vocabulary:
         out.append(text[pos:])
         return Rewritten("".join(out), [s[3] for s in spans])
 
+    def _cut_off(self, token: str) -> Hit:
+        """The start of a word, the rest cut off with an ellipsis: read as the word it begins, if he
+        knows one. Three letters at least; less says nothing (2026-10-31)."""
+        if (self.persona.card_type != "blank" and len(token) >= 3 and token.lower() not in self.force_fake
+                and token not in self.common and self.common.starts(token)):
+            return Hit(token, token, KNOW, "offlist")
+        return self._offlist(token)
+
     def _offlist(self, token: str) -> Hit:
         """An off-list word has no special meaning here (words that do are items), so
         knowing its everyday meaning is knowing it (2026-10-04). Interface words such as
@@ -322,9 +332,17 @@ class Vocabulary:
         if card == "full":
             return Hit(token, token, KNOW, "offlist", rank=rank)
         lower = token.lower()
-        if card != "blank" and lower not in self.force_fake and (token in common or lower in self.ui_words):
+        # A name written with a capital inside it (BigQuery, FinOps) is a product's name: no word list
+        # holds it, and that says nothing about whether he can read it.
+        name = re.search(r"[a-z][A-Z]", token)
+        if card != "blank" and lower not in self.force_fake and (token in common or lower in self.ui_words or name or lower in self.task_words):
             return Hit(token, token, KNOW, "offlist", rank=rank)
-        return Hit(token, fake(token), NONE, "offlist", rank=rank)
+        shown = fake(token)
+        for _ in range(5):  # a made-up word must not happen to be a word he knows
+            if shown not in common:
+                break
+            shown = fake(shown)
+        return Hit(token, shown, NONE, "offlist", rank=rank)
 
 
 def common_word_limit(persona: Persona, config: dict) -> int:

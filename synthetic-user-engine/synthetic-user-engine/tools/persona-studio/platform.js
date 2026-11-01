@@ -75,7 +75,6 @@ function chipsFor(scores, known, factors = {}) {
   if (scores.fatigue >= 5) out.push(['','bedtime','Gets tired']);
   if (known >= 0.9) out.push(['blue','school','Knows the product']);
   if (known <= 0.1) out.push(['','help','New to the product']);
-  if (factors.vision === 'reduced') out.push(['','visibility','Small text is hard']);
   return out.slice(0, 2).map(([c, i, t]) => `<span class="tag ${c}"><span class="ms">${i}</span>${t}</span>`).join('');
 }
 const KIND_LABEL = {studio: 'From a description', questionnaire: "From a participant's questionnaire", survey: "From a participant's survey or interview"};
@@ -84,7 +83,7 @@ const kindLabel = p => KIND_LABEL[p.from || p.kind] || '';
 function settingName(path) {
   const [head, key] = path.split('.');
   if (head === 'knowledge') return 'What they know: ' + ((groupsVisible().find(g => g.key === key) || {}).title || key);
-  if (head === 'humanFactors') return ({vision: 'Reading small text', colorVision: 'Colour vision', clickPrecision: 'Clicking small targets',
+  if (head === 'humanFactors') return ({colorVision: 'Colour vision', clickPrecision: 'Clicking small targets',
     readingSpeed: 'Reading speed', warningAttention: 'Noticing warnings', stressTolerance: 'Coping with stress', pressureChange: 'How pressure builds',
     care: 'What they care about most', financialRiskJudgment: 'Judging financial risk', financialCaution: 'Caution with money'})[key] || key;
   const t = [...TRAITS, ...STATES].find(x => x.key === path);
@@ -850,7 +849,7 @@ function editorHTML(p, flat, src) {
       ${STATES.map(s => `<div class="trait"><div class="head"><h3>${s.title}</h3></div>
         <md-slider min="0" max="10" step="0.5" value="${p[s.key]}" labeled data-trait="${s.key}" aria-label="${s.title}"></md-slider>
         <div class="readout">${s.note}</div>${sourceTag(src, s.key)}</div>`).join('')}
-      ${choiceRow('How pressure builds', 'With time pressure above 0', 'humanFactors.pressureChange', [['steady', 'Stays steady'], ['rises_after_setbacks', 'Rises after setbacks'], ['rises_over_time', 'Rises over time']], factor(p, 'pressureChange'), src)}
+      ${choiceRow('How pressure builds', 'With time pressure above 0', 'humanFactors.pressureChange', [['steady', 'Stays steady'], ['rises_after_setbacks', 'Rises after setbacks']], factor(p, 'pressureChange'), src)}
       ${choiceRow('Coping with setbacks', 'Low: pressure rises fast after a wrong turn', 'humanFactors.stressTolerance', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], factor(p, 'stressTolerance'), src)}
       ${choiceRow('Urgency', `Urgent sets time pressure to at least ${esc((window.SUE_PERSONA || {}).urgent_min_time_pressure)}`, 'urgency', [['calm', 'Calm'], ['urgent', 'Urgent']], p.urgency, src)}
       ${choiceRow('Stakes', 'High: more careful when checking, less daring', 'stakes', [['low', 'Low'], ['high', 'High']], p.stakes, src)}</div>
@@ -859,7 +858,6 @@ function editorHTML(p, flat, src) {
         <div class="seg" role="radiogroup" aria-label="${esc(g.title)}">${LEVEL_WORDS[!!g.word].map((l, i) =>
           `<button type="button" role="radio" aria-checked="${p.knowledge[g.key] === i}" class="${p.knowledge[g.key] === i ? 'on' : ''}" data-know="${esc(g.key)}" data-v="${i}">${l}</button>`).join('')}</div></div>${sourceTag(src, 'knowledge.' + g.key)}`).join('')}</div>
     <details class="${box} more"><summary><h2>Seeing, clicking and warnings</h2><span class="ms">expand_more</span></summary>
-      ${choiceRow('Reading small text', '', 'humanFactors.vision', [['normal', 'Normal'], ['mild', 'Some difficulty'], ['reduced', 'Difficult']], factor(p, 'vision'), src)}
       ${choiceRow('Colour', '', 'humanFactors.colorVision', [['typical', 'Normal'], ['reduced', 'Reduced'], ['no_color_cues', 'Cannot rely on it']], factor(p, 'colorVision'), src)}
       ${choiceRow('Clicking small targets', '', 'humanFactors.clickPrecision', [['high', 'Precise'], ['medium', 'Sometimes misses'], ['low', 'Often misses']], factor(p, 'clickPrecision'), src)}
       ${choiceRow('Reading speed', 'Slower reading tires them sooner', 'humanFactors.readingSpeed', [['slow', 'Slow'], ['average', 'Average'], ['fast', 'Fast']], factor(p, 'readingSpeed'), src)}
@@ -932,13 +930,29 @@ function composerHTML(hello) {
 }
 
 /* What was pasted: a questionnaire answer file, other survey answers or an interview, or a description. */
+/* The window a participant used longest: a card run from here gets the page they saw (sue.participant reads it the same way). */
+function longestWindow(doc) {
+  const rows = (doc.events || []).filter(e => e.clientTs), held = new Map();
+  let size = null, since = 0;
+  rows.forEach((e, i) => {
+    const at = Date.parse(e.clientTs), p = e.payload || {};
+    const next = e.type === 'session_started' ? p.viewport : e.type === 'viewport_changed' ? p : null;
+    if (size && (next || i === rows.length - 1)) held.set(size, (held.get(size) || 0) + at - since);
+    if (next) { size = `${next.width}x${next.height}`; since = at; }
+  });
+  const best = [...held].sort((a, b) => b[1] - a[1])[0];
+  if (!best) return (doc.session || {}).viewport || null;
+  const [width, height] = best[0].split('x').map(Number);
+  return {width, height};
+}
+
 function readInput(text) {
   try {
     const doc = JSON.parse(text);
     if (doc && doc.kind === 'sue-questionnaire' && doc.answers) return {kind: 'answers', doc};
     if (doc && doc.kind === 'uat-participant-file') {
       if (!doc.questionnaire || !doc.questionnaire.answers) throw Error('This participant file has no questionnaire answers; the persona is built from them.');
-      return {kind: 'answers', doc: doc.questionnaire, postTask: doc.postTask || null};
+      return {kind: 'answers', doc: doc.questionnaire, postTask: doc.postTask || null, window: longestWindow(doc)};
     }
     if (doc && typeof (doc.transcript || doc.text) === 'string') return {kind: 'survey', text: doc.transcript || doc.text};
   } catch (e) { if (!(e instanceof SyntaxError)) throw e; /* not JSON */ }
@@ -972,7 +986,7 @@ function setupComposer() {
     catch (e) { $('#draft-area').innerHTML = `<div class="banner bad" style="margin-top:24px"><span class="ms">error</span><div>${esc(e.message)}</div></div>`; return; }
     btn.disabled = true;
     try {
-      if (input.kind === 'answers') return fromAnswers(input.doc, input.postTask);
+      if (input.kind === 'answers') return fromAnswers(input.doc, input.postTask, input.window);
       if (input.kind === 'survey') {
         $('#draft-area').innerHTML = wait('Reading their answers: every setting has to come from something they said…');
         const r = await api('/api/extract-interview', {text: input.text});
@@ -1002,7 +1016,7 @@ function setupComposer() {
 }
 
 /* A participant's own questionnaire answers: the Persona Builder builds the card exactly, no AI. */
-function fromAnswers(doc, postTask) {
+function fromAnswers(doc, postTask, seenWindow) {
   const here = (S.flow || {}).name || '';
   if (doc.flow && doc.flow !== here) {
     const other = S.workflows.find(w => w.name === doc.flow);
@@ -1013,7 +1027,7 @@ function fromAnswers(doc, postTask) {
   if (!S.builder) throw Error('The persona builder is still loading. Try again in a moment.');
   S.builder.load(doc, 'normal');
   const card = S.builder.buildCard();
-  draft = {kind: 'answers', doc, card, postTask: postTask || null};
+  draft = {kind: 'answers', doc, card, postTask: postTask || null, window: seenWindow || null};
   const during = postTask ? PersonaParameters.fromAnswers(paramsFromCard(card, 'P'), doc.answers, postTask) : null;
   const t = card.tendency || {}, items = card.items.filter(i => i.kind !== 'habit');
   const knows = items.filter(i => i.result === 'understands').length, vague = items.filter(i => ['vague', 'everyday', 'other'].includes(i.result)).length;
@@ -1486,7 +1500,7 @@ document.addEventListener('click', async e => {
       let r, made;
       if (draft.kind === 'answers') {
         const parameters = PersonaParameters.fromAnswers(paramsFromCard(draft.card, typed), draft.doc.answers, draft.postTask);
-        r = await api('/api/personas/save-participant', {code: typed, card: draft.card, answers: draft.doc, parameters, postTask: draft.postTask,
+        r = await api('/api/personas/save-participant', {code: typed, card: draft.card, answers: draft.doc, parameters, postTask: draft.postTask, window: draft.window,
           built: draft.postTask ? buildBundle(parameters).card : undefined});
         made = r.name;
       } else {

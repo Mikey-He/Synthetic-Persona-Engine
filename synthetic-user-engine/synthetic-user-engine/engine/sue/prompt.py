@@ -14,10 +14,10 @@ from typing import Any
 from .completion import ways_text
 from .persona import Persona
 
-PROMPT_VERSION = "engine-p2-v4-en"  # recorded on the platform session; bump on any prompt change
+PROMPT_VERSION = "engine-p2-v7-en"  # recorded on the platform session; bump on any prompt change
 # A workflow that uses more actions or another kind of result (engine-design.md 6.3) gets this
 # version; Version A's prompt is the one above, word for word.
-PROMPT_VERSION_GENERAL = "engine-p3-v1-en"
+PROMPT_VERSION_GENERAL = "engine-p3-v4-en"
 
 ACTIONS = ["click", "type", "scroll", "back", "open_help"]
 # Actions some products need (engine-design.md 6.3): a native dropdown, a key, a menu that opens
@@ -45,9 +45,11 @@ Your job is to list every action they might take in this part, each with its evi
 - advance: a direct step toward finishing the task, such as choosing the option the task asks for or clicking Next.
 - fix: a value or setting here does not match the task; change it or delete it.
 - check: something here is unclear to them, or they are not sure it is set right; open it, expand it, open a dropdown to see the options, or try selecting it.
-- explore: there is nothing to do in this part; click into somewhere else to look.
+- explore: click into somewhere else in this part to look around, whether or not there is something to do here.
 - retreat: go back to the previous page, or close what was just opened.
 If there is really nothing to do in this part, candidates may be empty; they will look elsewhere.
+
+For each action give hope, 0 to 10: how likely this person would think it is to get them closer to what they want, judging only by what they can read here and what they know. Someone new to a product is rarely sure, and several things can look about as good. Not what you know about such products, and not which one is right.
 
 Evidence is of two kinds only. Your own experience with this kind of website is never evidence:
 - A word on screen: type "word", and ref copies the text on screen exactly as they see it.
@@ -105,9 +107,21 @@ def list_question(created: str, article: str | None = None) -> str:
             "answer is true or false. If true, quote copies that row's text exactly as they see it. Only what is on screen; do not guess.")
 
 
-def response_schema(created: str, extras: list[str] | tuple = (), outcome: dict[str, Any] | None = None) -> dict[str, Any]:
+MESSAGE_KEY = "success_message"
+
+
+def message_question(created: str, article: str | None = None) -> str:
+    article = article or ("an" if created[:1].lower() in "aeiou" else "a")
+    return (f"Also answer one question, in observations.{MESSAGE_KEY}: is a message on this screen saying {article} {created} was created or saved? "
+            "answer is true or false. If true, quote copies that message's heading exactly as they see it. Only what is on screen; do not guess.")
+
+
+def response_schema(created: str, extras: list[str] | tuple = (), outcome: dict[str, Any] | None = None,
+                    message: bool = False) -> dict[str, Any]:
     seen = {"type": "object", "properties": {"answer": {"type": "boolean"}, "quote": {"type": "string"}}, "required": ["answer"]}
     observed = {list_key(created): seen}
+    if message:
+        observed[MESSAGE_KEY] = seen
     if outcome and outcome.get("kind") in OUTCOME_KEYS:
         observed[OUTCOME_KEYS[outcome["kind"]]] = seen
     return {
@@ -138,6 +152,7 @@ def response_schema(created: str, extras: list[str] | tuple = (), outcome: dict[
                         },
                     },
                     "why": {"type": "string"},
+                    "hope": {"type": "number"},
                 },
                 "required": ["action", "purpose", "evidence", "why"],
             },
@@ -185,11 +200,11 @@ def element_lines(elements: list[dict[str, Any]], extras: list[str] | tuple = ()
 def build_turn(persona: Persona, elements: list[dict[str, Any]], scroll: dict[str, int], ask_list: bool = False,
                history: list[str] | None = None, looking_at: str | None = None, situation: str | None = None,
                created: str = "", article: str | None = None, extras: list[str] | tuple = (),
-               outcome: dict[str, Any] | None = None) -> str:
-    """created: what the workflow makes (config["workflow"]["created"]); needed when ask_list."""
+               outcome: dict[str, Any] | None = None, ask_message: bool = False, learned=()) -> str:
+    """created: what the workflow makes (config["workflow"]["created"]); needed when ask_list or ask_message."""
     if ask_list and not created:
         raise ValueError("ask_list needs created: what the workflow makes, from flow.json engine.created")
-    known, vague = persona.knowledge_lines()
+    known, vague = persona.knowledge_lines(learned)
     done = ways_text(persona.goal.get("confirmBy") or []) or "not given"
     parts = [
         "The task (verbatim):",
@@ -211,10 +226,13 @@ def build_turn(persona: Persona, elements: list[dict[str, Any]], scroll: dict[st
         "Clickable elements in this part (id | kind | text they see | how they understand it):",
         *(element_lines(elements, extras) or ["(nothing clickable in this part)"]),
         "",
+        f"More content above: {'yes' if scroll.get('y', 0) > 0 else 'no'}",
         f"More content below: {'yes' if scroll.get('y', 0) < scroll.get('max', 0) else 'no'}",
     ]
     if ask_list:
         parts += ["", list_question(created, article)]
+    if ask_message:
+        parts += ["", message_question(created, article)]
     if outcome and outcome.get("kind") in OUTCOME_KEYS:
         parts += ["", outcome_question(outcome)]
     return "\n".join(parts)

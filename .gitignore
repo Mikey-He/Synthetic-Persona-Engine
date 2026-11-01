@@ -37,3 +37,6 @@ synthetic-user-engine/synthetic-user-engine/data/workflows/*/flow.prev.json
 synthetic-user-engine/synthetic-user-engine/data/version-a/flow.prev.json
 synthetic-user-engine/synthetic-user-engine/data/personas/.deleted/
 synthetic-user-engine/synthetic-user-engine/data/workflows/*/session.json
+
+# Real participants' files from the study page (2026-10-31): this repository is public; they stay on this machine
+synthetic-user-engine/synthetic-user-engine/data/participants/

@@ -98,13 +98,50 @@ pressure_check_drop = 3.0     # points off detail when checking, at time pressur
 pressure_risk_gain = 3.0      # points added to risk, at time pressure 10
 pressure_patience_cut = 0.4   # share of the patience limit lost at time pressure 10
 pressure_setback_gain = 1.5   # pressure added per wrong turn or back ("rises after setbacks"), at stress tolerance 0
-pressure_time_gain = 0.15     # pressure added per unit of reading effort ("rises over time")
 distraction_max_lapse = 0.2   # chance per piece read, at distraction 10, of missing one of its less prominent elements
 small_target_px = 24          # a target this small or smaller can be missed
 miss_gap_px = 4               # how far past the edge a near miss lands
 click_miss = { "high" = 0.0, "medium" = 0.05, "low" = 0.15 }  # chance of a near miss on a small target, by click precision
-vision_px = { "normal" = 0, "mild" = 12, "reduced" = 14 }      # text smaller than this (px) he cannot read
 reading_effort = { "fast" = 0.7, "average" = 1.0, "slow" = 1.5 }  # effort per piece read
+
+[choice]
+# How a person chooses among what they might do (engine-design.md 4.3, 2026-11-01). From information foraging
+# (SNIF-ACT): a person takes what looks promising with a chance that grows with how promising it looks, and how
+# flat that chance is depends on how unsure they are. Chosen on principle before the first run of this core, and
+# not to be adjusted to the six people's results; only cards of format v3 use them.
+spread_sure = 0.5      # how flat the choice is for someone who knows where things are: all but the best-looking fade out
+spread_unsure = 5.0    # for someone who does not: a move that looks twice as good is only about twice as likely
+daring_weight = 0.5    # how much high risk tolerance alone adds to unsureness, at risk 10 (clicking in to see)
+read_on = 0.5          # chance, when fully unsure and outside a form, of reading on though something here looks right
+memory_span = 12       # actions after which a tried move is remembered with a chance of about 1 in 3
+look_after = 0.5       # chance, at detail when checking 10, of looking around a little after seeing it saved
+about_as_good = 3      # in a form, moves within this much hope of the best are taken in reading order
+change_floor = 5       # outside a form, less hope than this is not worth typing or choosing a value for
+
+[mind]
+# The one mechanism every card of format v3 decides by (sue/mind.py, engine-design.md 4.10). Every trait acts only
+# through these numbers. Fitted to the group, never to one person; see the design notes for how they were set.
+aspiration = 6.0       # how good a move must look (0 to 10) to be taken at once, at detail when finding 5
+aspiration_form = 6.0  # the same inside a form, where they go over each field rather than look for the way
+aspiration_find = 1.0  # added at detail when finding 10, taken off at 0: careful finders read on for longer
+doubt = 0.3            # how much hope someone fully unsure of the way takes off what looks right
+orient_span = 15       # moves outside a form after which being unsure has fallen to about a third
+look_changes = 0.3     # a look into something that changes a value, against one that does not
+noise_sure = 0.7       # how far the choice strays in a form, or for someone who knows the way
+noise_unsure = 2.5     # how far it strays for someone who does not know the way
+daring_weight = 0.5    # how much high risk tolerance alone adds to unsureness, at risk 10
+half_low = 0.3         # what a half-understood move counts for at risk 0; at risk 10 it counts in full
+void_low = 0.0         # what a move they cannot read counts for at risk 0
+void_high = 0.5        # and at risk 10
+fix_floor = 0.5        # a correction's weight at detail when checking 0; at 10 it counts in full
+check_floor = 0.2      # a look into something unclear, likewise
+explore_in_form = 0.2  # going to look elsewhere from inside a form: they are working through it
+retreat = 0.6          # going back or closing, against moving on
+memory_span = 12       # moves after which a move done outside a form looks about two thirds as fresh
+change_floor = 5.0     # outside a form, less hope than this types or chooses nothing
+floor = 0.5            # worth less than this is not a move at all
+read_on_hope = 4.0     # how much reading further down the page looks worth when nothing here does
+look_after = 0.8       # at detail when checking 10, the chance of each further look once it is saved
 
 [persona]
 # How the settings a researcher picks for a persona on the platform become the numbers on its card
@@ -116,7 +153,7 @@ urgent_min_time_pressure = 6                                    # an urgent situ
 # High stakes: points added to each behaviour score (more careful, less daring).
 high_stakes_shift = { risk = -5, patience = 0, detailFind = 5, detailCheck = 5, detail = 5 }
 # A setting left unspecified takes the value of a typical person.
-typical = { vision = "normal", colorVision = "typical", clickPrecision = "high", readingSpeed = "average", warningAttention = "high", stressTolerance = "medium", pressureChange = "steady" }
+typical = { colorVision = "typical", clickPrecision = "high", readingSpeed = "average", warningAttention = "high", stressTolerance = "medium", pressureChange = "steady" }
 
 [persona.answers]
 # How questionnaire answers the Persona Builder does not read become settings (tools/questionnaire.html ids;

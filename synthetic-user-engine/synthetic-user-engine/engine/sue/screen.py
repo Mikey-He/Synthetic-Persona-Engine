@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from .persona import EVERYDAY, KNOW, NONE, OTHER
-from .words import LETTERS, Hit, Vocabulary, fake, tokens, unreadable_text
+from .persona import EVERYDAY, KNOW, OTHER
+from .words import Hit, Vocabulary
 
 
 def _norm_text(text: str) -> str:
@@ -43,11 +43,6 @@ def color_filter(png: bytes, kind: str) -> bytes:
     return out.getvalue()
 
 
-def unreadable(text: str) -> str:
-    """Text too small for him to read: every word becomes a made-up word, digits blur to #."""
-    return unreadable_text(text)
-
-
 class RewriteError(RuntimeError):
     """The page kept putting original words back. Better no screenshot than a leaky one."""
 
@@ -68,6 +63,10 @@ class Observation:
     gray_icons: list[str] = field(default_factory=list)
     focus: Any = None  # the piece of the screen he is looking at (attention.Chunk), or None for all of it
     unnoticed: list[str] = field(default_factory=list)  # warning text hidden this step: he did not notice it
+    warnings: list[str] = field(default_factory=list)  # warning text he can see this step
+    product_text: str = ""  # what is on screen without the test's own task bar: quotes come from here
+    page: str = ""  # page_of the address
+    scroll_stamp: str = ""  # where everything that scrolls stands
 
     @property
     def seen(self) -> list[dict[str, Any]]:
@@ -102,12 +101,21 @@ def _filled(background: str) -> bool:
     return alpha > 0.5 and max(r, g, b) - min(r, g, b) > 60
 
 
+def page_of(url: str) -> str:
+    """Which page of a product that routes in a bare fragment (#budgets), not in its path. Which of
+    them count as off the route is the flow's (engine.routes.pages), so no route changes; reading
+    position, held levels and what he has clicked are kept per page (2026-10-31)."""
+    frag = urlparse(url).fragment.split("?")[0]
+    return "" if frag.startswith(("/", "!/")) else frag
+
+
 def context_of(url: str, expanded: list[str]) -> str:
     """The screen as memory and attention see it: the route plus what is open on the
     whole page (sections, dropdowns), whether or not it is scrolled into view. It used
     to count only what was in view, so scrolling made a new screen and the same
     dropdown could be opened and closed again and again (2026-10-04)."""
-    return f"{route_of(url)}|{'/'.join(sorted(expanded))}"
+    page = page_of(url)
+    return f"{route_of(url)}|{'/'.join(sorted(expanded))}" + (f"|{page}" if page else "")
 
 
 def understanding(hits: list[Hit]) -> list[str]:
@@ -213,9 +221,9 @@ class Screen:
         self.watch_pause_ms = config["watch"]["pause_ms"]
         self.watch_move_ms = config["watch"]["move_ms"]
         # Perception and states set by the run (engine-design.md 4.9); the defaults change nothing.
-        self.vision_px = 0.0  # text smaller than this he cannot read
         self.color = "typical"
         self.hide_warnings = False  # this step he does not notice warning text
+        self.learned: set[str] = set()  # items he has learned during the run
         # The product's own marks, or the flow's locators put on the page (engine-design.md 6.3).
         self.locators = (config.get("workflow") or {}).get("locators") or []
         self.marks: dict[str, Any] = {}  # this look's mark report: item -> how many found, and how
@@ -319,9 +327,6 @@ class Screen:
             self._cache[text] = self.vocab.rewrite(text)
         return self._cache[text]
 
-    def _too_small(self, size: float | None) -> bool:
-        return bool(self.vision_px) and (size or 0) > 0 and size < self.vision_px
-
     def settle(self) -> None:
         if self.page.is_closed():
             self.back_to_tab()
@@ -377,8 +382,6 @@ class Screen:
     def _expected(self, node: dict[str, Any]) -> str:
         if node["harness"]:
             return node["orig"]
-        if self._too_small(node.get("size")):
-            return unreadable(node["orig"])
         return self._rewrite(node["orig"]).text
 
     def _expanded(self) -> list[str]:
@@ -390,8 +393,9 @@ class Screen:
             for e in found:
                 e["frame"] = k
                 if k:  # a frame's boxes are in the frame; the mouse needs them in the window
-                    for b in (e["box"], e["region"], e["region"]["group"]):
-                        b["x"], b["y"] = round(b["x"] + ox), round(b["y"] + oy)
+                    for b in (e["box"], e["region"], e["region"]["group"], e.get("aim")):
+                        if b:
+                            b["x"], b["y"] = round(b["x"] + ox), round(b["y"] + oy)
                 elements.append(e)
         elements.sort(key=lambda e: (e["box"]["y"], e["box"]["x"]))
         if self.strip:
@@ -401,10 +405,8 @@ class Screen:
             e["filled"] = _filled(e.pop("background"))
             if e["icon"] and not e["harness"]:  # an icon is read like a word: its name in his vocabulary
                 e["original"], e["text"] = e["icon"], self._rewrite(e["icon"]).text
-            if e.get("options") is not None:  # a native dropdown's options, as he reads them
-                e["options"] = [self._rewrite(o).text for o in e["options"]]
-            small = self._too_small((e.get("font") or {}).get("size"))
-            e["understanding"] = [] if e["harness"] or small else understanding(self._rewrite(e["original"]).hits)
+            read = [h for h in self._rewrite(e["original"]).hits if h.item_id not in self.learned]
+            e["understanding"] = [] if e["harness"] else understanding(read)
         return elements
 
     def observe(self, step: int, gray_icons: list[str], focus=None) -> Observation:
@@ -450,6 +452,9 @@ class Screen:
             if all(n["cur"] == self._expected(n) for n in after):
                 obs = self._build(step, color_filter(shot, self.color), after, rounds, gray_icons, elements, piece)
                 obs.unnoticed = unnoticed
+                obs.warnings = [t for _, _, _, r in self._each("() => window.__sue.warningsShown()") for t in r]
+                obs.page = page_of(self.page.url)
+                obs.scroll_stamp = self.page.evaluate("() => window.__sue.scrollStamp()")
                 return obs
             self.page.wait_for_timeout(self.settle_ms)
         raise RewriteError(f"step {step}: original words came back {self.max_rounds} times in a row")
@@ -460,8 +465,6 @@ class Screen:
         for n in visible:
             if n["harness"]:
                 hits.append(Hit(n["orig"].strip(), n["orig"].strip(), KNOW, "harness"))
-            elif self._too_small(n.get("size")):
-                hits += [Hit(w, fake(w), NONE, "vision") for w in tokens(n["orig"], LETTERS)]
             else:
                 hits += self._rewrite(n["orig"]).hits
         on_page = {_norm_text(n["orig"]) for n in visible}
@@ -471,6 +474,9 @@ class Screen:
             # A box named only by what it shows inside (its placeholder, "Name *") is read like words too.
             elif e["tag"] in ("input", "textarea") and e.get("text") and not e["harness"] and _norm_text(e["text"]) not in on_page:
                 hits += self._rewrite(e["text"]).hits
+        for e in elements:  # a native dropdown lists its options, already swapped on the page: read them as words too
+            for name in e.get("optionNames") or []:
+                hits += self._rewrite(name).hits
         bar = self.strip.texts() if self.strip else []
         hits += [Hit(t, t, KNOW, "harness") for t in bar]
         hits += self._canvas.get("hits", [])
@@ -487,6 +493,7 @@ class Screen:
             screenshot=shot,
             elements=elements,
             visible_text="\n".join([n["cur"] for n in visible] + bar),
+            product_text="\n".join([n["cur"] for n in visible] + list(self._canvas.get("texts", []))),
             hits=hits,
             explanations=[x for _, _, _, r in self._each("() => window.__sue.openExplanations()") for x in r],
             scroll=self._scroll_state(),
@@ -555,11 +562,24 @@ class Screen:
         f = frames[element.get("frame", 0)][0] if element.get("frame", 0) < len(frames) else self.page.main_frame
         return f.locator(f'[data-sue-i="{element["index"]}"]').first
 
+    def has_control(self, label: str | None) -> bool:
+        """Whether a control with this name is on the page, in view or not."""
+        return bool(label) and bool(self.page.evaluate(
+            "([s, b, n]) => window.__sue.controlShown(s, b, n)", [*self.harness, label]))
+
+    def lands_on_it(self, element: dict[str, Any], miss: tuple[float, float]) -> bool:
+        """Whether a slip of the hand still lands on the control or its label: then it is a hit."""
+        box = element["box"]
+        aim = element.get("aim") or {"x": box["x"] + box["w"] / 2, "y": box["y"] + box["h"] / 2}
+        return bool(self.page.evaluate("([i, x, y]) => window.__sue.sameControlAt(i, x, y)",
+                                       [element["index"], aim["x"] + miss[0], aim["y"] + miss[1]]))
+
     def perform(self, action: str, element: dict[str, Any] | None, value: Any,
-                miss: tuple[float, float] | None = None) -> str:
+                miss: tuple[float, float] | None = None, at: tuple[float, float] | None = None) -> str:
         """Carries out one action with the mouse and keyboard, as a person would.
         Returns a short note for the log. miss: a near miss on a small target (engine-design.md
-        4.9), how far from the element's centre the click lands."""
+        4.9), how far from the element's centre the click lands. at: where the wheel turns, what
+        he is reading."""
         page = self.page
         # Watch mode: after a click the page first renders its original words; the
         # dashboard keeps the last frame until they are rewritten (it never affected the
@@ -571,7 +591,8 @@ class Screen:
         before = list(page.context.pages)
         if action in ("click", "open_help", "select", "type") and element:
             box = element["box"]
-            x, y = box["x"] + box["w"] / 2, box["y"] + box["h"] / 2
+            aim = element.get("aim") or {"x": box["x"] + box["w"] / 2, "y": box["y"] + box["h"] / 2}
+            x, y = aim["x"], aim["y"]
             if miss and action in ("click", "select"):
                 x, y = x + miss[0], y + miss[1]
             if self.show:
@@ -599,6 +620,8 @@ class Screen:
             dy = -600 if str(value).lower() in ("up", "-1") else 600
             if "cx" in self._scroll:  # the page scrolls inside a panel: the wheel goes over the panel
                 page.mouse.move(self._scroll["cx"], self._scroll["cy"])
+            elif at:  # the wheel moves what is under the mouse, which may be the menu just clicked
+                page.mouse.move(at[0], at[1])
             page.mouse.wheel(0, dy)
             note = "scrolled up" if dy < 0 else "scrolled down"
         elif action == "back":

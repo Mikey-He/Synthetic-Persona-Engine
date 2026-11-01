@@ -71,3 +71,11 @@ def test_the_inventory_lists_controls_not_named_containers(page):
     assert "Members" in texts and "About roles" in texts and not any("Groups" in t and "Members" in t for t in texts)
     first = page.evaluate("() => window.__sue.inventory()[0]")
     assert first["role"] == "link" and first["region"] == "nav" and first["group"] == "People"
+
+
+def test_warnings_he_can_see_are_reported_and_those_he_missed_are_not(page):
+    page.set_content('<div class="field-error">Enter a valid amount.</div><p>All fine here.</p>')
+    page.evaluate(PAGE_SCRIPT.read_text(encoding="utf-8"))
+    assert page.evaluate("() => window.__sue.warningsShown()") == ["Enter a valid amount."]
+    page.evaluate("() => window.__sue.hideWarnings(true)")
+    assert page.evaluate("() => window.__sue.warningsShown()") == []

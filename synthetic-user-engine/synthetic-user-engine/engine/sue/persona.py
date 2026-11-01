@@ -75,7 +75,15 @@ class Persona:
     def item(self, item_id: str) -> Item | None:
         return self.items.get(item_id)
 
-    def knowledge_lines(self) -> tuple[list[str], list[str]]:
+    def orientation(self) -> float:
+        """How well they know where things are, 0 to 1: the card's location items (the questionnaire's
+        experience, nothing else). Without any, they count as knowing."""
+        places = [it for it in self.items.values() if it.kind == "location"]
+        if not places:
+            return 1.0
+        return sum({KNOW: 1.0, VAGUE: 0.5}.get(it.result, 0.0) for it in places) / len(places)
+
+    def knowledge_lines(self, learned=()) -> tuple[list[str], list[str]]:
         """What goes into the prompt (engine-design.md 4.1, 4.2): non-word items they know,
         and the ones they only vaguely remember. Words are not listed here; they reach the
         model through the screen itself."""
@@ -83,7 +91,7 @@ class Persona:
         for it in self.items.values():
             if it.kind in (WORD, HABIT):
                 continue
-            if it.result == KNOW:
+            if it.result == KNOW or it.id in learned:
                 known.append(f"[{it.id}] {it.text}")
             elif it.result == VAGUE:
                 vague.append(f"[{it.id}] {it.text} (vaguely remembered, not sure)")

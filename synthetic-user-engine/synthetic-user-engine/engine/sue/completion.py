@@ -2,16 +2,17 @@
 
 Code never asks the model "are you done". It asks a question the person could answer
 by looking, chosen by how this person confirms he is done, and checks the answer
-against the screen. Phase 1 wires two of the five ways:
+against the screen. Three of the five ways are wired:
 
 - list (checks the list or details page): the list shows the budget; the quote must be
   on screen and readable to him (a fake word means he cannot recognise it, as a person
   would not);
 - action (done once the last button is clicked): he stops right after the final
-  consequential action.
+  consequential action, unless the product visibly refused it (save_refused);
+- toast (a success message, 2026-10-31): asked on the first look after the final action,
+  since such a message goes away, and checked like the list's quote.
 
-The others (success message, email, trigger) and the expectation-missed handling come
-in phase 2."""
+The others (email, trigger) go through the expectation-missed handling."""
 
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ from .persona import Persona
 
 BY_LIST = "list"
 BY_LAST_ACTION = "action"
+BY_MESSAGE = "toast"
 
 # The ways a person makes sure a setup worked, as the questionnaire asks (card goal.confirmBy).
 WAY_TEXT = {
@@ -52,6 +54,18 @@ def asks_list(persona: Persona) -> bool:
     return BY_LIST in (goal.get("confirmBy") or []) and bool((goal.get("productSignals") or {}).get("list"))
 
 
+def asks_message(persona: Persona) -> bool:
+    goal = persona.goal
+    return BY_MESSAGE in (goal.get("confirmBy") or []) and bool((goal.get("productSignals") or {}).get(BY_MESSAGE))
+
+
+def save_refused(still_there: bool, warnings: list[str]) -> bool:
+    """The final button did not take: it is still on the page, in view or not, with a warning he can
+    see. Some pages keep the button after a save and some show warnings that are not about it, so it
+    takes both. A warning he did not notice does not count: he believes it went through."""
+    return bool(still_there and warnings)
+
+
 def missing_confirmation(persona: Persona) -> list[str]:
     """The ways he confirms he is done, when the product offers none of them (the
     expectation is missed, engine-design.md 4.6). Empty when at least one works: the
@@ -61,6 +75,14 @@ def missing_confirmation(persona: Persona) -> list[str]:
     if not ways or any(w == BY_LAST_ACTION or signals.get(w) for w in ways):
         return []
     return list(ways)
+
+
+def lacking_confirmation(persona: Persona) -> list[str]:
+    """The ways he confirms that the product does not offer, even when another way works: someone who
+    wants to see it trigger too goes on looking after the success message (P003 did)."""
+    goal = persona.goal
+    signals = goal.get("productSignals") or {}
+    return [w for w in goal.get("confirmBy") or [] if w != BY_LAST_ACTION and not signals.get(w)]
 
 
 def stops_after_last_action(persona: Persona) -> bool:
