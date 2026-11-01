@@ -66,7 +66,7 @@ history_steps = 8     # placeholder: how many recent steps the model is shown (e
 # Field of view and reading order (engine-design.md 4.8, 2026-10-04). A piece is what a glance takes in (the part just
 # opened, a list, a table, a group); someone with high detail when finding (detailFind high) takes a whole region at once.
 # Where they look first: the part just opened, the middle of the page, the navigation menu, the side panel, the top bar
-order = ["popup", "main", "nav", "aside", "header", "footer", "other"]
+order = ["popup", "nav", "main", "aside", "header", "footer", "other"]  # menu before the middle (2026-11-01): 4 of 6 people clicked Billing first
 
 [watch]
 # Watch mode (--watch) only: how the drawn pointer moves and how long each step pauses, so a person can follow. Changes no decision.

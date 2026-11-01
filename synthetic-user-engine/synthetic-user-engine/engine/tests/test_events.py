@@ -61,3 +61,11 @@ def test_a_new_form_starts_clean_and_the_engine_is_read_by_the_same_names():
     assert Fact("Actions", "saved") in got
     assert not any(f.kind == "left" for f in got)
     assert got[-1] == Fact("After the save", "click", "Reports")
+
+
+def test_after_the_save_another_form_is_looking_around_not_trouble():
+    step = lambda section, **action: {"signature": f"/app|{section}|budgets|x", "action": {"type": "click", **action}}  # noqa: E731
+    rows = [step("4 Actions", original="FINISH", text="FINISH"), step("", original="+ CREATE BUDGET"), step("1 Define", original="NEXT"), step("", original="Reports")]
+    got = engine_facts(rows, ["Define", "Actions"], {}, ["FINISH"])
+    assert [f.kind for f in got if f.kind in ("section", "left")] == ["section"]  # only the one before the save
+    assert troubles(got, ["Define", "Actions"], []) == []

@@ -207,11 +207,14 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
                         wrong += 1
                     left_form = pending["in_form"] and not where(obs.context)[1]
                     refused = pending["commit"] and save_refused(bool(obs.warnings) and screen.has_control(pending["label"]), obs.warnings)
+                    took = True
                     if pending["commit"]:
                         target.note_save(screen.page)
+                        wrote = getattr(target, "last_saved", None)  # a web product's storage; None where the product is not watched
+                        took = wrote is None or bool(wrote)
                     if left_form or refused:  # a new form is a new form; a refused save has a reason to go over it
                         tried = {k: v for k, v in tried.items() if not k[1]}
-                    if pending["commit"] and not refused and not saved:
+                    if pending["commit"] and not refused and took and not saved:
                         saved = True
                         after_budget = 0 if let_go else looks_after(var.rng, var.score("detailCheck") / 10, wants_more, limit, params["look_after"])
                     pending = None
@@ -228,7 +231,7 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
                     seen = [e for e in seen if e is not lapse]
                     slips["lapses"] += 1
                 looking_at = obs.focus.describe() if obs.focus else None
-                if readings:  # the screen shows what an ambiguity turns on: they may think again
+                if readings and not saved:  # the screen shows what an ambiguity turns on: they may think again
                     flipped = readings.rethink(var.rng, obs.product_text, where(obs.context)[1], var.score("detailCheck") / 10, reading_now)
                     if flipped:
                         rethought.append({"step": step, **flipped})

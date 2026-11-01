@@ -57,7 +57,7 @@ def person_facts(events: Iterable[dict[str, Any]], parts: list[str], options: di
         elif kind == "screen_viewed":
             screen = str(e.get("target") or "")
             section = next((p for p in parts if screen.endswith(p)), None)
-            if section:
+            if section and not saved:
                 if section != part or not in_form:
                     out.append(Fact(section, "section", section))
                 part, in_form = section, True
@@ -92,7 +92,7 @@ def engine_facts(steps: Iterable[dict[str, Any]], parts: list[str], options: dic
         section = (r.get("signature") or "").split("|")
         section = section[1] if len(section) > 1 else ""
         here = next((p for p in parts if p in section), None)
-        if here:
+        if here and not saved:
             if here != part or not in_form:
                 out.append(Fact(here, "section", here))
             part, in_form = here, True
