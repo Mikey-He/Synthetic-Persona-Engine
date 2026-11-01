@@ -200,8 +200,10 @@ def element_lines(elements: list[dict[str, Any]], extras: list[str] | tuple = ()
 def build_turn(persona: Persona, elements: list[dict[str, Any]], scroll: dict[str, int], ask_list: bool = False,
                history: list[str] | None = None, looking_at: str | None = None, situation: str | None = None,
                created: str = "", article: str | None = None, extras: list[str] | tuple = (),
-               outcome: dict[str, Any] | None = None, ask_message: bool = False, learned=()) -> str:
-    """created: what the workflow makes (config["workflow"]["created"]); needed when ask_list or ask_message."""
+               outcome: dict[str, Any] | None = None, ask_message: bool = False, learned=(),
+               reading: str | None = None) -> str:
+    """created: what the workflow makes (config["workflow"]["created"]); needed when ask_list or ask_message.
+    reading: what this person takes the task to mean where it could be read more than one way (sue/task.py)."""
     if ask_list and not created:
         raise ValueError("ask_list needs created: what the workflow makes, from flow.json engine.created")
     known, vague = persona.knowledge_lines(learned)
@@ -209,6 +211,7 @@ def build_turn(persona: Persona, elements: list[dict[str, Any]], scroll: dict[st
     parts = [
         "The task (verbatim):",
         persona.task,
+        *(["", f"What they take the task to mean: {reading}"] if reading else []),
         "",
         f"How they make sure it is done: {done}",
         "",

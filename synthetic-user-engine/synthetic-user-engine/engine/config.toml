@@ -142,6 +142,7 @@ change_floor = 5.0     # outside a form, less hope than this types or chooses no
 floor = 0.5            # worth less than this is not a move at all
 read_on_hope = 4.0     # how much reading further down the page looks worth when nothing here does
 look_after = 0.8       # at detail when checking 10, the chance of each further look once it is saved
+task_readings = true   # draw how the person reads the task where it forks (sue/task.py, readings.json beside the flow); rethinking has the chance of detail when checking / 10
 
 [persona]
 # How the settings a researcher picks for a persona on the platform become the numbers on its card

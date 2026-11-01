@@ -30,11 +30,12 @@ from .runlog import RunLog
 from .screen import RewriteError, Screen, Strip, open_browser
 from .similarity import similarity, task_words
 from .target import Target
+from .task import load_readings
 from .variability import make, traits_of
 from .viewer import Dashboard, LiveFeed, write_report
 from .words import build_vocabulary
 
-PROMPT_VERSION = "engine-p4-v1-en"
+PROMPT_VERSION = "engine-p4-v2-en"
 NOTE = ("\n\nGive low hope to what is already as the task needs it, and to going over what is plainly done. "
         "Say what the screen means, whatever they did before: what they did is kept elsewhere.")
 
@@ -109,6 +110,13 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
 
     session = target.start(model_id=model.model_id, prompt_version=PROMPT_VERSION, persona_id=f"{card}-{persona.id}")
     persona = dataclasses.replace(persona, task=target.substitute(persona.task))
+    # How this person reads the task where it forks (sue/task.py): drawn per run, like a trait between two levels.
+    readings = None
+    if params.get("task_readings") and hasattr(model, "model") and hasattr(model.model, "client"):
+        readings = load_readings(workflow["file"], persona.task, model.model.client, model.model_id)
+    chosen = readings.draw(var.rng) if readings else {}
+    started_with = readings.line(chosen) if readings else None
+    rethought: list[dict[str, Any]] = []
     if hasattr(model, "substitute"):
         model.substitute = target.substitute
     final_labels = [target.substitute(x) for x in rules["consequential_labels"]]
@@ -120,7 +128,7 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
     log.write_json("run.json", {
         "card": card, "persona": persona.name, "session": session.id, "model": model.model_id, "target": target.kind,
         "prompt_version": PROMPT_VERSION, "actions": extras, "outcome": aim, "word_limit": vocab.common.limit,
-        "card_version": persona.version, "seed": seed, "traits": traits.as_dict(), "orientation": orientation,
+        "card_version": persona.version, "seed": seed, "traits": traits.as_dict(), "orientation": orientation, "task_reading": started_with,
         "started_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "config": config,
     })
     system = system_text(config["model"]["max_candidates"], extras) + NOTE
@@ -220,8 +228,14 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
                     seen = [e for e in seen if e is not lapse]
                     slips["lapses"] += 1
                 looking_at = obs.focus.describe() if obs.focus else None
+                if readings:  # the screen shows what an ambiguity turns on: they may think again
+                    flipped = readings.rethink(var.rng, obs.product_text, where(obs.context)[1], var.score("detailCheck") / 10, chosen)
+                    if flipped:
+                        rethought.append({"step": step, **flipped})
+                        print(f"      thinks again about {flipped['about']}: now {flipped['now'][:70]}")
                 turn = build_turn(persona, seen, obs.scroll, ask_list=by_list, extras=extras, outcome=aim, history=[], looking_at=looking_at,
-                                  created=created, ask_message=by_message, learned=memory.learned, article=workflow.get("article"))
+                                  created=created, ask_message=by_message, learned=memory.learned, article=workflow.get("article"),
+                                  reading=readings.line(chosen) if readings else None)
                 say(f"Step {step}: reading {looking_at or 'the whole screen'}")
                 candidates, observations, error, latency, attempts, detail = None, {}, None, None, 0, None
                 for attempts in range(1, config["model"]["retries"] + 2):
@@ -241,6 +255,7 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
                     "focus_rect": obs.focus.rect if obs.focus else None, "model": {"latency_ms": latency, "attempts": attempts, "error": error, "detail": detail if candidates is None else None},
                     "state": {"learned_now": learned_now, "learned": dict(memory.learned), "tried": len(tried), "wrong": wrong, "backs": backs, "saved": saved},
                     "prompt": turn, "looks": looks, "words_seen": len(obs.product_text.split()),
+                    "task_reading": readings.line(chosen) if readings else None,
                 }
                 words = obs.product_text.split()
                 runs_of_words = {tuple(words[i:i + 3]) for i in range(max(0, len(words) - 2))}
@@ -421,6 +436,7 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
             "saved_items": len(result.get("saved") or result.get("budgets") or next((v for v in (result.get("stored") or {}).values() if isinstance(v, list)), [])),
             "off_path_pages": off_path, "stored": result.get("stored"), "last_saved": result.get("last_saved"), "orientation": round(orientation, 2), "draws": var.rng.draws,
             "rules": dict(rules_used), "learned": dict(memory.learned), "missed_defaults": [], "seed": seed, "slips": dict(slips), "reported": reported, "downloads": list(screen.downloads),
+            "task_readings": {"start": started_with, "end": readings.line(chosen) if readings else None, "changes": rethought},
             "cleanup_error": cleanup_error, "unmarked_items": [], "marks": {"not_found": [], "several": [], "loose": [], "by_item": {}}, "target": target.kind,
             "model_calls": getattr(model, "calls", None), "readings_kept": getattr(model, "kept", None), "seconds": round(time.monotonic() - started, 1), "dir": str(log.dir),
             "files": [{"path": "report.html", "what": "The whole run as a report"}, {"path": "steps.jsonl", "what": "The full record, one line per step"},

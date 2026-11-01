@@ -181,6 +181,7 @@ Not in this repository: the participants' files (`data/participants/`, real peop
 | `sue/vision.py` | Text read off a canvas with OCR, and painted over | 6.3 |
 | `sue/mind.py` | The one mechanism a v3 card decides by: value = hope × understanding × purpose weight × freshness, then a chance of acting; every trait is a parameter of it | 4.10 |
 | `sue/session.py` | The run loop for v3 cards, built on `mind.py`; keeps every model reading on disk (`runs/readings/`) so repeats cost nothing | 4.10 |
+| `sue/task.py` | How this person reads the task where it forks: the forks are listed once per workflow (`readings.json` beside the flow, editable), one reading is drawn per run, and they may think again on the screen that bears on it | 4.11 |
 | `sue/participant.py` | A study page participant file (events and what the product saved) as the same moves an engine run makes | 5 |
 | `sue/parts.py` | A session cut into the parts of the task: moves, estimated time and repeats per part; which part a failed check points at | 5 |
 | `sue/events.py` | What went wrong, part by part, read the same way from a person's events and an engine run: lost the way, changed a value, went back, left unsaved, wrong when saved | 5 |
