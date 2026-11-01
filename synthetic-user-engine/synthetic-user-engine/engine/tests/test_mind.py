@@ -69,6 +69,16 @@ def test_once_saved_they_change_nothing_and_looking_around_changes_no_value_on_l
     assert appraise(move("Name", 4, action="type"), outlook(in_form=True), None, 1) == 4
 
 
+def test_from_inside_a_form_the_menu_is_leaving_whatever_the_model_called_it():
+    menu = move("Budgets & caps", 8)
+    menu.element["region"] = {"kind": "nav"}
+    assert appraise(menu, outlook(in_form=True), None, 1) == 8 * 0.2
+    assert appraise(menu, outlook(in_form=False), None, 1) == 8  # outside a form the menu is the way
+    field = move("Target amount", 8)
+    field.element["region"] = {"kind": "main"}
+    assert appraise(field, outlook(in_form=True), None, 1) == 8
+
+
 def test_doubt_takes_hope_off_only_outside_a_form_for_someone_unsure():
     assert appraise(move("The way", 9), outlook(unsure=1.0), None, 1) < appraise(move("The way", 9), outlook(), None, 1) == 9
     assert appraise(move("Field", 9), outlook(unsure=1.0, in_form=True), None, 1) == 9

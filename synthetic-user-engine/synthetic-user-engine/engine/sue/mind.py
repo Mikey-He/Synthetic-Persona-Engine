@@ -88,10 +88,17 @@ def hope_of(move: Move, o: Outlook) -> float:
     return hope if o.in_form else hope * (1 - o.params["doubt"] * o.unsure)
 
 
+AROUND = ("nav", "header", "aside")  # the frame around every page: the menu, the top bar, the side panel
+
+
 def elsewhere(move: Move, o: Outlook) -> bool:
-    """Leaves what they are working on: a look around, or folding this section for another."""
+    """Leaves what they are working on: a look around, folding this section for another, or, from
+    inside a form, anything in the frame around the page. By where the element is, not by what the
+    model called the move: runs left Actions through the menu with the move labelled advance."""
     e = move.element or {}
-    return move.purpose == EXPLORE or (o.in_form and e.get("expanded") is not None and not e.get("dropdown"))
+    if move.purpose == EXPLORE:
+        return True
+    return o.in_form and ((e.get("expanded") is not None and not e.get("dropdown")) or (e.get("region") or {}).get("kind") in AROUND)
 
 
 def changes_value(move: Move) -> bool:
