@@ -381,6 +381,12 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
                     break
 
             element, action, value = chosen.element, chosen.action, chosen.candidate.get("value")
+            if action == "choose" and element is not None and element.get("options") is None:
+                # Only a native select is set by choosing. On a dropdown drawn by the page, choosing is clicking the
+                # option: the one named, or the element itself when it is the option. Left as choose, nothing happened
+                # and the time range stayed unset (P002, 2026-11-01).
+                named = next((e for e in obs.elements if not e["harness"] and (e.get("original") or "").strip().lower() == str(value or "").strip().lower()), None)
+                element, action, value = (named or element), "click", None
             miss = var.miss_offset(element) if action in ("click", "select") else None
             if miss and screen.lands_on_it(element, miss):
                 miss = None
