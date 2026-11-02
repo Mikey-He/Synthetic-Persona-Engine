@@ -22,7 +22,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--card", default="full")
     parser.add_argument("--headed", action="store_true")
-    parser.add_argument("--watch", action="store_true", help="show the engine's browser and a live log side by side")
     parser.add_argument("--flow", help="the workflow's flow.json (default paths.flow in config.toml)")
     args = parser.parse_args(argv)
     config = load_config(flow=args.flow)
@@ -31,8 +30,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{config['workflow']['file']} has no engine.plumbing path to follow", file=sys.stderr)
         return 1
     load_env()
-    summary = run(args.card, config, make_target(config), LabelScriptModel(path), headed=args.headed, watch=args.watch,
-                  max_steps=len(path) + 8)
+    summary = run(args.card, config, make_target(config), LabelScriptModel(path), headed=args.headed, max_steps=len(path) + 8)
     return 0 if (summary.get("evaluation") or {}).get("overall") or args.card != "full" else 1
 
 

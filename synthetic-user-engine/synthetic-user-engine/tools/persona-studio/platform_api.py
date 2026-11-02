@@ -631,7 +631,7 @@ def reachable(flow: dict) -> tuple[bool, str]:
 
 def start_tests(body) -> dict:
     wid = STATE['current']
-    if status(wid)['key'] != 'ready':
+    if status(wid)['key'] not in ('ready', 'changed'):  # one workflow; the checks step is gone from this platform
         raise ValueError('This workflow is not ready: run its checks first.')
     cards, runs = body.get('cards'), body.get('runs', 5)
     if not isinstance(cards, list) or not 1 <= len(cards) <= 20 or type(runs) is not int or not 1 <= runs <= 10:
@@ -690,15 +690,19 @@ def live_view(job: dict) -> dict:
     steps = []
     path = d / 'steps.jsonl'
     if path.exists():
-        for line in path.read_text(encoding='utf-8', errors='replace').splitlines()[-8:]:
+        for line in path.read_text(encoding='utf-8', errors='replace').splitlines()[-12:]:
             try:
                 s = json.loads(line)
             except ValueError:
                 continue
             a = s.get('action') or {}
-            steps.append({'step': s['step'], 'route': s.get('route'), 'rule': s.get('rule'), 'looking': s.get('looking_at'),
+            rule = s.get('rule') or ''
+            m = re.search(r'worth ([\d.]+) against wanting ([\d.]+)', rule) or re.search(r'\(worth ([\d.]+)\)', rule)
+            steps.append({'step': s['step'], 'route': s.get('route'), 'rule': rule, 'looking': s.get('looking_at'),
                           'did': f"{a.get('type', '')} {a.get('original') or a.get('text') or ''}".strip(),
-                          'why': next((c.get('why') for c in s.get('candidates') or [] if c.get('element') == a.get('element')), '')})
+                          'why': next((c.get('why') for c in s.get('candidates') or [] if c.get('element') == a.get('element')), ''),
+                          'worth': m.group(1) if m else None, 'want': m.group(2) if m and m.lastindex and m.lastindex >= 2 else None,
+                          'reading': s.get('task_reading'), 'settled': rule.startswith('Read everything')})
     run = read_json(d / 'run.json', {}) or {}
     state = read_json(d / 'live.json')
     frame = f'/runs/{d.name}/live.jpg' if (d / 'live.jpg').exists() else None
@@ -706,6 +710,106 @@ def live_view(job: dict) -> dict:
         shots = sorted(d.glob('step_*.png'))
         frame = f'/runs/{d.name}/{shots[-1].name}' if shots else None
     return {'dir': d.name, 'card': run.get('persona'), 'seed': run.get('seed'), 'frame': frame, 'state': state, 'steps': steps}
+
+
+def billing_view() -> dict:
+    """The one workflow this platform tests, read-only: the task as the participant reads it, the steps,
+    the parts of the form, what must be right at the end, and where the task can be read more than one way."""
+    flow = read_json(current_flow_path(), {}) or {}
+    e = flow.get('engine') or {}
+    readings = read_json(current_flow_path().parent / 'readings.json', {}) or {}
+    return {'name': flow.get('name', ''), 'task': flow.get('task', ''), 'start': (e.get('target') or {}).get('start', ''),
+            'steps': [{'id': s.get('id'), 'action': s.get('action', '')} for s in flow.get('steps') or []],
+            'parts': (e.get('compare') or {}).get('parts') or [],
+            'checks': [c.get('name', '') for c in (e.get('target') or {}).get('success') or []],
+            'readings': [{'about': a.get('about', ''), 'options': a.get('options') or []} for a in readings.get('ambiguities') or []],
+            'personas': len(list_personas()['personas'])}
+
+
+# ---- the three questions, with the computation behind every number (2026-11-01) ------------------
+
+def _people_files() -> list:
+    """Participant files from the study page, wherever they are kept under data/participants."""
+    out = []
+    for p in sorted((ROOT / 'data' / 'participants').glob('*/participant-*.json')):
+        try:
+            d = read_json(p)
+            if d and d.get('kind') == 'uat-participant-file':
+                out.append(d)
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def _route(facts, before: str, entry_label: str) -> dict:
+    clicks = [f.what for f in facts if f.kind in ('click', 'value') and f.part == before]
+    create = next((i for i, w in enumerate(clicks) if w == entry_label), None)
+    return {'first': clicks[0] if clicks else '', 'entry': clicks[create - 1] if create else ''}
+
+
+def _saved(rows) -> dict | None:
+    if not isinstance(rows, list) or not rows:
+        return None
+    r = rows[-1]
+    return {'amount': r.get('amount'), 'rules': [f"{x.get('percent')}% {x.get('trigger')}" for x in r.get('rules') or []]}
+
+
+def tables_view(bid: str) -> dict:
+    """Each run and each person who did the task, read the same way: where they went first, what went
+    wrong in each part, what they saved and whether it passed. The page sums it up and shows this behind
+    every cell."""
+    if not re.match(r'^batch-[0-9-]+$', bid or ''):
+        raise ValueError('That is not a result.')
+    data = read_json(RUNS / bid / 'batch.json')
+    if not data:
+        raise ValueError('No such result.')
+    from sue.config import load_config
+    from sue.events import engine_facts, person_facts, person_trouble, run_trouble
+    from sue.parts import AFTER, BEFORE, engine_parts, person_parts, read_steps
+    from sue.target import json_check
+    config = load_config(flow=str(current_flow_path()))
+    c, success = config['compare'], config['workflow']['target']['success']
+    parts, commit = c.get('parts') or [], config['run'].get('commit_labels') or []
+    entry_label = (c.get('entry') or ['+ CREATE BUDGET'])[0]
+    storage_key = next((s.get('key') for s in success if s.get('type') == 'storage'), None)
+    names = {}
+    for card in data.get('cards') or []:
+        p = read_json(PERSONAS / f"{card['card']}.json", {}) or {}
+        names[card['card']] = (p.get('persona') or {}).get('name') or card['card']
+    runs = []
+    for card in data.get('cards') or []:
+        for i, r in enumerate(card.get('run_dirs') or []):
+            d = RUNS / Path(r).name
+            s = read_json(d / 'summary.json', {}) or {}
+            if not s or not (d / 'steps.jsonl').exists():
+                continue
+            steps = read_steps(d)
+            ev = s.get('evaluation') or {}
+            tr = run_trouble(str(d), s, config)
+            runs.append({'card': card['card'], 'name': names[card['card']], 'n': i + 1, 'dir': d.name, 'report': f'/runs/{d.name}/report.html',
+                         'passed': bool(ev.get('overall')) and (s.get('stop') or {}).get('reason') == 'completion_declared',
+                         'checks': ev.get('criteria') or {}, 'stop': (s.get('stop') or {}).get('reason'),
+                         'moves': engine_parts(steps, parts, commit)['moves'], 'seconds': engine_parts(steps, parts, commit)['seconds'],
+                         'trouble': [list(t) for t in tr], 'saved': _saved((s.get('stored') or {}).get(storage_key)),
+                         **_route(engine_facts(steps, parts, c.get('options') or {}, commit), BEFORE, entry_label)})
+    wanted = set(names.values())
+    people = []
+    for d in _people_files():
+        name = ((d.get('questionnaire') or {}).get('answers') or {}).get('name')
+        if name not in wanted:
+            continue
+        ev = d.get('events') or []
+        checks = {s['name']: json_check((d.get('product') or {}).get(s['key']), s)[0] for s in success if s.get('type') == 'storage'}
+        people.append({'name': name, 'passed': all(checks.values()), 'checks': checks,
+                       'moves': person_parts(ev, parts)['moves'], 'seconds': person_parts(ev, parts)['seconds'],
+                       'trouble': [list(t) for t in person_trouble(d, config)], 'saved': _saved((d.get('product') or {}).get(storage_key)),
+                       **_route(person_facts(ev, parts, c.get('options') or {}), BEFORE, entry_label)})
+    return {'id': bid, 'at': data.get('at') or bid[6:], 'parts': [BEFORE, *parts, AFTER], 'runs': runs, 'people': people, 'checks': [s.get('name') for s in success],
+            'definitions': {'lost the way': f"before the form, a click that is not on the way to it (the way: {', '.join(c.get('way') or [])})",
+                            'changed a value': 'the same setting given one value, then another (typing the same value again is not one)',
+                            'went back': 'in the form, back to a section already passed', 'left unsaved': 'out of the form without saving, losing the work',
+                            'wrong when saved': 'the saved value fails one of the checks',
+                            'seconds': 'people: real time from their first click; engine: estimated from the words read and the actions made (Card, Moran and Newell), not measured'}}
 
 
 def batch_workflow(data: dict) -> str:

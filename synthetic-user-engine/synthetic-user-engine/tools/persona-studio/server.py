@@ -377,6 +377,8 @@ class Handler(BaseHTTPRequestHandler):
             q = lambda key: (query.get(key) or [''])[0]  # noqa: E731
             platform_get = {
                 '/api/workflows': lambda: api.list_workflows(),
+                '/api/billing': lambda: api.billing_view(),
+                '/api/tables': lambda: api.tables_view(q('id')),
                 '/api/workflow': lambda: api.detail(q('id')),
                 '/api/wjob': lambda: platform_job(q('id')),
                 '/api/live': lambda: api.live_view(api.get_job(q('id'))),
@@ -473,6 +475,7 @@ def main():
     args = parser.parse_args()
     if args.flow:
         os.environ['SUE_FLOW'] = str(Path(args.flow).resolve())
+        api.STATE['current'] = Path(args.flow).resolve().parent.name  # this platform tests that one workflow
     else:
         api.select({'id': api.STATE['current']})
     print(f'Workflow: {load_flow()["name"]} ({flow_path()})', flush=True)

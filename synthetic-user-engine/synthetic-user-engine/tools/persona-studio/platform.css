@@ -210,6 +210,35 @@ table.matrix th { font-weight: 500; color: var(--md-sys-color-on-surface-variant
 .snack.show { transform: translate(-50%, 0); }
 .snack button { background: none; border: 0; color: #a8c7fa; font: 500 14px var(--md-ref-typeface-plain); cursor: pointer; padding: 8px 12px; border-radius: 20px; }
 .live { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; min-height: 360px; }
+.live.inline { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); margin-top: 12px; }
+/* The steps as a Material list: a numbered dot, a headline, supporting text, and the value as a small chip. */
+.live.inline .log { max-height: 600px; gap: 0; background: var(--md-sys-color-surface-container-lowest); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; padding: 0; }
+.live.inline .log > div { background: transparent; border-radius: 0; padding: 0; }
+.live.inline .log > .muted { padding: 16px; }
+.step-line { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 2px 12px; align-items: start; padding: 12px 16px; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.step-line:first-child { border-top: 0; }
+.step-line .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 500; grid-row: span 3;
+  background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.step-line .title { font: 500 14px/20px var(--md-ref-typeface-brand); color: var(--md-sys-color-on-surface); overflow-wrap: anywhere; }
+.step-line .worth { font-size: 11px; line-height: 16px; padding: 2px 8px; border-radius: 8px; white-space: nowrap; font-variant-numeric: tabular-nums;
+  background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.step-line .worth.low { background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface-variant); }
+.step-line .sub { grid-column: 2 / 4; font-size: 13px; line-height: 18px; color: var(--md-sys-color-on-surface-variant); }
+.step-line .sub.why { color: var(--md-sys-color-on-surface); }
+.step-line div { background: transparent; padding: 0; border-radius: 0; }
+.lphase { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+/* Result tables: every value shows what it was computed from on hover or focus. */
+table.q { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.q th, table.q td { text-align: left; padding: 10px 12px; border-top: 1px solid var(--md-sys-color-outline-variant); vertical-align: top; }
+table.q tr:first-child th { border-top: 0; color: var(--md-sys-color-on-surface-variant); font-weight: 500; font-size: 12px; }
+table.q th[scope="row"] { font-weight: 500; width: 34%; }
+.cell-v { position: relative; display: inline-block; cursor: default; border-bottom: 1px dotted var(--md-sys-color-outline); }
+.cell-v .pop { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; min-width: 320px; max-width: 520px; padding: 12px 14px; border-radius: 12px;
+  background: var(--md-sys-color-surface-container-lowest); color: var(--md-sys-color-on-surface); box-shadow: 0 2px 6px rgba(0,0,0,.15), 0 8px 24px rgba(0,0,0,.12); font-size: 13px; line-height: 18px; font-weight: 400; }
+.cell-v .pop b { display: block; margin-bottom: 6px; font-weight: 500; }
+.cell-v .pop ul { margin: 0; padding-left: 18px; max-height: 260px; overflow: auto; }
+.cell-v:hover .pop, .cell-v:focus-within .pop, .cell-v:focus .pop { display: block; }
+@media (max-width: 1000px) { .live.inline { grid-template-columns: 1fr; } }
 .screen { border-radius: 12px; background: var(--md-sys-color-surface-container); display: grid; place-items: center; min-height: 340px;
   position: relative; overflow: hidden; }
 .screen .fake { width: 86%; display: grid; gap: 10px; }

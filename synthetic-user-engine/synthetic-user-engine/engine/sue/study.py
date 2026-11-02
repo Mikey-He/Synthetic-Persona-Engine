@@ -4,7 +4,7 @@ Each person: the engine's runs at that person's window, against that person's fi
 how often each thing was done, how often each check passed, among the people and among the runs.
 The group level is what a team without participants would rely on, so it is reported on its own.
 
-    python -m sue.study --flow <flow.json> --participants <folder> --runs 5 --watch
+    python -m sue.study --flow <flow.json> --participants <folder> --runs 5
 """
 
 from __future__ import annotations
@@ -285,7 +285,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--report", nargs="+", help="make one report from these study folders instead of running")
     parser.add_argument("--runs", type=int, default=5, help="runs per person, seeds 1 to this number (default 5)")
     parser.add_argument("--only", action="append", help="a participant id, such as 001; repeat for more (default all)")
-    parser.add_argument("--watch", action="store_true", help="show every run in a window, live")
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--seeds", help="which seeds, such as 3 or 1,2,3, instead of 1 to --runs")
     args = parser.parse_args(argv)
@@ -324,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
                                  "checks": person_checks(person, success), "runs": []}
         for seed in [int(x) for x in args.seeds.split(",")] if args.seeds else range(1, args.runs + 1):
             print(f"\n##### {name}, seed {seed} (window {w}x{h})")
-            summary = run(card, config, target, model, max_steps=args.max_steps, seed=seed, watch=args.watch)
+            summary = run(card, config, target, model, max_steps=args.max_steps, seed=seed)
             if "no_credits" in (summary["stop"].get("why") or ""):
                 print(f"Stopped: the model's credits ran out ({summary['stop']['why']})", file=sys.stderr)
                 return 3

@@ -33,7 +33,7 @@ from .similarity import similarity, task_words
 from .target import Target
 from .task import load_readings
 from .variability import make, traits_of
-from .viewer import Dashboard, LiveFeed, write_report
+from .viewer import LiveFeed, write_report
 from .words import build_vocabulary
 
 PROMPT_VERSION = "engine-p4-v2-en"
@@ -89,7 +89,7 @@ def looks_after(rng, careful: float, wants_more: bool, limit: int, chance: float
 
 
 def run_session(card: str, config: dict[str, Any], target: Target, model: Model, *, headed: bool = False,
-                watch: bool = False, max_steps: int | None = None, seed: int = 0, live: bool = False) -> dict[str, Any]:
+                max_steps: int | None = None, seed: int = 0, live: bool = False) -> dict[str, Any]:
     workflow = config["workflow"]
     persona: Persona = load_card(config["paths"]["personas"], card, workflow.get("file"))
     extras, aim = workflow.get("actions") or [], workflow.get("outcome") or {"kind": "change"}
@@ -153,8 +153,8 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
     print(f"=== {card} ({persona.name}) session {session.id}, log in {log.dir}\n    {traits.as_dict()}, orientation {orientation:.2f}, seed {seed}")
 
     with sync_playwright() as pw:
-        browser, page = open_browser(pw, config, headless=not headed or watch, strip=strip, state=target.storage_state())
-        show = Dashboard(log.dir, pw, page, viewport) if watch else LiveFeed(log.dir, page, viewport) if live else None
+        browser, page = open_browser(pw, config, headless=not headed, strip=strip, state=target.storage_state())
+        show = LiveFeed(log.dir, page, viewport) if live else None
         screen = Screen(page, vocab, config, show=show, reveal_hover=traits.check >= 2.5, strip=strip)
         screen.color, screen.download_dir = traits.color, log.dir
         say = show.phase if show else (lambda text: None)
@@ -466,9 +466,6 @@ def run_session(card: str, config: dict[str, Any], target: Target, model: Model,
         print(f"Grading: {'pass' if ev.get('overall') else 'fail'}  {ev.get('criteria')}")
         if show:
             show.finish()
-            if watch:
-                print("\nClose the watch window to end. To see it again later, open report.html above.")
-            show.wait_until_closed()
             show.close()
         browser.close()
     summary["report"] = str(report)

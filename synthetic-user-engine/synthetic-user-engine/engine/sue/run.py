@@ -6,8 +6,8 @@ acts; session memory, patience (4.5) and the completion check (4.6) decide when 
 Trait scores, fatigue, time pressure, distraction, unnoticed warnings, small text and near-miss
 clicks come from sue/variability.py (4.9), drawn from --seed; a v2 card runs as it always did.
 
-    python -m sue.run --card full --watch     # one window: his screen live on the left, the log on the right
-    python -m sue.run --card blank            # no window, same files
+    python -m sue.run --card full             # a run; its files land in runs/
+    python -m sue.run --card blank --live     # also writes the live screen for the platform's run page
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from .screen import RewriteError, Screen, Strip, open_browser
 from .similarity import similarity, task_values, task_words
 from .target import Target, make_target
 from .variability import make, traits_of
-from .viewer import Dashboard, LiveFeed, write_report
+from .viewer import LiveFeed, write_report
 from .words import Vocabulary, build_vocabulary
 
 DISTRACTED = "Distracted for a moment; did not notice this element"
@@ -124,7 +124,7 @@ def attention_done(attention: Attention, obs) -> bool:
 
 
 def run(card: str, config: dict[str, Any], target: Target, model: Model, *, headed: bool = False,
-        watch: bool = False, max_steps: int | None = None, seed: int = 0, live: bool = False) -> dict[str, Any]:
+        max_steps: int | None = None, seed: int = 0, live: bool = False) -> dict[str, Any]:
     """live: write the screen and the pointer into the run folder as it goes, for the platform's Watch live."""
     workflow = config["workflow"]
     persona = load_card(config["paths"]["personas"], card, workflow.get("file"))
@@ -133,7 +133,7 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
                          f"\"{workflow['name']}\" ({workflow['file']}). Pass --flow with that workflow's flow.json.")
     if persona.version >= 3 and config.get("mind"):  # one mechanism (engine-design.md 4.10); only v2 cards still use the rules below
         from .session import run_session
-        return run_session(card, config, target, model, headed=headed, watch=watch, max_steps=max_steps, seed=seed, live=live)
+        return run_session(card, config, target, model, headed=headed, max_steps=max_steps, seed=seed, live=live)
     created, answer_key = workflow["created"], list_key(workflow["created"])
     # What else this workflow needs (engine-design.md 6.3): extra actions, and a result that is an
     # answer found or a page reached rather than something saved. Version A has neither.
@@ -248,8 +248,8 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
 
     with sync_playwright() as pw:
         # In watch mode the engine's own browser has no window: the dashboard streams it.
-        browser, page = open_browser(pw, config, headless=not headed or watch, strip=strip, state=target.storage_state())
-        show = Dashboard(log.dir, pw, page, viewport) if watch else LiveFeed(log.dir, page, viewport) if live else None
+        browser, page = open_browser(pw, config, headless=not headed, strip=strip, state=target.storage_state())
+        show = LiveFeed(log.dir, page, viewport) if live else None
         screen = Screen(page, vocab, config, show=show, reveal_hover=policy.check in ("medium", "high"), strip=strip)
         screen.color = traits.color
         screen.download_dir = log.dir
@@ -786,9 +786,6 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
             print(f"  {f['path']:<24} {f['what']}")
         if show:
             show.finish()
-            if watch:
-                print("\nClose the watch window to end. To see it again later, open report.html above.")
-            show.wait_until_closed()
             show.close()
         browser.close()
     summary["report"] = str(report)
@@ -798,7 +795,6 @@ def run(card: str, config: dict[str, Any], target: Target, model: Model, *, head
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run of the synthetic user engine")
     parser.add_argument("--card", default="full", help="blank / full, or a card file name in data/personas (mikey, joy, ...)")
-    parser.add_argument("--watch", action="store_true", help="one window: his screen live on the left, the log on the right")
     parser.add_argument("--headed", action="store_true", help="show the engine's browser only")
     parser.add_argument("--max-steps", type=int, help="most actions before stopping (looking around is not counted)")
     parser.add_argument("--viewport", help="window size, e.g. 1920x955; default from config.toml")
@@ -828,7 +824,7 @@ def main(argv: list[str] | None = None) -> int:
         w, h = (int(x) for x in size.lower().split("x"))
         config["platform"]["viewport_width"], config["platform"]["viewport_height"] = w, h
     model = gemini_for(config, require_env("GEMINI_API_KEY"))
-    run(args.card, config, target, model, headed=args.headed, watch=args.watch, max_steps=args.max_steps, seed=args.seed)
+    run(args.card, config, target, model, headed=args.headed, max_steps=args.max_steps, seed=args.seed)
     return 0
 
 

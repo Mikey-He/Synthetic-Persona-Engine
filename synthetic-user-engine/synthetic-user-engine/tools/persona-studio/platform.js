@@ -112,7 +112,7 @@ async function loadWorkflows() {
   const data = await api('/api/workflows');
   S.workflows = data.workflows; S.current = data.current;
   const w = currentWf();
-  $('#workflow-label').textContent = w ? w.name : 'Choose a workflow';
+  const wl = $('#workflow-label'); if (wl) wl.textContent = w ? w.name : 'Choose a workflow';
 }
 async function loadPersonas() { const d = await api('/api/personas'); S.personas = d.personas; S.selfTest = d.selfTest; }
 async function loadResults() { S.results = (await api('/api/results')).results; }
@@ -129,6 +129,20 @@ function waitBuilder() {
 
 /* ---------------- pages ---------------- */
 const pages = {};
+/* The one workflow this platform tests, read-only (2026-11-01). */
+pages.workflow = async () => {
+  const b = await api('/api/billing');
+  const li = (xs, f) => xs.map(x => `<li>${f(x)}</li>`).join('');
+  return `<div class="page" style="max-width:960px">
+    <div class="page-head"><div><h1>${esc(b.name)}</h1><p class="muted">The one workflow this platform tests. Personas run it; the results are read against the people who did it.</p></div></div>
+    <div class="card"><h2>The task, as the participant reads it</h2><p style="white-space:pre-wrap;margin:12px 0">${esc(b.task)}</p><p class="muted small" style="margin:0">Product: <a href="${esc(b.start)}" target="_blank" rel="noopener">${esc(b.start)}</a></p></div>
+    <div class="card"><h2>The steps of the task</h2><ol style="margin:12px 0 0;padding-left:22px;line-height:1.7">${li(b.steps, s => esc(s.action))}</ol>
+      <p class="muted small" style="margin:12px 0 0">Results are read by the parts of the form: ${b.parts.map(esc).join(' → ')}; before the form and after the save count as parts too.</p></div>
+    <div class="card"><h2>What must be right at the end</h2><ul style="margin:12px 0 0;padding-left:22px;line-height:1.7">${li(b.checks, esc)}</ul></div>
+    <div class="card"><h2>Where the task can be read more than one way</h2><p class="muted small" style="margin:6px 0 12px">Listed once from the task text. Each run draws one reading per fork; a careful persona may think again on the screen that bears on it.</p>
+      ${b.readings.map(r => `<div class="knowrow"><div style="min-width:0"><h3>${esc(r.about)}</h3><ul style="margin:6px 0 0;padding-left:20px" class="muted small">${li(r.options, esc)}</ul></div></div>`).join('') || '<p class="muted">None listed.</p>'}</div>
+  </div>`;
+};
 pages.home = async () => {
   await Promise.all([loadPersonas(), loadResults()]);
   const w = currentWf(), ready = w && w.status.key === 'ready';
@@ -184,7 +198,7 @@ function readBasics() {
 }
 /* ---- Advanced settings: every part of a test's flow, for review by hand ---- */
 const W = {id: null, d: null, edit: null, dirty: false, tab: 0, stepState: {}, picking: null, poll: null};
-pages.workflow = async (id) => {
+pages['workflow-editor'] = async (id) => {
   W.id = id; clearTimeout(W.poll);
   W.d = await api(`/api/workflow?id=${encodeURIComponent(id)}`);
   if (!W.dirty || !W.edit || W.edit.__id !== id) { W.edit = W.d.flow ? clone(W.d.flow) : null; if (W.edit) W.edit.__id = id; W.dirty = false; }
@@ -849,19 +863,10 @@ function editorHTML(p, flat, src) {
       ${STATES.map(s => `<div class="trait"><div class="head"><h3>${s.title}</h3></div>
         <md-slider min="0" max="10" step="0.5" value="${p[s.key]}" labeled data-trait="${s.key}" aria-label="${s.title}"></md-slider>
         <div class="readout">${s.note}</div>${sourceTag(src, s.key)}</div>`).join('')}
-      ${choiceRow('How pressure builds', 'With time pressure above 0', 'humanFactors.pressureChange', [['steady', 'Stays steady'], ['rises_after_setbacks', 'Rises after setbacks']], factor(p, 'pressureChange'), src)}
-      ${choiceRow('Coping with setbacks', 'Low: pressure rises fast after a wrong turn', 'humanFactors.stressTolerance', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], factor(p, 'stressTolerance'), src)}
-      ${choiceRow('Urgency', `Urgent sets time pressure to at least ${esc((window.SUE_PERSONA || {}).urgent_min_time_pressure)}`, 'urgency', [['calm', 'Calm'], ['urgent', 'Urgent']], p.urgency, src)}
-      ${choiceRow('Stakes', 'High: more careful when checking, less daring', 'stakes', [['low', 'Low'], ['high', 'High']], p.stakes, src)}</div>
     <div class="${box}"><h2>What they know</h2><p class="muted small" style="margin:6px 0 12px">Terms they don't know show up as made-up words, as they would to them.</p>
       ${groupsVisible().map(g => `<div class="knowrow"><div style="min-width:0"><h3>${esc(g.title)}</h3><div class="muted small">${esc(g.examples || g.description)}</div></div>
         <div class="seg" role="radiogroup" aria-label="${esc(g.title)}">${LEVEL_WORDS[!!g.word].map((l, i) =>
           `<button type="button" role="radio" aria-checked="${p.knowledge[g.key] === i}" class="${p.knowledge[g.key] === i ? 'on' : ''}" data-know="${esc(g.key)}" data-v="${i}">${l}</button>`).join('')}</div></div>${sourceTag(src, 'knowledge.' + g.key)}`).join('')}</div>
-    <details class="${box} more"><summary><h2>Seeing, clicking and warnings</h2><span class="ms">expand_more</span></summary>
-      ${choiceRow('Colour', '', 'humanFactors.colorVision', [['typical', 'Normal'], ['reduced', 'Reduced'], ['no_color_cues', 'Cannot rely on it']], factor(p, 'colorVision'), src)}
-      ${choiceRow('Clicking small targets', '', 'humanFactors.clickPrecision', [['high', 'Precise'], ['medium', 'Sometimes misses'], ['low', 'Often misses']], factor(p, 'clickPrecision'), src)}
-      ${choiceRow('Reading speed', 'Slower reading tires them sooner', 'humanFactors.readingSpeed', [['slow', 'Slow'], ['average', 'Average'], ['fast', 'Fast']], factor(p, 'readingSpeed'), src)}
-      ${choiceRow('Noticing warnings', '', 'humanFactors.warningAttention', [['low', 'Often misses'], ['medium', 'Sometimes misses'], ['high', 'Always notices']], factor(p, 'warningAttention'), src)}</details>
     <details class="${box} more"><summary><h2>Language and finishing</h2><span class="ms">expand_more</span></summary>
       <div class="knowrow" style="border-top:0"><div style="min-width:0"><h3>English</h3><div class="muted small" data-english-note>${englishNote(p)}</div></div>
         <div class="seg">${['beginner','intermediate','fluent'].map(k => `<button type="button" class="${p.english === k ? 'on' : ''}" data-english="${k}" title="About ${englishWords(k)} common words">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>
@@ -1136,14 +1141,14 @@ function refreshChips(el) {
 let runs = 5;
 pages.run = async () => {
   await loadPersonas();
-  const w = currentWf() || {}, ready = w.status && w.status.key === 'ready';
+  const w = currentWf() || {}, ready = w.status && ['ready', 'changed'].includes(w.status.key);
   const pick = p => `<label class="pick"><md-checkbox touch-target="wrapper" data-pick="${esc(p.id)}" ${p.kind !== 'self' && (!preselect || preselect === p.id) ? 'checked' : ''}></md-checkbox>${avatar(p, 40)}<div style="flex:1;min-width:0"><div>${esc(p.name)}</div><div class="muted small">${kindLabel(p)}</div></div></label>`;
   return `<div class="page">
     <div class="page-head"><div><h1>Run a test</h1><p class="muted">Each persona runs several times, so you see how often a problem happens.</p></div></div>
     ${ready ? '' : `<div class="banner bad"><span class="ms">block</span><div>${esc(w.name || 'This workflow')} is not ready to test. <a href="#test/${esc(w.id)}">Finish setting it up</a> first.</div></div>`}
     <div class="run-grid">
       <div class="stack">
-        <div class="card"><div class="row" style="justify-content:space-between"><div style="min-width:0"><h3>${esc(w.name || 'Workflow')}</h3><p class="muted small" style="margin:4px 0 0">${esc(String(w.task || '').split(/(?<=[.!?])\s/)[0])}</p></div><md-outlined-button id="change-flow">Change</md-outlined-button></div></div>
+        <div class="card"><div class="row" style="justify-content:space-between"><div style="min-width:0"><h3>${esc(w.name || 'Workflow')}</h3><p class="muted small" style="margin:4px 0 0">${esc(String(w.task || '').split(/(?<=[.!?])\s/)[0])}</p></div></div></div>
         <div class="card"><h3 style="margin-bottom:8px">Who takes part</h3>
           ${S.personas.map(pick).join('') || '<p class="muted">No personas yet. <a href="#new">Describe one</a>.</p>'}
         </div>
@@ -1157,7 +1162,7 @@ pages.run = async () => {
     <div id="progress-area"></div></div>`;
 };
 function setupRun() {
-  const ready = (currentWf() || {}).status && currentWf().status.key === 'ready';
+  const ready = (currentWf() || {}).status && ['ready', 'changed'].includes(currentWf().status.key);
   const chosen = () => $$('[data-pick]').filter(c => c.checked).map(c => c.dataset.pick);
   const summary = () => {
     const n = chosen().length;
@@ -1167,7 +1172,7 @@ function setupRun() {
   $('#runs-minus').addEventListener('click', () => { runs = Math.max(1, runs - 1); $('#runs-n').textContent = runs; summary(); });
   $('#runs-plus').addEventListener('click', () => { runs = Math.min(10, runs + 1); $('#runs-n').textContent = runs; summary(); });
   $$('[data-pick]').forEach(c => c.addEventListener('change', summary));
-  $('#change-flow').addEventListener('click', openPicker);
+  const cf = $('#change-flow'); if (cf) cf.addEventListener('click', openPicker);
   $('#start-run').addEventListener('click', async () => {
     try { const r = await api('/api/tests/start', {cards: chosen(), runs}); S.runJob = {id: r.id, cards: chosen(), runs}; showProgress(); } catch (e) { fail(e); }
   });
@@ -1188,10 +1193,29 @@ function showProgress() {
       <div class="row"><span class="muted small" id="eta"></span><md-text-button id="stop-run">Stop</md-text-button></div></div>
     <md-linear-progress id="overall" value="0" style="margin:16px 0 8px"></md-linear-progress>
     ${job.cards.map(c => `<div class="livecard">${avatar({id: c, name: nameOf(c)}, 40)}<div style="min-width:0"><div>${esc(nameOf(c))}</div><div class="muted small" data-status="${esc(c)}">Waiting</div>
-      <div class="dots" data-dots="${esc(c)}">${Array.from({length: job.runs}, () => '<span></span>').join('')}</div></div>
-      <md-text-button class="watch-btn" data-watch="${esc(c)}"><span slot="icon" class="ms">visibility</span>Watch live</md-text-button></div>`).join('')}</div>`;
+      <div class="dots" data-dots="${esc(c)}">${Array.from({length: job.runs}, () => '<span></span>').join('')}</div></div><span></span></div>`).join('')}</div>
+    <div class="card" style="margin-top:16px"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h2 id="live-title">Watching the run</h2><span class="muted small" id="live-phase"></span></div>
+      <div class="live inline">
+        <div><div class="livescreen" id="live-screen">
+          <img id="live-img" alt="What the persona sees now" hidden>
+          <div class="lfocus" id="live-focus" hidden></div>
+          <svg class="lpointer" id="live-pointer" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 2l15 11-6.5 1.2 3.8 7.3-2.6 1.4-3.8-7.3L4 20z" fill="#e37400" stroke="#fff" stroke-width="1.5"/></svg>
+          <div class="lripple" id="live-ripple"></div>
+          <div class="lwait" id="live-wait"><md-circular-progress indeterminate></md-circular-progress></div>
+        </div></div>
+        <div class="log" id="live-log"><div class="muted">Waiting for the first step…</div></div>
+      </div></div>`;
   $('#stop-run').addEventListener('click', async () => { try { await api('/api/jobs/stop', {id: job.id}); } catch (e) { fail(e); } });
   pollRun();
+  startLive();
+}
+/* One step as a person would tell it: what they did and how good it looked, where they were looking and how they read the task, why. */
+function stepLine(s) {
+  const worth = s.worth ? (s.settled ? `took the best, ${s.worth}` : `${s.worth} of ${s.want || '?'}`) : '';
+  const reading = (s.reading || '').match(/\$[\d,]*\d/g);
+  const where = [s.looking ? `looking at ${s.looking.replace(/ \(piece.*\)/, '')}` : '', reading ? `reads the amount as ${reading[0]}` : ''].filter(Boolean).join(' · ');
+  return `<div class="step-line"><span class="n">${s.step}</span><div class="title">${esc(s.did || 'looked around')}</div>${worth ? `<span class="worth ${s.settled ? 'low' : ''}">${esc(worth)}</span>` : '<span></span>'}
+    ${where ? `<div class="sub">${esc(where)}</div>` : ''}${s.why ? `<div class="sub why">${esc(s.why)}</div>` : ''}</div>`;
 }
 let runTimer;
 async function pollRun() {
@@ -1232,14 +1256,13 @@ function placeLive(st) {
   const f = $('#live-focus'), rect = st.focus;
   f.hidden = !rect;
   if (rect) Object.assign(f.style, {left: pct(rect.x, W0), top: pct(rect.y, H0), width: pct(rect.w, W0), height: pct(rect.h, H0)});
-  $('#live-phase').textContent = st.phase || '';
+  const ph = $('#live-phase'); if (ph) ph.textContent = String(st.phase || '').replace(/^Step \d+: /, '').split(';')[0].slice(0, 80);
 }
-async function openLive() {
-  const job = S.runJob; if (!job) return snack('Nothing is running right now.');
-  LIVE.frame = -1; LIVE.dir = null; LIVE.on = true;  // the dialog's own open flag comes a moment after show()
-  $('#live-dialog').show();
+async function startLive() {
+  const job = S.runJob; if (!job) return;
+  LIVE.frame = -1; LIVE.dir = null; LIVE.on = true;
   const tick = async () => {
-    if (!LIVE.on) return;
+    if (!LIVE.on || !S.runJob || !$('#live-screen')) { LIVE.on = false; return; }
     try {
       const v = await api(`/api/live?id=${job.id}`);
       $('#live-title').textContent = v.card ? `Watching · ${v.card} · run ${v.seed}` : 'Watching the run';
@@ -1252,8 +1275,7 @@ async function openLive() {
         next.src = `${v.frame}?f=${LIVE.frame}-${Date.now()}`;
       }
       if (st) placeLive(st);
-      $('#live-log').innerHTML = (v.steps || []).slice().reverse().map(s => `<div><b>Step ${s.step}</b> · ${esc(s.did || 'looking')}
-        ${s.why ? `<div class="small" style="margin-top:2px">“${esc(s.why)}”</div>` : ''}<div class="muted small">${esc(s.rule || '')}</div></div>`).join('') || '<div>Opening the product…</div>';
+      $('#live-log').innerHTML = (v.steps || []).slice().reverse().map(stepLine).join('') || '<div class="muted">Waiting for the first step…</div>';
     } catch (e) { /* between runs */ }
     liveTimer = setTimeout(tick, 300);
   };
@@ -1290,7 +1312,7 @@ function stepTrouble(i) {
   const runs = RES.all.filter(r => r.path), at = r => r.path[i] || {};
   return {trouble: runs.filter(r => TROUBLE.has(at(r).status)), hesitated: runs.filter(r => at(r).status === 'hesitated')};
 }
-pages.result = async (id) => {
+pages['result-journey'] = async (id) => {
   if (!S.results.length) await loadResults();
   RES = await api(`/api/result?id=${encodeURIComponent(id)}`);
   RES.all = RES.cards.flatMap(c => c.runList.map((r, i) => ({...r, name: c.name, card: c.card, n: i + 1})));
@@ -1394,6 +1416,80 @@ function resultsBody(tab) {
       <span slot="end" class="ms ${pass ? 'ok' : 'bad'}">${pass ? 'check_circle' : 'error'}</span></md-list-item>`; }).join('')}</md-list></div>`;
 }
 
+/* ---------------- the result page: three questions, the computation behind every cell (2026-11-01) ---------------- */
+const PLAIN = {'Before the form': 'Finding the budget page', Define: 'Naming', Scope: 'Time, project, services', Amount: 'The amount', Actions: 'The alert', 'After the save': 'After the save'};
+const KIND = {'lost the way': 'lost the way', 'changed a value': 'changed a value', 'went back': 'went back', 'left unsaved': 'left unsaved', 'wrong when saved': 'saved wrong'};
+function cell(text, title, lines, cls = '') {
+  // A value with what it was computed from: the definition, then one line per person or run.
+  return `<td><span class="cell-v ${cls}" tabindex="0">${text}<span class="pop"><b>${esc(title)}</b>${lines.length ? `<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</span></span></td>`;
+}
+function tablesHTML(T) {
+  const P = T.people, R = T.runs, nP = P.length, nR = R.length, D = T.definitions;
+  const who = x => x.n ? `${x.name} run ${x.n}` : x.name;
+  const tally = (xs, f) => { const c = new Map(); xs.forEach(x => { const k = f(x) || '(none)'; c.set(k, (c.get(k) || 0) + 1); }); return [...c].sort((a, b) => b[1] - a[1]); };
+  const top = (xs, f, n = 3) => tally(xs, f).slice(0, n).map(([k, v]) => `${k.slice(0, 26)} ${v}`).join(', ') || '—';
+  const entryOf = x => /Budgets & caps/.test(x.entry) ? 'side menu' : /Budgets & alerts/.test(x.entry) ? 'search' : x.entry ? 'other' : 'never reached';
+  const inPart = (x, part) => x.trouble.filter(t => t[0] === part);
+  const lost = x => x.trouble.filter(t => t[1] === 'lost the way').length;
+  const wentBack = x => x.trouble.some(t => t[1] === 'went back');
+  const head = `<tr><th>What</th><th>People (${nP})</th><th>Engine (${nR} runs)</th></tr>`;
+  const row = (what, pf, rf, title, pl, rl, cls) => `<tr><th scope="row">${esc(what)}</th>${nP ? cell(pf(P), title, pl(P), cls) : '<td class="muted">no participant files</td>'}${cell(rf(R), title, rl(R), cls)}</tr>`;
+  const list = (xs, f) => xs.map(x => `${who(x)}: ${f(x)}`);
+  const q1 = [
+    row('First click', xs => top(xs, x => x.first), xs => top(xs, x => x.first), 'The first control each one clicked', xs => list(xs, x => x.first || '(none)'), xs => list(xs, x => x.first || '(none)')),
+    row('Way into the form', xs => top(xs, entryOf), xs => top(xs, entryOf), 'The control clicked just before + CREATE BUDGET', xs => list(xs, x => `${entryOf(x)} (${x.entry || '—'})`), xs => list(xs, x => `${entryOf(x)} (${x.entry || '—'})`)),
+    row('Went back inside the form', xs => `${xs.filter(wentBack).length} of ${xs.length}`, xs => `${xs.filter(wentBack).length} of ${xs.length}`, D['went back'],
+        xs => list(xs.filter(wentBack), x => x.trouble.filter(t => t[1] === 'went back').map(t => t[2]).join('; ')), xs => list(xs.filter(wentBack), x => x.trouble.filter(t => t[1] === 'went back').map(t => t[2]).join('; '))),
+  ].join('');
+  const troubleRow = part => {
+    const f = xs => `${xs.filter(x => inPart(x, part).length).length} of ${xs.length}`;
+    const detail = xs => xs.filter(x => inPart(x, part).length).map(x => `${who(x)}: ${part === 'Before the form' ? `${lost(x)} wrong clicks (${[...new Set(inPart(x, part).map(t => t[2]))].slice(0, 6).join(', ')})` : [...new Set(inPart(x, part).map(t => `${KIND[t[1]]}: ${t[2]}`))].join('; ')}`);
+    const kinds = part === 'Before the form' ? D['lost the way'] : ['changed a value', 'went back', 'left unsaved', 'wrong when saved'].map(k => `${KIND[k]}: ${D[k]}`).join(' · ');
+    return row(PLAIN[part] || part, f, f, `Trouble here means: ${kinds}`, detail, detail);
+  };
+  const q2 = T.parts.filter(p => p !== 'After the save').map(troubleRow).join('');
+  const timeRow = part => {
+    const share = xs => xs.length ? `${Math.round(100 * xs.reduce((s, x) => s + (x.seconds[part] || 0) / (Object.values(x.seconds).reduce((a, b) => a + b, 0) || 1), 0) / xs.length)}%` : '—';
+    const detail = xs => list(xs, x => `${Math.round(x.seconds[part] || 0)} s of ${Math.round(Object.values(x.seconds).reduce((a, b) => a + b, 0))} s`);
+    return row(PLAIN[part] || part, share, share, `Share of the session's time spent here, averaged over sessions. ${D.seconds}`, detail, detail);
+  };
+  const q2t = T.parts.map(timeRow).join('');
+  const amountOf = x => x.saved && x.saved.amount ? `$${x.saved.amount}` : 'nothing saved';
+  const failWhy = x => Object.entries(x.checks || {}).filter(([, ok]) => !ok).map(([k]) => k.split(' (')[0]).join('; ');
+  const q3 = [
+    row('Did the task right', xs => `${xs.filter(x => x.passed).length} of ${xs.length}`, xs => `${xs.filter(x => x.passed).length} of ${xs.length}`, 'Every check passes and they said they were done',
+        xs => list(xs, x => x.passed ? 'yes' : `no: ${failWhy(x) || x.stop || 'did not finish'}`), xs => list(xs, x => x.passed ? 'yes' : `no: ${failWhy(x) || x.stop || 'did not finish'}`)),
+    row('Amount saved', xs => top(xs, amountOf), xs => top(xs, amountOf), 'The amount in the budget saved last', xs => list(xs, x => `${amountOf(x)}; rules ${(x.saved || {}).rules ? x.saved.rules.join(', ') : '—'}`), xs => list(xs, x => `${amountOf(x)}; rules ${(x.saved || {}).rules ? x.saved.rules.join(', ') : '—'}`)),
+  ].join('');
+  const byName = new Map(P.map(p => [p.name, p]));
+  const personTables = [...new Set(R.map(r => r.name))].map(name => {
+    const rs = R.filter(r => r.name === name), p = byName.get(name);
+    const seq = f => rs.map(f).join(', ');
+    const inForm = x => T.parts.slice(1, -1).reduce((s, k) => s + (x.moves[k] || 0), 0);
+    const ft = x => [...new Set(x.trouble.filter(t => t[1] !== 'lost the way').map(t => `${PLAIN[t[0]] || t[0]}: ${KIND[t[1]]}`))].join('; ') || 'none';
+    const rows = [['Did the task right', p ? (p.passed ? 'yes' : 'no') : '—', seq(r => r.passed ? 'yes' : 'no')], ['First click', p ? p.first : '—', seq(r => r.first)],
+      ['Wrong clicks before the form', p ? lost(p) : '—', seq(lost)], ['Moves inside the form', p ? inForm(p) : '—', seq(inForm)],
+      ['Amount saved', p ? amountOf(p) : '—', seq(amountOf)], ['Trouble inside the form', p ? ft(p) : '—', rs.map((r, i) => `run ${i + 1}: ${ft(r)}`).join('<br>')]];
+    return `<div class="card"><div class="row" style="gap:12px;margin-bottom:8px">${avatar({id: rs[0].card, name}, 36)}<h3>${esc(name)}</h3>${p ? '' : '<span class="muted small">no participant file</span>'}</div>
+      <table class="matrix q"><tr><th></th><th>Person</th><th>Engine, ${rs.length} run${rs.length > 1 ? 's' : ''}</th></tr>${rows.map(([a, b, c]) => `<tr><th scope="row">${a}</th><td>${a.startsWith('Trouble') ? b : esc(String(b))}</td><td>${a.startsWith('Trouble') ? c : esc(String(c))}</td></tr>`).join('')}</table>
+      <p class="muted small" style="margin:8px 0 0">${rs.map((r, i) => `<a href="${r.report}" target="_blank">run ${i + 1}</a>`).join(' · ')}</p></div>`;
+  }).join('');
+  return `<div class="card"><h2>Is the direction right?</h2><table class="matrix q">${head}${q1}</table></div>
+    <div class="card"><h2>Where does it go wrong?</h2><p class="muted small" style="margin:4px 0 10px">How many had trouble in each part. Hover a number for who, and what.</p><table class="matrix q">${head}${q2}</table>
+      <h3 style="margin-top:20px">Where does the time go?</h3><table class="matrix q">${head}${q2t}</table></div>
+    <div class="card"><h2>Is the task done?</h2><table class="matrix q">${head}${q3}</table></div>
+    <h2 style="margin:24px 0 12px">Each persona</h2>${personTables}`;
+}
+pages.result = async (id) => {
+  const [T] = await Promise.all([api(`/api/tables?id=${encodeURIComponent(id)}`), loadResults()]);
+  const others = (S.results || []).map(r => `<md-filter-chip label="${esc(when(r.at))} · ${r.runs} run${r.runs === 1 ? '' : 's'}" data-go="result/${esc(r.id)}" ${r.id === id ? 'selected' : ''}></md-filter-chip>`).join('');
+  return `<div class="page">
+    <div class="page-head"><div><h1>Result · ${esc(when(T.at))}</h1><p class="muted">${T.runs.length} runs of ${new Set(T.runs.map(r => r.card)).size} personas${T.people.length ? `, read against ${T.people.length} participant${T.people.length > 1 ? 's' : ''} who did the task` : ''}. Hover any number for how it was computed.</p></div>
+    </div>
+    ${others ? `<div class="chips" style="margin:0 0 16px">${others}</div>` : ''}
+    ${tablesHTML(T)}</div>`;
+};
+
 /* ---------------- workflow picker ---------------- */
 function openPicker() {
   $('#workflow-list').innerHTML = S.workflows.map(w => `<md-list-item type="button" data-flow="${esc(w.id)}" ${w.steps ? '' : 'disabled'}><span slot="start" class="ms">account_tree</span>
@@ -1411,9 +1507,9 @@ function go(name) { location.hash = name; }
 let rendering = 0;
 async function render() {
   const n = ++rendering;
-  let [name, arg] = (location.hash || '#home').slice(1).split('/');
-  name = {workflows: 'tests', 'new-workflow': 'new-test', workflow: 'test'}[name] || name;  // the old pages are gone
-  const page = pages[name] ? name : 'home';
+  let [name, arg] = (location.hash || '#workflow').slice(1).split('/');
+  name = {home: 'workflow', tests: 'workflow', workflows: 'workflow', 'new-test': 'workflow', test: 'workflow', 'new-workflow': 'workflow'}[name] || name;  // one workflow: those pages are gone
+  const page = pages[name] ? name : 'workflow';
   if (!(name === 'workflow' && arg === W.id)) { W.picking = null; }
   try {
     const html = await pages[page](arg && decodeURIComponent(arg));
@@ -1471,9 +1567,6 @@ document.addEventListener('click', async e => {
       return;
     }
     if (t.matches('#sheet-run')) { const id = sheetFor.id; if (sheetDirty) await saveSheet(); else closeSheet(); preselect = id; return go('run'); }
-    if (t.matches('.watch-btn')) return openLive();
-    if (t.matches('#live-close')) { LIVE.on = false; clearTimeout(liveTimer); return $('#live-dialog').close(); }
-    if (t.matches('#live-size')) return toggleLiveSize();
     if (t.matches('#workflow-pick')) return openPicker();
     if (t.matches('#workflow-close')) return $('#workflow-dialog').close();
     if (t.matches('#help-btn')) return snack('Add a workflow by doing its task once; describe personas in plain words; run; read what went wrong.');

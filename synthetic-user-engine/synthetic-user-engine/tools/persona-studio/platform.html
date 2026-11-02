@@ -15,53 +15,19 @@
 <header class="top">
   <div class="brand"><span class="logo"><span class="ms fill" style="font-size:20px">diversity_3</span></span>Persona Engine</div>
   <span class="spacer"></span>
-  <button class="workflow-pick" id="workflow-pick" title="The workflow being tested">
-    <span class="ms" style="font-size:20px">account_tree</span><span class="label" id="workflow-label">Loading…</span><span class="ms" style="font-size:20px">arrow_drop_down</span>
-  </button>
   <md-icon-button aria-label="Help" id="help-btn"><span class="ms">help</span></md-icon-button>
 </header>
 
 <div class="shell">
   <nav class="rail" aria-label="Main">
     <div class="fab-slot"><md-fab size="medium" aria-label="New persona" id="rail-fab"><span slot="icon" class="ms">edit</span></md-fab></div>
-    <a href="#home" data-nav="home"><span class="pill"><span class="ms">home</span></span>Home</a>
+    <a href="#workflow" data-nav="workflow"><span class="pill"><span class="ms">account_tree</span></span>Workflow</a>
     <a href="#personas" data-nav="personas"><span class="pill"><span class="ms">groups</span></span>Personas</a>
-    <a href="#tests" data-nav="tests"><span class="pill"><span class="ms">science</span></span>Tests</a>
-    <a href="#run" data-nav="run"><span class="pill"><span class="ms">play_circle</span></span>Run test</a>
+    <a href="#run" data-nav="run"><span class="pill"><span class="ms">play_circle</span></span>Run</a>
     <a href="#results" data-nav="results"><span class="pill"><span class="ms">insights</span></span>Results</a>
   </nav>
   <main id="main"></main>
 </div>
-
-<md-dialog id="live-dialog">
-  <div slot="headline" class="live-head"><span id="live-title">Watching the run</span><span class="grow"></span>
-    <md-icon-button id="live-size" aria-label="Enlarge" title="Enlarge"><span class="ms">open_in_full</span></md-icon-button></div>
-  <div slot="content">
-    <div class="live">
-      <div>
-        <div class="livescreen" id="live-screen">
-          <img id="live-img" alt="What the persona sees now" hidden>
-          <div class="lfocus" id="live-focus" hidden></div>
-          <svg class="lpointer" id="live-pointer" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 2l15 11-6.5 1.2 3.8 7.3-2.6 1.4-3.8-7.3L4 20z" fill="#fff" stroke="#202124" stroke-width="1.6" stroke-linejoin="round"/></svg>
-          <div class="lripple" id="live-ripple"></div>
-          <div class="lwait" id="live-wait"><md-circular-progress indeterminate></md-circular-progress></div>
-        </div>
-        <div class="lphase" id="live-phase">Getting ready</div>
-      </div>
-      <div class="log" id="live-log"></div>
-    </div>
-  </div>
-  <div slot="actions"><md-text-button id="live-close">Close</md-text-button></div>
-</md-dialog>
-
-<md-dialog id="workflow-dialog">
-  <div slot="headline">Choose a workflow</div>
-  <div slot="content">
-    <p class="muted" style="margin-top:0">A workflow is one task on one product. Only a workflow that passed its checks can be tested.</p>
-    <md-list id="workflow-list"></md-list>
-  </div>
-  <div slot="actions"><md-text-button id="workflow-close">Done</md-text-button></div>
-</md-dialog>
 
 <md-dialog id="confirm-dialog">
   <div slot="headline" id="confirm-title"></div>

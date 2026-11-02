@@ -133,6 +133,10 @@ The last three commands need the local platform running (`npm run open:a` in the
 - `sue.smoke`: shows how each card sees each screen, without choosing or clicking.
 - `sue.compare`: lines up the engine's run and the person's session from the platform event logs, prints them side by side, computes content (recall, precision), order, first-touch order and saved settings, and writes `compare.json` into the run folder. Pilot sessions: Mikey `cmut8m8290000pk7stzauis43`.
 
+## The platform (2026-11-01)
+
+`tools/persona-studio` is now a platform for this one workflow: `python server.py --flow ../../data/workflows/<workflow>/flow.json`. Four pages: the workflow (read-only), personas (a participant file imported, or traits set by hand; only what the engine reads is shown), run (the live screen, the pointer and one concise line per step, inline), results (the three questions with the computation behind every number on hover, and one table per persona, read against the participant files when they exist). The engine's own `--watch` window is gone; `--live` writes what the platform shows.
+
 ## State on 2026-11-01
 
 The decision layer was rebuilt as one formula (`sue/mind.py`, run by `sue/session.py`, numbers in `config.toml [mind]`). Every card of format v3 (Persona Studio, and every imported participant) runs on it; a v2 card still runs on the rule set in `sue/choose.py` through `sue/run.py`.
