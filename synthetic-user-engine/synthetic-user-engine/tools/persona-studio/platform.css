@@ -238,6 +238,19 @@ table.q th[scope="row"] { font-weight: 500; width: 34%; }
 .cell-v .pop b { display: block; margin-bottom: 6px; font-weight: 500; }
 .cell-v .pop ul { margin: 0; padding-left: 18px; max-height: 260px; overflow: auto; }
 .cell-v:hover .pop, .cell-v:focus-within .pop, .cell-v:focus .pop { display: block; }
+/* Charts: people in the primary blue, the engine in a copper that reads apart from it in both themes. */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px 24px; }
+.chart { margin: 0; min-width: 0; }
+.chart figcaption { font: 500 14px/20px var(--md-ref-typeface-brand); margin-bottom: 4px; }
+.chart svg { width: 100%; height: auto; display: block; font: 12px var(--md-ref-typeface-plain); }
+.chart .lbl { fill: var(--md-sys-color-on-surface); font-size: 12px; }
+.chart .val { fill: var(--md-sys-color-on-surface-variant); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .p { fill: var(--md-sys-color-primary); } .chart .e { fill: #b4602a; }
+.chart .legend { fill: var(--md-sys-color-on-surface-variant); font-size: 11px; } .chart .lp { fill: var(--md-sys-color-primary); } .chart .le { fill: #b4602a; }
+.chart.big .bignums { display: flex; gap: 32px; padding: 8px 0; }
+.chart.big .bignums div { display: grid; gap: 2px; }
+.chart.big .n { font: 400 40px/44px var(--md-ref-typeface-brand); }
+.chart.big .n.p { color: var(--md-sys-color-primary); } .chart.big .n.e { color: #b4602a; }
 @media (max-width: 1000px) { .live.inline { grid-template-columns: 1fr; } }
 .screen { border-radius: 12px; background: var(--md-sys-color-surface-container); display: grid; place-items: center; min-height: 340px;
   position: relative; overflow: hidden; }

@@ -612,6 +612,30 @@ pages.results = async () => {
 /* ---------------- the result page: three questions, the computation behind every cell (2026-11-01) ---------------- */
 const PLAIN = {'Before the form': 'Finding the budget page', Define: 'Naming', Scope: 'Time, project, services', Amount: 'The amount', Actions: 'The alert', 'After the save': 'After the save'};
 const KIND = {'lost the way': 'lost the way', 'changed a value': 'changed a value', 'went back': 'went back', 'left unsaved': 'left unsaved', 'wrong when saved': 'saved wrong'};
+/* Bars, people beside the engine, drawn to one scale: label, two bars, the two values. */
+function barChart(title, rows, fmt, max) {
+  const W = 360, L = 150, H = 22, gap = 8, top = 26, right = 48, scale = (W - L - right) / (max || 1);
+  const bars = rows.map((r, i) => { const y = top + i * (2 * H + gap);
+    return `<text x="${L - 8}" y="${y + H}" text-anchor="end" class="lbl">${esc(r.label)}</text>
+      <rect x="${L}" y="${y}" width="${Math.max(1, r.a * scale)}" height="${H - 4}" rx="3" class="p"></rect><text x="${L + r.a * scale + 6}" y="${y + H - 7}" class="val">${esc(fmt(r.a))}</text>
+      <rect x="${L}" y="${y + H}" width="${Math.max(1, r.b * scale)}" height="${H - 4}" rx="3" class="e"></rect><text x="${L + r.b * scale + 6}" y="${y + 2 * H - 7}" class="val">${esc(fmt(r.b))}</text>`; }).join('');
+  const height = top + rows.length * (2 * H + gap);
+  return `<figure class="chart"><figcaption>${esc(title)}</figcaption><svg viewBox="0 0 ${W} ${height}" role="img" aria-label="${esc(title)}"><text x="${L}" y="14" class="legend"><tspan class="lp">■</tspan> people <tspan class="le">■</tspan> engine</text>${bars}</svg></figure>`;
+}
+function glanceHTML(T) {
+  const P = T.people, R = T.runs, parts = T.parts;
+  const name = p => (PLAIN[p] || p).replace('Finding the budget page', 'Finding the page');
+  const share = (xs, f) => xs.length ? xs.reduce((s, x) => s + f(x), 0) / xs.length : 0;
+  const total = x => Object.values(x.seconds).reduce((a, b) => a + b, 0) || 1;
+  const trouble = parts.filter(p => p !== 'After the save').map(p => ({label: name(p), a: share(P, x => x.trouble.some(t => t[0] === p) ? 1 : 0), b: share(R, x => x.trouble.some(t => t[0] === p) ? 1 : 0)}));
+  const time = parts.map(p => ({label: name(p), a: share(P, x => (x.seconds[p] || 0) / total(x)), b: share(R, x => (x.seconds[p] || 0) / total(x))}));
+  const moves = parts.map(p => ({label: name(p), a: share(P, x => x.moves[p] || 0), b: share(R, x => x.moves[p] || 0)}));
+  const pct = v => `${Math.round(v * 100)}%`;
+  const done = {a: share(P, x => x.passed ? 1 : 0), b: share(R, x => x.passed ? 1 : 0)};
+  return `<div class="card"><h2>At a glance</h2><p class="muted small" style="margin:4px 0 12px">${P.length ? `${P.length} people who did the task, beside ${R.length} engine runs.` : `${R.length} engine runs; no participant files for these personas, so the engine stands alone.`}</p>
+    <div class="charts">${barChart('Share who had trouble, by part', trouble, pct, 1)}${barChart('Share of the session\'s time, by part', time, pct, Math.max(0.01, ...time.flatMap(r => [r.a, r.b])))}${barChart('Moves made, by part (average)', moves, v => `${Math.round(v)}`, Math.max(1, ...moves.flatMap(r => [r.a, r.b])))}
+    <figure class="chart big"><figcaption>Did the task right</figcaption><div class="bignums"><div><span class="n p">${P.length ? pct(done.a) : '—'}</span><span class="muted small">people</span></div><div><span class="n e">${pct(done.b)}</span><span class="muted small">engine runs</span></div></div></figure></div></div>`;
+}
 function cell(text, title, lines, cls = '') {
   // A value with what it was computed from: the definition, then one line per person or run.
   return `<td><span class="cell-v ${cls}" tabindex="0">${text}<span class="pop"><b>${esc(title)}</b>${lines.length ? `<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</span></span></td>`;
@@ -667,7 +691,7 @@ function tablesHTML(T) {
       <table class="matrix q"><tr><th></th><th>Person</th><th>Engine, ${rs.length} run${rs.length > 1 ? 's' : ''}</th></tr>${rows.map(([a, b, c]) => `<tr><th scope="row">${a}</th><td>${a.startsWith('Trouble') ? b : esc(String(b))}</td><td>${a.startsWith('Trouble') ? c : esc(String(c))}</td></tr>`).join('')}</table>
       <p class="muted small" style="margin:8px 0 0">${rs.map((r, i) => `<a href="${r.report}" target="_blank">run ${i + 1}</a>`).join(' · ')}</p></div>`;
   }).join('');
-  return `<div class="card"><h2>Is the direction right?</h2><table class="matrix q">${head}${q1}</table></div>
+  return `${glanceHTML(T)}<div class="card"><h2>Is the direction right?</h2><table class="matrix q">${head}${q1}</table></div>
     <div class="card"><h2>Where does it go wrong?</h2><p class="muted small" style="margin:4px 0 10px">How many had trouble in each part. Hover a number for who, and what.</p><table class="matrix q">${head}${q2}</table>
       <h3 style="margin-top:20px">Where does the time go?</h3><table class="matrix q">${head}${q2t}</table></div>
     <div class="card"><h2>Is the task done?</h2><table class="matrix q">${head}${q3}</table></div>
