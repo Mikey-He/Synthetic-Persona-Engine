@@ -102,11 +102,6 @@ function newCard() {
   return `<button class="card tonal pcard" data-go="new" style="display:grid;place-items:center;min-height:200px;border:0;font:inherit;color:inherit">
     <span style="text-align:center"><span class="ms" style="font-size:36px;color:var(--md-sys-color-primary)">add_circle</span><h3 style="margin-top:8px">New persona</h3></span></button>`;
 }
-function statusChip(st) {
-  const icon = {ready:'check_circle', failed:'error', recording:'radio_button_checked', drafting:'auto_awesome', checking:'progress_activity'}[st.key] || 'schedule';
-  return `<span class="chip-status ${esc(st.key)}"><span class="ms">${icon}</span>${esc(st.label)}</span>`;
-}
-
 /* ---------------- loading ---------------- */
 async function loadWorkflows() {
   const data = await api('/api/workflows');
@@ -143,697 +138,20 @@ pages.workflow = async () => {
       ${b.readings.map(r => `<div class="knowrow"><div style="min-width:0"><h3>${esc(r.about)}</h3><ul style="margin:6px 0 0;padding-left:20px" class="muted small">${li(r.options, esc)}</ul></div></div>`).join('') || '<p class="muted">None listed.</p>'}</div>
   </div>`;
 };
-pages.home = async () => {
-  await Promise.all([loadPersonas(), loadResults()]);
-  const w = currentWf(), ready = w && w.status.key === 'ready';
-  const latest = S.results[0];
-  const hour = new Date().getHours();
-  const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  let insight = '<p class="insight">No test has run on this workflow yet.</p><p class="muted" style="margin:0 0 16px">Describe who you are testing with, then run a test.</p>';
-  if (latest) {
-    const failed = latest.runs - latest.passed;
-    insight = `<span class="small muted">Latest result · ${esc(when(latest.at))}</span>
-      <p class="insight">${failed ? `${failed} of ${latest.runs} runs did not finish the task correctly.` : `All ${latest.runs} runs finished the task correctly.`}</p>
-      <md-filled-tonal-button data-go="result/${latest.id}">See the results<span slot="icon" class="ms">arrow_forward</span></md-filled-tonal-button>`;
-  }
-  // The first thing to do is say who to test with, so the page opens on that box.
-  return `<div class="page">${composerHTML(hello)}<div id="draft-area"></div>
-    <div class="hello" style="margin-top:48px;grid-template-columns:1fr">
-      <div class="card tonal">${insight}
-        <div class="muted small" style="margin-top:8px">Testing <b>${esc((w || {}).name || 'no task yet')}</b>${ready ? '' : ' · not ready yet'} · <a href="#tests">Tests</a></div></div>
-    </div>
-    ${S.personas.length ? `<h2 style="margin:32px 0 16px">Your personas</h2><div class="grid">${S.personas.map(personaCard).join('')}</div>` : ''}
-  </div>`;
-};
-
 /* ---- the product details form (Advanced settings) ---- */
-function basicsForm(b = {}) {
-  const login = b.login || {};
-  return `<div class="form">
-    <md-outlined-text-field id="b-name" label="Name" value="${esc(b.name)}" supporting-text="For example: Teamspace · invite a member"></md-outlined-text-field>
-    <div class="two"><md-outlined-text-field id="b-product" label="Product" value="${esc(b.product)}"></md-outlined-text-field>
-      <md-outlined-text-field id="b-users" label="Who uses it" value="${esc(b.users)}"></md-outlined-text-field></div>
-    <md-outlined-text-field id="b-start" label="Start page address" value="${esc(b.start)}" supporting-text="Where the task starts, e.g. https://staging.example.com/home. Never a live product: the engine really clicks Save."></md-outlined-text-field>
-    <md-outlined-text-field id="b-task" type="textarea" rows="5" label="The task, as participants read it" value="${esc(b.task)}"></md-outlined-text-field>
-    <div class="card tonal" style="padding:16px">
-      <div class="row" style="justify-content:space-between"><div><h3>Sign-in</h3><p class="muted small" style="margin:4px 0 0">The engine signs in by itself before each run, with a test account.</p></div>
-        <md-switch id="b-login-on" ${login.url ? 'selected' : ''} aria-label="The product needs a sign-in"></md-switch></div>
-      <div id="b-login" class="form" style="margin-top:16px" ${login.url ? '' : 'hidden'}>
-        <md-outlined-text-field id="b-login-url" label="Sign-in page" value="${esc(login.url || '/login')}"></md-outlined-text-field>
-        <div class="two"><md-outlined-text-field id="b-login-user" label="Test account" ${login.user ? 'placeholder="Kept in engine/.env"' : ''}></md-outlined-text-field>
-          <md-outlined-text-field id="b-login-pass" label="Password" type="password" ${login.user ? 'placeholder="Kept in engine/.env"' : ''}></md-outlined-text-field></div>
-        <p class="hint">Stored only in engine/.env on this computer. Leave empty to keep the one saved.</p>
-      </div>
-    </div>
-    <details class="more"><summary><h3>Start clean every time</h3><span class="ms">expand_more</span></summary>
-      <md-outlined-text-field id="b-reset" label="Reset address (optional)" value="${esc(b.reset)}" style="margin-top:12px" supporting-text="A path the engine sends POST to before each run, e.g. /api/reset, so earlier runs leave nothing behind."></md-outlined-text-field>
-    </details>
-  </div>`;
-}
-function readBasics() {
-  const v = id => ($(id) || {}).value || '';
-  const out = {name: v('#b-name'), product: v('#b-product'), users: v('#b-users'), start: v('#b-start'), task: v('#b-task'), reset: v('#b-reset')};
-  if ($('#b-login-on').selected) out.login = {url: v('#b-login-url'), user: v('#b-login-user'), password: v('#b-login-pass')};
-  return out;
-}
 /* ---- Advanced settings: every part of a test's flow, for review by hand ---- */
-const W = {id: null, d: null, edit: null, dirty: false, tab: 0, stepState: {}, picking: null, poll: null};
-pages['workflow-editor'] = async (id) => {
-  W.id = id; clearTimeout(W.poll);
-  W.d = await api(`/api/workflow?id=${encodeURIComponent(id)}`);
-  if (!W.dirty || !W.edit || W.edit.__id !== id) { W.edit = W.d.flow ? clone(W.d.flow) : null; if (W.edit) W.edit.__id = id; W.dirty = false; }
-  const d = W.d, st = d.status.key;
-  if (!d.legacy && (d.job || ['new', 'recorded', 'recording', 'drafting'].includes(st))) { location.hash = 'test/' + id; return ''; }
-  const head = `<a class="backlink" href="#${d.legacy ? 'tests' : 'test/' + esc(id)}"><span class="ms">arrow_back</span>${d.legacy ? 'Tests' : 'Back to the test'}</a>
-    <div class="page-head"><div><div class="row" style="flex-wrap:wrap"><h1>${esc(d.name)}</h1>${statusChip(d.status)}</div>
-      <p class="muted">${esc(d.product || (d.kind === 'uat' ? 'On our own test platform' : d.start))}</p></div>
-      <div class="actions">${headActions(d)}</div></div>`;
-  let body;
-  if (d.job || ['recording','drafting','checking'].includes(st)) body = jobCard(d);
-  else if (st === 'new') body = recordCard(d);
-  else if (st === 'recorded') body = draftCard(d);
-  else body = review(d);
-  if (d.job) setTimeout(() => pollJob(d.job), 500);
-  return `<div class="page">${head}${body}</div>`;
-};
-function headActions(d) {
-  const st = d.status.key, out = [];
-  if (d.legacy) return st === 'ready' && !d.current ? '<md-filled-button data-act="use-wf"><span slot="icon" class="ms">play_arrow</span>Test this workflow</md-filled-button>' : '';
-  if (['draft','changed','failed','ready'].includes(st)) {
-    out.push('<md-outlined-button data-act="edit-basics"><span slot="icon" class="ms">tune</span>Product details</md-outlined-button>');
-  }
-  if (st === 'ready' && !d.current) out.push('<md-filled-button data-act="use-wf"><span slot="icon" class="ms">play_arrow</span>Test this workflow</md-filled-button>');
-  return out.join('');
-}
-function recordCard(d) {
-  return `<div class="card"><h2>Do the task once</h2>
-    <p class="muted" style="max-width:640px">A browser window opens on ${esc(d.basics.start)}${d.basics.login ? ', already signed in' : ''}. Do the task the way it should be done, at an ordinary pace.
-      Open any help you think a person would need. Every click and every box you fill is written down with a screenshot; passwords never are.
-      Close the window or press Finish here when you are done.</p>
-    <div class="actions" style="justify-content:flex-start"><md-filled-button data-act="record"><span slot="icon" class="ms">radio_button_checked</span>Open the browser and record</md-filled-button>
-      <md-text-button data-act="edit-basics">Change the details</md-text-button></div></div>`;
-}
-function draftCard(d) {
-  const r = d.recording || {actions: [], states: []};
-  return `<div class="card"><h2>Recorded: ${r.actions.length} actions on ${r.states.length} screens</h2>
-    <p class="muted">Gemini drafts the steps, what a person needs to know at each one, the questionnaire and the success checks. You review every part next.</p>
-    <div class="rec-list">${r.actions.map(actionLine).join('')}</div>
-    <div class="actions" style="justify-content:flex-start;margin-top:16px"><md-filled-button data-act="draft"><span slot="icon" class="ms">auto_awesome</span>Draft the workflow</md-filled-button>
-      <md-text-button data-act="record">Record again</md-text-button></div></div>`;
-}
-function actionLine(a) {
-  const what = a.action === 'type' ? (a.secret ? 'Typed a password' : `Typed “${esc(a.value)}” into <b>${esc(a.name || (a.control || {}).text || '')}</b>`)
-    : a.action === 'select' ? `Chose “${esc(a.value)}” in <b>${esc(a.name || (a.control || {}).text)}</b>` : a.action === 'press' ? 'Pressed Enter'
-    : `Clicked <b>${esc(a.name || (a.control || {}).text || (a.control || {}).label || 'a control')}</b>`;
-  return `<div><span class="tag">${a.n}</span><span>${what}</span>${a.route ? `<span class="muted small" style="margin-left:auto">${esc(a.route)}</span>` : ''}</div>`;
-}
-function jobCard(d) {
-  const st = d.status.key;
-  if (st === 'recording') return `<div class="card"><div class="row"><span class="ms" style="color:var(--md-sys-color-error)">radio_button_checked</span><h2>Recording in the browser window</h2></div>
-    <p class="muted">Do the task there. Each action shows up here as it is written down.</p>
-    <div class="rec-list" id="rec-live"><div class="muted">Waiting for the first action…</div></div>
-    <div class="actions" style="justify-content:flex-start;margin-top:16px"><md-filled-button data-act="stop-job"><span slot="icon" class="ms">stop</span>Finish recording</md-filled-button></div></div>`;
-  if (st === 'drafting') return `<div class="drafting card tonal" style="max-width:none;margin:0"><div class="row"><md-circular-progress indeterminate style="--md-circular-progress-size:28px"></md-circular-progress>
-    <span>Drafting the workflow from your recording… this takes about a minute.</span></div>
-    <div class="shimmer" style="width:90%;margin-top:20px"></div><div class="shimmer" style="width:70%"></div><div class="shimmer" style="width:80%"></div></div>`;
-  return `<div class="card"><div class="row"><md-circular-progress indeterminate style="--md-circular-progress-size:28px"></md-circular-progress><h2>Checking the workflow</h2></div>
-    <p class="muted">The engine follows your recorded path with a card that knows everything, then with one that knows nothing. It signs in, clicks and grades exactly as in a test.</p>
-    <div class="checklist" id="check-live"></div>
-    <div class="actions" style="justify-content:flex-start"><md-text-button data-act="stop-job">Stop</md-text-button></div></div>`;
-}
-async function pollJob(jid) {
-  clearTimeout(W.poll);
-  if (!location.hash.startsWith('#workflow/')) return;
-  try {
-    const j = await api(`/api/wjob?id=${jid}`);
-    if (j.kind === 'record' && $('#rec-live')) $('#rec-live').innerHTML = j.view.actions.length ? j.view.actions.map(actionLine).join('') : '<div class="muted">Waiting for the first action…</div>';
-    if (j.kind === 'check' && $('#check-live')) $('#check-live').innerHTML = (j.view.lines || []).map(l => `<div class="crow"><span class="ms">${/\[pass\]/.test(l) ? 'check_circle' : /FAIL/.test(l) ? 'error' : 'pending'}</span><span>${esc(l.replace(/^\s*\[\w+\]\s*/, ''))}</span><span></span></div>`).join('')
-      + (j.view.started || []).map(c => `<div class="crow"><span class="ms">pending</span><span>Ran the ${esc(c)} card</span><span></span></div>`).join('');
-    if (j.state === 'running') { W.poll = setTimeout(() => pollJob(jid), 1200); return; }
-    if (j.kind === 'record' && j.state !== 'failed') {
-      const d = await api(`/api/workflow?id=${encodeURIComponent(W.id)}`);
-      if ((d.recording || {}).actions && d.recording.actions.length) { snack(`Recorded ${d.recording.actions.length} actions. Drafting now.`); await api('/api/workflows/draft', {id: W.id}); }
-    } else if (j.kind === 'draft' && j.state === 'completed') { W.dirty = false; W.edit = null; snack('Drafted. Review each part, then confirm.'); }
-    else if (j.kind === 'check' && j.state === 'completed') snack('Every check passed. The workflow is ready for testing.');
-    else if (j.state === 'failed') snack(`${j.kind === 'check' ? 'Some checks failed' : 'That did not work'}: ${(j.log || '').trim().split('\n').slice(-1)[0].slice(0, 160)}`);
-    render();
-  } catch (e) { fail(e); }
-}
-
 /* -- review: the draft, part by part -- */
-const KINDS = [['word','A word on screen'],['icon','An icon'],['location','Where something is'],['concept','How something works'],['habit','A habit from other products']];
-function review(d) {
-  const f = W.edit;
-  if (!f) return '<div class="card">This workflow has no flow yet.</div>';
-  const notes = (d.notes || []).filter(n => !n.startsWith('Engine:'));
-  const problems = d.problems || [];
-  return `${problems.length ? `<div class="banner bad"><span class="ms">error</span><div><b>Fix before checking</b><ul>${problems.slice(0, 8).map(p => `<li>${esc(p)}</li>`).join('')}</ul></div></div>` : ''}
-    ${notes.length && d.status.key === 'draft' ? `<div class="banner"><span class="ms">rate_review</span><div><b>Look at these in the draft</b><ul>${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div></div>` : ''}
-    ${checkCard(d)}
-    <div class="tabs-wrap"><md-tabs id="wf-tabs" active-tab-index="${W.tab}"><md-primary-tab>Steps</md-primary-tab><md-primary-tab>Knowledge</md-primary-tab><md-primary-tab>Questionnaire</md-primary-tab><md-primary-tab>Success</md-primary-tab><md-primary-tab>Product</md-primary-tab></md-tabs></div>
-    <div id="wf-body">${reviewTab(W.tab)}</div>
-    <div class="card tonal" style="margin-top:24px;position:sticky;bottom:12px;z-index:4;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <span id="dirty-note" class="muted small" style="flex:1">${W.dirty ? 'Unsaved changes' : d.status.key === 'ready' ? 'Checked and ready. Any change asks for the checks again.' : 'Review every tab, then confirm.'}</span>
-      ${d.legacy ? '' : `<md-outlined-button data-act="redraft"><span slot="icon" class="ms">auto_awesome</span>Draft again</md-outlined-button>
-      <md-outlined-button data-act="save-flow" ${W.dirty ? '' : 'disabled'} id="save-flow">Save</md-outlined-button>
-      <md-filled-button data-act="confirm-flow"><span slot="icon" class="ms">verified</span>Confirm and check</md-filled-button>`}
-    </div>`;
-}
-function checkCard(d) {
-  const c = d.check;
-  if (!c) return '';
-  const fresh = d.status.key === 'ready' || d.status.key === 'failed';
-  return `<div class="card" style="margin-bottom:16px"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Checks${fresh ? '' : ' (before your last change)'}</h3><span class="muted small">${esc(when(c.at))}</span></div>
-    <div class="checklist">${c.checks.map(x => `<div class="crow"><span class="ms ${x.ok ? 'ok' : x.required ? 'bad' : ''}">${x.ok ? 'check_circle' : x.required ? 'error' : 'warning'}</span>
-      <div><div>${esc(x.name)}</div><div class="muted small">${esc(x.detail)}</div></div>
-      ${x.run ? `<md-text-button href="/runs/${esc(x.run.split(/[\\/]/).pop())}/report.html" target="_blank">See the run</md-text-button>` : '<span></span>'}</div>`).join('')}</div></div>`;
-}
-function reviewTab(i) { return [stepsTab, knowledgeTab, questionnaireTab, successTab, productTab][i](); }
-function markDirtyFlow() {
-  W.dirty = true;
-  const b = $('#save-flow'); if (b) b.disabled = false;
-  const n = $('#dirty-note'); if (n) n.textContent = 'Unsaved changes';
-}
-function routeOfScreen(sid) { return ((W.edit.screens || []).find(s => s.id === sid) || {}).route; }
-
 /* locators, as sue/locate.py and page_script.js read them */
-const normT = t => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
-function sameT(h, w, how) { h = normT(h); w = normT(w); if (!w) return false; return how === 'contains' ? h.includes(w) : how === 'starts' ? h.startsWith(w) : h === w; }
-function fitsLoc(c, loc, how) {
-  how = how || loc.match || 'exact';
-  if (loc.role && c.role !== loc.role) return false;
-  if (loc.text && !sameT(c.text, loc.text, how)) return false;
-  if (loc.label && !sameT(c.label, loc.label, how)) return false;
-  if (loc.region && c.region !== loc.region) return false;
-  if (loc.group && !sameT(c.group, loc.group)) return false;
-  return true;
-}
-function findLoc(controls, loc) {
-  if (!loc || loc.selector) return [];
-  let found = controls.map((c, i) => fitsLoc(c, loc) ? i : -1).filter(i => i >= 0);
-  if (!found.length && (loc.match || 'exact') === 'exact' && (loc.text || loc.label)) {
-    const loose = controls.map((c, i) => fitsLoc(c, loc, 'contains') ? i : -1).filter(i => i >= 0);
-    found = loose.length === 1 || loc.nth != null ? loose : [];
-  }
-  return loc.nth != null ? found.slice(loc.nth, loc.nth + 1) : found;
-}
-function sameControl(a, b) {
-  return ['tag','role','text','label','region','group'].every(k => (a[k] || '') === (b[k] || '')) && Math.abs((a.box || {}).x - (b.box || {}).x) < 4 && Math.abs((a.box || {}).y - (b.box || {}).y) < 40;
-}
-const locText = l => !l ? 'Not tied to a control' : l.selector ? `CSS ${l.selector}` : [l.text ? `“${l.text}”` : '', l.label ? `icon “${l.label}”` : '', l.role || '', l.region ? `in ${l.region}` : '', l.group ? `under ${l.group}` : '', l.nth != null ? `#${l.nth + 1}` : ''].filter(Boolean).join(' ');
-
-function stepStates(step) {
-  const rec = W.d.recording; if (!rec) return [];
-  const acts = (step.recorded || []).map(n => rec.actions.find(a => a.n === n)).filter(Boolean);
-  const ns = [...new Set([...acts.map(a => a.before), ...(acts.length ? [acts[acts.length - 1].after] : [])])];
-  if (!ns.length) { const route = routeOfScreen(step.screen); const s = rec.states.find(x => x.route === route); if (s) ns.push(s.n); }
-  return ns;
-}
-function shotBox(step) {
-  const rec = W.d.recording, ns = stepStates(step);
-  if (!rec || !ns.length) return '<div class="muted small">No recorded screen for this step.</div>';
-  const n = W.stepState[step.id] ?? ns[0], st = rec.states[n];
-  const W0 = (st.size || {}).w || 1440, H0 = (st.size || {}).h || 900;
-  const box = (c, cls, label, extra = '') => { const b = c.box || {}; return `<div class="${cls}" ${extra} style="left:${b.x / W0 * 100}%;top:${b.y / H0 * 100}%;width:${Math.max(b.w, 6) / W0 * 100}%;height:${Math.max(b.h, 6) / H0 * 100}%">${label ? `<span class="tagno">${esc(label)}</span>` : ''}</div>`; };
-  let hits = '';
-  if (W.picking && W.picking.step === step.id) {
-    hits = st.controls.map((c, i) => box(c, 'pickable', '', `data-pick-state="${n}" data-pick-control="${i}" title="${esc(c.text || c.label || c.role)}"`)).join('');
-  } else {
-    const acts = (step.recorded || []).map(k => rec.actions.find(a => a.n === k)).filter(a => a && a.before === n);
-    for (const a of acts) { const i = st.controls.findIndex(c => sameControl(c, a.control || {})); if (i >= 0) hits += box(st.controls[i], 'hit', a.n); }
-    for (const it of W.edit.items.filter(x => x.step === step.id && x.locate)) for (const i of findLoc(st.controls, it.locate)) hits += box(st.controls[i], 'hit item', it.id);
-  }
-  return `<div class="shotscroll"><div class="shotbox ${W.picking && W.picking.step === step.id ? 'picking' : ''}"><img src="/wf/${W.id}/${st.shot}" alt="Screen ${n}: ${esc(st.route)}" loading="lazy">${hits}</div></div>
-    <div class="statepick">${ns.map(k => `<button data-state-of="${step.id}" data-state="${k}" class="${k === n ? 'on' : ''}">Screen ${k} · ${esc(rec.states[k].route)}</button>`).join('')}</div>
-    ${W.picking && W.picking.step === step.id ? `<div class="banner info" style="margin-top:8px"><span class="ms">touch_app</span><div>Click the control <b>${esc(W.picking.item)}</b> is about. <a href="#" data-act="cancel-pick">Cancel</a></div></div>` : ''}`;
-}
-function itemRow(it) {
-  const word = it.kind === 'word';
-  return `<div class="itemrow" data-item="${esc(it.id)}">
-    <div><span class="idtag">${esc(it.id)}</span>
-      <md-outlined-select data-field="kind" aria-label="Kind" style="margin-top:6px;width:100%">${KINDS.map(([k, l]) => `<md-select-option value="${k}" ${it.kind === k ? 'selected' : ''}><div slot="headline">${l}</div></md-select-option>`).join('')}</md-outlined-select></div>
-    <div class="fields">
-      <md-outlined-text-field data-field="text" label="${word ? 'The word, as on screen' : 'What a person needs to know'}" value="${esc(it.text)}"></md-outlined-text-field>
-      <md-outlined-text-field data-field="meaning" label="What it means here" value="${esc(it.meaning)}"></md-outlined-text-field>
-      ${word ? `<div class="two" style="display:grid;grid-template-columns:1fr 160px;gap:8px"><md-outlined-text-field data-field="everyday" label="Its everyday meaning, if different" value="${esc(it.everyday)}"></md-outlined-text-field>
-        <md-outlined-select data-field="common" label="In everyday English">${[['common','Common'],['rare','Rare'],['none','Jargon']].map(([k, l]) => `<md-select-option value="${k}" ${it.common === k ? 'selected' : ''}><div slot="headline">${l}</div></md-select-option>`).join('')}</md-outlined-select></div>` : ''}
-      <div class="where"><span class="ms" style="font-size:16px">my_location</span>${esc(locText(it.locate))}${it.explainedBy ? ` · explained by “${esc(it.explainedBy.text)}”` : ''}</div>
-    </div>
-    <div class="tools">
-      <label class="row small" style="gap:4px"><md-checkbox data-field="needed" ${it.needed ? 'checked' : ''} aria-label="Needed to finish"></md-checkbox>Needed</label>
-      <md-icon-button data-act="pick" data-item-id="${esc(it.id)}" title="Point at its control"><span class="ms">ads_click</span></md-icon-button>
-      ${it.locate ? `<md-icon-button data-act="unpick" data-item-id="${esc(it.id)}" title="Not tied to a control"><span class="ms">link_off</span></md-icon-button>` : ''}
-      <md-icon-button data-act="del-item" data-item-id="${esc(it.id)}" title="Remove"><span class="ms">delete</span></md-icon-button>
-    </div></div>`;
-}
-function stepsTab() {
-  const f = W.edit;
-  return f.steps.map((s, k) => `<div class="card" style="margin-bottom:16px" data-step="${esc(s.id)}">
-    <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><h2>Step ${k + 1}</h2><span class="muted small">${esc((f.screens.find(x => x.id === s.screen) || {}).name || '')} · ${esc(routeOfScreen(s.screen) || '')}</span></div>
-    <div class="stepcard"><div>${shotBox(s)}</div>
-      <div class="stack" style="gap:12px">
-        <md-outlined-text-field data-step-field="action" type="textarea" rows="2" label="What the person does" value="${esc(s.action)}"></md-outlined-text-field>
-        <md-outlined-text-field data-step-field="defaults" label="Defaults the task needs changed" value="${esc(s.defaults)}"></md-outlined-text-field>
-        <label class="row small"><md-switch data-step-field="risky" ${s.risky ? 'selected' : ''}></md-switch>A mistake here is costly or hard to undo</label>
-      </div></div>
-    <h3 style="margin:20px 0 4px">What a person needs to know here</h3>
-    <div>${f.items.filter(i => i.step === s.id).map(itemRow).join('') || '<p class="muted small">Nothing yet.</p>'}</div>
-    <md-text-button data-act="add-item" data-step-id="${esc(s.id)}"><span slot="icon" class="ms">add</span>Add an item</md-text-button>
-  </div>`).join('');
-}
 const LEVEL_WORDS = {true: ['Unknown','Everyday meaning','Knows it'], false: ['Unknown','Vaguely','Knows it']};
-function knowledgeTab() {
-  const f = W.edit, itemOf = id => f.items.find(i => i.id === id) || {id, text: id};
-  return `<p class="muted" style="margin-top:0">Groups set knowledge for many items at once when a persona is made. Every item but a habit is in exactly one group; a word group holds only words.</p>
-    ${f.knowledgeGroups.map((g, gi) => `<div class="card" style="margin-bottom:16px" data-group="${gi}">
-      <div class="form" style="max-width:none"><div class="two"><md-outlined-text-field data-group-field="title" label="Title" value="${esc(g.title)}"></md-outlined-text-field>
-        <md-outlined-text-field data-group-field="examples" label="Examples" value="${esc(g.examples)}"></md-outlined-text-field></div>
-        <md-outlined-text-field data-group-field="description" label="Description" value="${esc(g.description)}"></md-outlined-text-field>
-        <div class="row" style="flex-wrap:wrap"><span class="muted small">A typical user</span><div class="seg">${LEVEL_WORDS[!!g.word].map((l, v) => `<button type="button" class="${g.default === v ? 'on' : ''}" data-group-default="${gi}" data-v="${v}">${l}</button>`).join('')}</div>
-          <span class="tag">${g.word ? 'Words' : 'Knowledge'}</span></div></div>
-      <div class="chips" style="margin-top:12px">${g.items.map(id => { const it = itemOf(id); return `<span class="tag" title="${esc(it.meaning || '')}">${esc(id)} · ${esc(String(it.text).slice(0, 48))}
-        <select data-move="${esc(id)}" aria-label="Move ${esc(id)}" style="border:0;background:transparent;color:inherit;font:inherit">${f.knowledgeGroups.map((o, oi) => (!!o.word === !!g.word) ? `<option value="${oi}" ${oi === gi ? 'selected' : ''}>${esc(o.title)}</option>` : '').join('')}</select></span>`; }).join('')}</div>
-    </div>`).join('')}
-    <div class="row"><md-text-button data-act="add-group" data-word="1"><span slot="icon" class="ms">add</span>Word group</md-text-button><md-text-button data-act="add-group" data-word="0"><span slot="icon" class="ms">add</span>Knowledge group</md-text-button></div>`;
-}
-function questionnaireTab() {
-  const f = W.edit;
-  const srcs = (f.sources || []).map(s => [s.id, (s.label || {}).en || s.id]);
-  return `<div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><p class="muted" style="margin:0">Real participants answer these before a test. Their answers decide what their persona card knows.</p>
-      ${W.d.current ? '<md-text-button href="/questionnaire" target="_blank"><span slot="icon" class="ms">open_in_new</span>Open the questionnaire</md-text-button>' : ''}</div>
-    <div class="card" style="margin-bottom:16px"><h3>Groups of experience</h3>
-      ${f.groups.map((g, gi) => `<div class="kv" style="grid-template-columns:160px 1fr 1fr;margin-top:12px" data-egroup="${gi}">
-        <md-outlined-select data-eg-field="source" label="Source">${srcs.map(([k, l]) => `<md-select-option value="${k}" ${g.source === k ? 'selected' : ''}><div slot="headline">${esc(l)}</div></md-select-option>`).join('')}</md-outlined-select>
-        <md-outlined-text-field data-eg-field="en" label="Label" value="${esc(g.label.en)}"></md-outlined-text-field>
-        <md-outlined-text-field data-eg-field="zh" label="中文" value="${esc(g.label.zh)}"></md-outlined-text-field></div>`).join('')}</div>
-    ${f.experiences.map((e, ei) => `<div class="card" style="margin-bottom:12px" data-exp="${ei}">
-      <div class="row" style="justify-content:space-between"><span class="idtag">${esc(e.id)}</span><md-icon-button data-act="del-exp" data-exp-i="${ei}" title="Remove"><span class="ms">delete</span></md-icon-button></div>
-      <div class="form" style="max-width:none"><md-outlined-text-field data-exp-field="text" label="The experience" value="${esc(e.text)}"></md-outlined-text-field>
-        <div class="two"><md-outlined-text-field data-exp-field="en" label="Question" value="${esc(e.question.en)}"></md-outlined-text-field>
-          <md-outlined-text-field data-exp-field="zh" label="问题" value="${esc(e.question.zh)}"></md-outlined-text-field></div></div>
-      <details class="more" style="margin-top:8px"><summary><span class="small">Teaches ${f.items.filter(i => (i.exps || []).includes(e.id)).length} items</span><span class="ms">expand_more</span></summary>
-        <div class="chips" style="margin-top:8px">${f.items.map(i => `<md-filter-chip label="${esc(i.id)} ${esc(String(i.text).slice(0, 36))}" data-teach="${esc(e.id)}" data-teach-item="${esc(i.id)}" ${(i.exps || []).includes(e.id) ? 'selected' : ''}></md-filter-chip>`).join('')}</div></details>
-    </div>`).join('')}
-    <md-text-button data-act="add-exp"><span slot="icon" class="ms">add</span>Add an experience</md-text-button>`;
-}
-const kvText = o => Object.entries(o || {}).map(([k, v]) => `${k} = ${typeof v === 'string' ? v : JSON.stringify(v)}`).join('\n');
-function kvParse(t) {
-  const out = {};
-  for (const line of String(t || '').split('\n')) {
-    const m = line.match(/^\s*([^=]+?)\s*=\s*(.*?)\s*$/); if (!m) continue;
-    let v = m[2]; if (/^[\[{]/.test(v) || /^(true|false|null|-?\d+(\.\d+)?)$/.test(v)) { try { v = JSON.parse(v); } catch (e) { /* keep text */ } }
-    out[m[1]] = v;
-  }
-  return out;
-}
-function successTab() {
-  const f = W.edit, e = f.engine, t = e.target || {kind: 'uat'};
-  const saved = (W.d.recording || {}).saved || [];
-  const checks = t.success || [];
-  const routes = (e.routes || {}).path || [];
-  return `<div class="card" style="margin-bottom:16px"><h3>What counts as done</h3><p class="muted small" style="margin:4px 0 12px">In plain words, as a report shows them.</p>
-      ${(f.checks || []).map((c, i) => `<div class="kv" style="grid-template-columns:1fr auto;margin-top:8px"><md-outlined-text-field data-plain="${i}" value="${esc(c)}" aria-label="Criterion ${i + 1}"></md-outlined-text-field>
-        <md-icon-button data-act="del-plain" data-i="${i}"><span class="ms">delete</span></md-icon-button></div>`).join('')}
-      <md-text-button data-act="add-plain"><span slot="icon" class="ms">add</span>Add</md-text-button></div>
-    ${t.kind === 'web' ? `<div class="card" style="margin-bottom:16px"><h3>How the engine grades a run</h3><p class="muted small" style="margin:4px 0 12px">Each check runs after the run, in the same signed-in browser. Prefer reading what was saved over looking for words on a page.</p>
-      ${checks.map((c, i) => `<div class="card tonal" style="margin-top:12px;padding:16px" data-check="${i}">
-        <div class="kv" style="grid-template-columns:1fr 200px auto"><md-outlined-text-field data-ck="name" label="Name" value="${esc(c.name)}"></md-outlined-text-field>
-          <md-outlined-select data-ck="type" label="Check">${[['json','What was saved (JSON)'],['text','Words on a page'],['url','Where it ended']].map(([k, l]) => `<md-select-option value="${k}" ${c.type === k ? 'selected' : ''}><div slot="headline">${l}</div></md-select-option>`).join('')}</md-outlined-select>
-          <md-icon-button data-act="del-check" data-i="${i}"><span class="ms">delete</span></md-icon-button></div>
-        ${c.type === 'json' ? `<div class="form" style="max-width:none;margin-top:12px"><div class="two"><md-outlined-text-field data-ck="url" label="Read from (GET)" value="${esc(c.url)}"></md-outlined-text-field>
-            <md-outlined-text-field data-ck="list" label="The list in the answer (optional)" value="${esc(c.list)}"></md-outlined-text-field></div>
-          <div class="two"><md-outlined-text-field data-ck="where" type="textarea" rows="3" label="The new row is the one where" value="${esc(kvText(c.where))}" supporting-text="field = value, one per line"></md-outlined-text-field>
-            <md-outlined-text-field data-ck="expect" type="textarea" rows="3" label="It must have" value="${esc(kvText(c.expect))}" supporting-text='A list is written as JSON: projects = ["Lyra"]'></md-outlined-text-field></div></div>`
-        : c.type === 'text' ? `<div class="two" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:16px"><md-outlined-text-field data-ck="url" label="Page to open" value="${esc(c.url)}"></md-outlined-text-field>
-            <md-outlined-text-field data-ck="contains" label="Must show" value="${esc(c.contains)}"></md-outlined-text-field></div>`
-        : `<md-outlined-text-field data-ck="matches" label="The final address matches (regular expression)" value="${esc(c.matches)}" style="width:100%;margin-top:12px"></md-outlined-text-field>`}
-      </div>`).join('')}
-      <md-text-button data-act="add-check"><span slot="icon" class="ms">add</span>Add a check</md-text-button>
-      ${saved.length ? `<details class="more" style="margin-top:12px"><summary><span class="small">What the product saved while you recorded</span><span class="ms">expand_more</span></summary>
-        ${saved.map(r => `<pre class="mono">${esc(r.method)} ${esc(r.path)}\n${esc(JSON.stringify(r.sent, null, 2))}</pre>`).join('')}</details>` : ''}
-    </div>` : '<div class="card" style="margin-bottom:16px"><h3>Grading</h3><p class="muted small">Our platform grades what was saved itself.</p></div>'}
-    <div class="card"><h3>How the product confirms it</h3>
-      <div class="form" style="max-width:none;margin-top:12px">
-        <div class="two"><md-outlined-text-field data-eng="created" label="What the task makes (as a list shows it)" value="${esc(e.created)}"></md-outlined-text-field>
-          <md-outlined-select data-eng="list" label="The page that lists it"><md-select-option value="" ${!(e.routes.list || [])[0] ? 'selected' : ''}><div slot="headline">None</div></md-select-option>${routes.map(r => `<md-select-option value="${esc(r)}" ${(e.routes.list || [])[0] === r ? 'selected' : ''}><div slot="headline">${esc(r)}</div></md-select-option>`).join('')}</md-outlined-select></div>
-        <div class="chips">${[['toast','A success message'],['list','It shows in a list'],['external','An email or notification'],['test','It can be tried out']].map(([k, l]) => `<md-filter-chip label="${l}" data-signal="${k}" ${(f.signals || {})[k] ? 'selected' : ''}></md-filter-chip>`).join('')}</div>
-      </div></div>`;
-}
-function productTab() {
-  const f = W.edit, e = f.engine;
-  const list = (k, v) => `<md-outlined-text-field data-list="${k}" label="${esc(v)}" value="${esc((k.split('.').reduce((o, p) => (o || {})[p], e) || []).join(', '))}" supporting-text="Separate with commas"></md-outlined-text-field>`;
-  return `<div class="card" style="margin-bottom:16px"><h3>Buttons</h3><div class="form" style="max-width:none;margin-top:12px">
-      ${list('labels.consequential', 'Buttons that commit or cancel something (clicked only when sure)')}${list('labels.advancing', 'Buttons that only move on')}</div></div>
-    <div class="card" style="margin-bottom:16px"><h3>Words</h3><div class="form" style="max-width:none;margin-top:12px">
-      ${list('words.dataTerms', 'Data shown as it is to everyone (names, emails, ids)')}${list('words.forceFake', 'Jargon nobody outside knows, even if it looks English')}</div></div>
-    <div class="card" style="margin-bottom:16px"><h3>Special items</h3><div class="form" style="max-width:none;margin-top:12px">
-      ${list('items.entry', 'Items that say where the task starts')}${list('items.help', 'Help icons a person may know')}${list('items.review', 'Links that open what was just made')}</div></div>
-    <div class="card"><h3>The person</h3><div class="form" style="max-width:none;margin-top:12px">
-      <md-outlined-text-field data-top="org" label="Who they are in the product, and what they may do" value="${esc(f.org)}"></md-outlined-text-field>
-      <div class="two"><md-outlined-select data-sit="urgency" label="Urgency">${['calm','urgent'].map(k => `<md-select-option value="${k}" ${(f.situation || {}).urgency === k ? 'selected' : ''}><div slot="headline">${k}</div></md-select-option>`).join('')}</md-outlined-select>
-        <md-outlined-select data-sit="stakes" label="Stakes">${['low','high'].map(k => `<md-select-option value="${k}" ${(f.situation || {}).stakes === k ? 'selected' : ''}><div slot="headline">${k}</div></md-select-option>`).join('')}</md-outlined-select></div></div></div>`;
-}
-function nextItemId() { const n = Math.max(0, ...W.edit.items.map(i => Number(String(i.id).replace(/\D/g, '')) || 0)) + 1; return 'T' + String(n).padStart(2, '0'); }
-function groupFor(kind) {
-  const word = kind === 'word';
-  let g = W.edit.knowledgeGroups.find(x => !!x.word === word);
-  if (!g) { g = {key: word ? 'other-terms' : 'other-knowledge', title: word ? 'Other terms' : 'Other knowledge', word, default: 1, description: 'Added in review', examples: '', items: []}; W.edit.knowledgeGroups.push(g); }
-  return g;
-}
-function regroup(it) {
-  for (const g of W.edit.knowledgeGroups) g.items = g.items.filter(x => x !== it.id);
-  if (it.kind !== 'habit') groupFor(it.kind).items.push(it.id);
-  W.edit.knowledgeGroups = W.edit.knowledgeGroups.filter(g => g.items.length);
-}
-function rerenderTab() { const b = $('#wf-body'); if (b) b.innerHTML = reviewTab(W.tab); }
-
-
 /* ---- tests: four steps (approved prototype-new-test.html), each asking only what only the researcher knows ---- */
-pages.tests = async () => {
-  await loadWorkflows();
-  return `<div class="page">
-    <div class="page-head"><div><h1>Tests</h1><p class="muted">One task on one product. Do it once; the engine works out the rest.</p></div>
-      <md-filled-button data-go="new-test"><span slot="icon" class="ms">add</span>New test</md-filled-button></div>
-    <div class="grid">${S.workflows.map(w => `<div class="card wcard" data-go="test/${w.id}">
-      <div class="row" style="justify-content:space-between;align-items:flex-start"><h3>${esc(w.name)}</h3>${statusChip(w.status)}</div>
-      <p class="muted small" style="margin:0">${esc(String(w.task || '').replace(/\+?\{run\}/g, '').split(/(?<=[.!?])\s/)[0])}</p>
-      <div class="chips">${{change: '<span class="tag blue"><span class="ms">edit_note</span>Changes something</span>', answer: '<span class="tag green"><span class="ms">search</span>Finds an answer</span>', place: '<span class="tag"><span class="ms">location_on</span>Reaches a page</span>'}[w.outcome || 'change']}</div>
-      <div class="meta"><span>${w.steps} step${w.steps === 1 ? '' : 's'}</span><span>${w.kind === 'web' ? esc((w.start || '').replace(/^https?:\/\//, '').split('/')[0]) : 'Our test platform'}</span>${w.current ? '<span style="color:var(--md-sys-color-primary)">Being tested</span>' : ''}</div>
-    </div>`).join('')}
-    <button class="card tonal wcard" data-go="new-test" style="display:grid;place-items:center;min-height:150px;border:0;font:inherit;color:inherit">
-      <span style="text-align:center"><span class="ms" style="font-size:36px;color:var(--md-sys-color-primary)">add_circle</span><h3 style="margin-top:8px">New test</h3></span></button>
-    </div></div>`;
-};
-function signInChoice(b = {}) {
-  const login = b.login || {}, mode = login.mode === 'session' ? 'hand' : login.url ? 'form' : 'none';
-  return `<div class="card tonal" style="padding:16px">
-    <h3>Signing in</h3>
-    <div class="seg" style="margin:10px 0" role="radiogroup" aria-label="Signing in">
-      ${[['none', 'No sign-in'], ['form', 'Account and password'], ['hand', 'I sign in myself']].map(([k, l]) => `<button type="button" data-signin="${k}" class="${mode === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <p class="muted small" id="signin-note" style="margin:0 0 8px">${mode === 'hand' ? 'For single sign-on or a second step: you sign in once in the recording window and the runs reuse it.' : mode === 'form' ? 'The engine signs in with this test account before every run.' : 'The product opens without signing in.'}</p>
-    <div id="signin-form" class="form" ${mode === 'form' ? '' : 'hidden'}>
-      <md-outlined-text-field id="b-login-url" label="Sign-in page" value="${esc(login.url || '/login')}"></md-outlined-text-field>
-      <div class="two"><md-outlined-text-field id="b-login-user" label="Test account" ${login.user ? 'placeholder="Kept in engine/.env"' : ''}></md-outlined-text-field>
-        <md-outlined-text-field id="b-login-pass" label="Password" type="password" ${login.user ? 'placeholder="Kept in engine/.env"' : ''}></md-outlined-text-field></div>
-      <p class="hint">Kept only in engine/.env on this computer.</p></div></div>`;
-}
-function testForm(b = {}) {
-  return `<div class="form">
-    <md-outlined-text-field id="b-start" label="Product address" value="${esc(b.start)}" supporting-text="A test environment, never the live product: the test really clicks Send and Save."></md-outlined-text-field>
-    <md-outlined-text-field id="b-task" type="textarea" rows="4" label="The task, as participants will read it" value="${esc(b.task)}"></md-outlined-text-field>
-    <div class="two"><md-outlined-text-field id="b-name" label="A short name for this test" value="${esc(b.name)}"></md-outlined-text-field>
-      <md-outlined-text-field id="b-product" label="Product (optional)" value="${esc(b.product)}"></md-outlined-text-field></div>
-    ${signInChoice(b)}
-    <details class="more"><summary><h3>Start clean every time (optional)</h3><span class="ms">expand_more</span></summary>
-      <md-outlined-text-field id="b-reset" label="Reset address" value="${esc(b.reset)}" style="margin-top:12px;width:100%" supporting-text="A path the engine sends POST to before each run, e.g. /api/reset. Without one, you can record a clean-up after the task."></md-outlined-text-field>
-    </details></div>`;
-}
-function readTestForm() {
-  const v = id => ($(id) || {}).value || '';
-  const mode = ($('[data-signin].on') || {dataset: {signin: 'none'}}).dataset.signin;
-  const task = v('#b-task').trim();
-  // A short name when none is given: the task's first words, without addresses and brackets.
-  const short = task.replace(/\([^)]*\)|\S+@\S+/g, ' ').split(/(?<=[.!?])\s/)[0].split(/\s+/).filter(Boolean).slice(0, 7).join(' ').replace(/[.,;:]+$/, '');
-  const out = {name: v('#b-name').trim() || short, product: v('#b-product'), start: v('#b-start'), task, reset: v('#b-reset')};
-  if (mode === 'hand') out.login = {mode: 'session'};
-  if (mode === 'form') out.login = {url: v('#b-login-url'), user: v('#b-login-user'), password: v('#b-login-pass')};
-  return out;
-}
-pages['new-test'] = async () => `<div class="page" style="max-width:960px">
-  <a class="backlink" href="#tests"><span class="ms">arrow_back</span>Tests</a>
-  <div class="page-head"><div><h1>New test</h1><p class="muted">Four steps. You only tell us what only you know; we work out the rest.</p></div></div>
-  ${vstep(1, 'What to test', 'open', '', `${testForm()}<div class="actions" style="justify-content:flex-start;margin-top:20px"><md-filled-button id="create-test">Continue</md-filled-button></div>
-    <div class="banner info" style="margin-top:24px"><span class="ms">upload_file</span><div>Already have this test as a workflow file (the format our Version A test uses)? <a href="#" data-act="test-import">Import the file</a> and skip to the checks.
-      <input type="file" id="import-file" accept=".json,application/json" hidden></div></div>`)}
-  ${vstep(2, 'Do it once', '', '', '')}${vstep(3, 'What must be right at the end', '', '', '')}${vstep(4, 'We get it ready', '', '', '')}
-</div>`;
 /* One step of a test. A finished step's title takes you back into it (reopen), as in a stepper:
    it opens as it was set up, and the steps after it fold until it is saved again. */
-function vstep(n, title, state, sum, body, reopen = false) {
-  const num = state === 'done' || state === 'openDone' ? '<span class="ms" style="font-size:18px">check</span>' : n;
-  const head = reopen ? `<button type="button" class="head reopen" data-test-edit="${n}" title="Go back to this step"><h2>${title}</h2><span class="ms">edit</span></button>`
-    : `<div class="head"><h2>${title}</h2></div>`;
-  return `<section class="vstep ${state === 'open' ? 'open' : ''} ${state === 'done' ? 'done' : ''} ${state === 'openDone' ? 'open done' : ''}" id="s${n}">
-    <div class="rail-line"><span class="num">${num}</span><span class="line"></span></div>
-    <div>${head}<p class="sum">${sum}</p><div class="body">${body}</div></div></section>`;
-}
-const stepActions = (save, label = 'Save') => `<div class="actions" style="justify-content:flex-start;margin-top:20px">${save}<md-text-button data-test-edit="0">Cancel</md-text-button></div>`;
-const T = {id: null, d: null, facts: null, summary: null, poll: null, edit: 0};
-pages.test = async (id) => {
-  if (T.id !== id) T.edit = 0;
-  T.id = id; clearTimeout(T.poll);
-  const d = T.d = await api(`/api/workflow?id=${encodeURIComponent(id)}`);
-  if (d.legacy) return legacyTest(d);
-  const job = d.job ? await api(`/api/wjob?id=${d.job}`) : null;
-  const rec = d.recording, hasRec = rec && rec.actions.length, st = d.status.key;
-  const recording = job && job.kind === 'record', drafting = job && job.kind === 'draft', checking = job && job.kind === 'check';
-  const host = (d.basics.start || '').replace(/^https?:\/\//, '').split('/')[0];
-  const signIn = (d.basics.login || {}).mode === 'session' ? ' · you sign in yourself' : (d.basics.login || {}).url ? ' · signed in as a test account' : '';
-  // 1
-  const folded = n => T.edit && n > T.edit;  // a step after the one being changed
-  let html = vstep(1, 'What to test', T.edit === 1 ? 'open' : 'done', `${esc(host)}${signIn} · “${esc(String(d.basics.task || '').split(/(?<=[.!?])\s/)[0])}”`,
-    T.edit === 1 ? `${testForm(d.basics)}${stepActions('<md-filled-button id="save-test">Save</md-filled-button>')}` : '', T.edit !== 1 && !job);
-  // 2
-  const imported = !hasRec && !!d.flow && !recording;  // a workflow file: its steps came with it
-  const s2open = (!hasRec && !imported) || recording || T.edit === 2;
-  const caps = (rec || {}).capabilities || {};
-  let body2 = '';
-  if (recording && job.view.name === 'recording') {
-    body2 = `${job.view.waitingForSignIn ? `<div class="banner info"><span class="ms">login</span><div>Sign in in the browser window that opened. When you see the product, press <b>I'm signed in</b>.<div style="margin-top:8px"><md-filled-tonal-button data-act="signed-in">I'm signed in</md-filled-tonal-button></div></div></div>` : ''}
-      <div class="row small" style="gap:8px"><span class="rec-dot"></span><b>Recording</b><span class="muted">Do the task in the browser window</span></div>
-      <div class="rec-list" id="rec-live">${(job.view.actions || []).map(actionLine).join('') || '<div class="muted">Waiting for the first step…</div>'}</div>
-      <div class="actions" style="justify-content:flex-start;margin-top:12px"><md-filled-button data-act="stop-test-job">I'm done</md-filled-button></div>`;
-  } else {
-    body2 = `<p class="lead">A browser window opens on your product${signIn ? (d.basics.login.mode === 'session' ? '; sign in there first' : ', already signed in') : ''}. Do the task the way it <b>should</b> be done, as a person who knows the product would. We write down each step; we never record passwords.</p>
-      <md-filled-button data-act="test-record"><span slot="icon" class="ms">open_in_new</span>${hasRec ? 'Record again' : 'Open the browser'}</md-filled-button>
-      ${hasRec || imported ? '<md-text-button data-test-edit="0">Cancel</md-text-button>' : ''}
-      <details class="more" style="margin-top:20px" ${d.basics.written ? 'open' : ''}><summary><h3>Or write the steps, and AI does them once</h3><span class="ms">expand_more</span></summary>
-        <p class="muted small" style="margin:8px 0">One step per line, as you would tell a colleague. A browser window opens and AI carries out each line on your product while you watch; we write it down exactly as when you do it yourself.</p>
-        <md-outlined-text-field id="w-steps" type="textarea" rows="6" style="width:100%" label="The right way, step by step" placeholder="Open Members from the left menu&#10;Click Invite people&#10;Enter the email address and set the role to Viewer&#10;Send the invite"></md-outlined-text-field>
-        <div class="actions" style="justify-content:flex-start;margin-top:12px"><md-filled-tonal-button data-act="test-written"><span slot="icon" class="ms">auto_awesome</span>Let AI do it once</md-filled-tonal-button></div></details>`;
-  }
-  const extras = hasRec && !s2open && !d.basics.reset ? `<div class="sum" style="margin-top:6px">
-      ${['setup', 'cleanup'].map(k => `<md-text-button data-act="test-record-${k}"><span slot="icon" class="ms">${rec[k] ? 'check_circle' : 'add'}</span>${k === 'setup' ? (rec[k] ? 'Set-up recorded' : 'Record what to set up before each run') : (rec[k] ? 'Clean-up recorded' : 'Record how to clean up after each run')}</md-text-button>`).join('')}</div>` : '';
-  const extrasRunning = recording && job.view.name !== 'recording' ? `<div class="banner info" style="margin-top:8px"><span class="ms">radio_button_checked</span><div>Recording the ${job.view.name === 'setup' ? 'set-up' : 'clean-up'} in the browser window. ${(job.view.actions || []).length} steps so far. <a href="#" data-act="stop-test-job">I'm done</a></div></div>` : '';
-  html += vstep(2, 'Do it once', s2open && !folded(2) ? 'open' : hasRec || imported ? 'done' : '', hasRec ? `${rec.actions.length} steps on ${new Set(rec.states.map(s => s.route)).size} pages` : imported ? `${d.flow.steps.length} steps, from your workflow file` : '',
-    folded(2) ? '' : body2, (hasRec || imported) && !s2open && !job).replace('</p><div class="body">', `</p>${folded(2) ? '' : extras + extrasRunning}<div class="body">`);
-  // 3
-  const confirmed = !!d.check || checking;
-  let state3 = (!hasRec && !imported) || s2open ? '' : imported ? 'done' : (drafting || !d.flow) ? 'open' : (!confirmed || T.edit === 3) ? 'open' : 'done';
-  if (folded(3) && d.flow && confirmed) state3 = 'done';
-  let body3 = '';
-  if (state3 === 'open') {
-    if (drafting || !d.flow) body3 = `<div class="drafting card tonal" style="max-width:none;margin:0"><div class="row"><md-circular-progress indeterminate style="--md-circular-progress-size:28px"></md-circular-progress><span>Reading what you did and what your product saved…</span></div>
-      <div class="shimmer" style="width:90%;margin-top:20px"></div><div class="shimmer" style="width:70%"></div></div>`;
-    else {
-      T.facts = await api(`/api/facts?id=${encodeURIComponent(id)}`);
-      body3 = factsHTML(T.facts);
-    }
-  }
-  const nOn = T.facts ? T.facts.facts.filter(f => f.on).length : 0;
-  html += vstep(3, 'What must be right at the end', state3, state3 === 'done' ? (n => `${n} check${n === 1 ? '' : 's'}, read from what your product saved`)((d.flow.engine.target.success || []).length) : '',
-    state3 === 'open' && T.edit === 3 ? body3.replace(/<md-filled-button data-act="save-facts">Continue<\/md-filled-button><\/div>$/, '<md-filled-button data-act="save-facts">Continue</md-filled-button><md-text-button data-test-edit="0">Cancel</md-text-button></div>') : body3,
-    state3 === 'done' && !job && !imported);
-  // 4
-  let state4 = '', body4 = '';
-  if (folded(4)) state4 = st === 'ready' ? 'done' : '';
-  else if (state3 === 'done') {
-    state4 = st === 'ready' ? 'openDone' : 'open';
-    if (checking) body4 = prepHTML(job.view.lines || [], true);
-    else if (st === 'ready') { T.summary = await api(`/api/summary?id=${encodeURIComponent(id)}`); body4 = readyHTML(d, T.summary); }
-    else body4 = failedHTML(d);
-  }
-  html += vstep(4, 'We get it ready', state4, st === 'ready' ? 'Ready' : '', body4);
-  if (job && job.state === 'running') T.poll = setTimeout(() => pollTest(job.id), 1200);
-  return `<div class="page" style="max-width:960px">
-    <a class="backlink" href="#tests"><span class="ms">arrow_back</span>Tests</a>
-    <div class="page-head"><div><div class="row" style="flex-wrap:wrap"><h1>${esc(d.name)}</h1>${statusChip(d.status)}</div></div>
-    </div>
-    ${html}</div>`;
-};
 /* The part of a screenshot around where a step happens, zoomed so its words can be read, with a
    ring on the control. Clicking it opens the whole screen. */
-function shotCrop(url, size, box, alt, cw = 720) {
-  if (!url) return '';
-  if (!size || !box) return `<img src="${url}" alt="${esc(alt)}" loading="lazy" data-full="${url}">`;
-  const [W, H] = size; cw = Math.min(cw, W); const ch = Math.min(H, Math.round(cw * 10 / 16));
-  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
-  const x0 = Math.max(0, Math.min(W - cw, cx - cw / 2)), y0 = Math.max(0, Math.min(H - ch, cy - ch / 2));
-  const px = W > cw ? x0 / (W - cw) * 100 : 0, py = H > ch ? y0 / (H - ch) * 100 : 0;
-  const ring = cx <= W && cy <= H ? `<span class="ring" style="left:${(cx - x0) / cw * 100}%;top:${(cy - y0) / ch * 100}%"></span>` : '';
-  return `<button type="button" class="crop" data-full="${url}" title="See the whole screen" aria-label="${esc(alt)}; see the whole screen"
-    style="aspect-ratio:${cw}/${ch};background-image:url('${url}');background-size:${W / cw * 100}% auto;background-position:${px}% ${py}%">${ring}</button>`;
-}
-function openFull(url) {
-  let v = $('#viewer');
-  if (!v) { v = document.createElement('div'); v.id = 'viewer'; v.className = 'viewer'; v.innerHTML = '<img alt="The whole screen"><md-icon-button aria-label="Close"><span class="ms">close</span></md-icon-button>'; document.body.appendChild(v);
-    v.addEventListener('click', () => v.classList.remove('show')); }
-  v.querySelector('img').src = url; v.classList.add('show');
-}
-document.addEventListener('click', e => { const f = e.target.closest('[data-full]'); if (f) { e.preventDefault(); openFull(f.dataset.full); } });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#viewer')) $('#viewer').classList.remove('show'); });
-
 /* A test defined before the four steps (Version A, on our own platform): the same page and the same
    stepper. It was not recorded, so step 2 shows the steps the research team set, each on the screen
    where it happens (from the latest full-card run). Our platform grades the result itself, so
    step 3 chooses which of its checks count towards "done right"; it does not rewrite them. */
-async function legacyTest(d) {
-  T.summary = await api(`/api/summary?id=${encodeURIComponent(d.id)}`);
-  const f = d.flow, e = f.engine || {}, labels = e.grading || {}, off = new Set(e.gradingIgnored || []);
-  const keys = Object.keys(labels), counted = keys.filter(k => !off.has(k));
-  const open = n => T.edit === n, folded = n => T.edit && n > T.edit;
-  const s1 = open(1) ? `<md-outlined-text-field id="l-task" type="textarea" rows="6" label="The task, as participants read it" value="${esc(f.task)}" style="width:100%"></md-outlined-text-field>
-      ${stepActions('<md-filled-button data-act="test-save-task">Save</md-filled-button>')}` : '';
-  const s2 = open(2) ? `<p class="lead">The way a person who knows the product does it, one step per row. Change what a step says or what is easy to get wrong there.</p>
-      <div class="story edit">${T.summary.steps.map((s, i) => `<div class="srow${s.shot ? '' : ' noshot'}"><span class="n">${i + 1}</span>${shotCrop(s.shot, s.shotSize, s.shotBox, `The screen for step ${i + 1}`)}
-        <div style="display:grid;gap:8px;min-width:0">
-          <md-outlined-text-field data-step-action="${esc(s.id)}" label="What to do" value="${esc(s.action)}" style="width:100%"></md-outlined-text-field>
-          <md-outlined-text-field data-step-hard="${esc(s.id)}" label="Easy to get wrong (optional)" value="${esc(s.hard)}" style="width:100%"></md-outlined-text-field></div></div>`).join('')}</div>
-      ${stepActions('<md-filled-button data-act="test-save-steps">Save</md-filled-button>')}` : '';
-  const s3 = open(3) ? `<p class="lead">After every run our platform checks what was saved. Choose which checks count: a run is done right only when every check that counts is met. The others are still shown in the results.</p>
-      <div class="card" id="checks">${keys.map(k => `<label class="fact" style="grid-template-columns:auto 1fr"><md-checkbox data-count="${esc(k)}" ${off.has(k) ? '' : 'checked'} touch-target="wrapper"></md-checkbox><span>${esc(labels[k])}</span></label>`).join('')}</div>
-      ${stepActions('<md-filled-button data-act="test-save-checks">Save</md-filled-button>')}` : '';
-  return `<div class="page" style="max-width:960px">
-    <a class="backlink" href="#tests"><span class="ms">arrow_back</span>Tests</a>
-    <div class="page-head"><div><div class="row" style="flex-wrap:wrap"><h1>${esc(d.name)}</h1>${statusChip(d.status)}</div></div></div>
-    ${vstep(1, 'What to test', open(1) ? 'open' : 'done', `On our own test platform · “${esc(String(f.task || '').split(/(?<=[.!?])\s/)[0])}”`, s1, !open(1))}
-    ${vstep(2, 'Do it once', open(2) ? 'open' : 'done', `${f.steps.length} steps, set by the research team with real participants`, folded(2) ? '' : s2, !open(2))}
-    ${vstep(3, 'What must be right at the end', open(3) ? 'open' : 'done', `${counted.length} of ${keys.length} checks count: ${esc(counted.map(k => labels[k]).join('; '))}`, folded(3) ? '' : s3, !open(3))}
-    ${vstep(4, 'We get it ready', T.edit ? 'done' : 'openDone', 'Ready', T.edit ? '' : readyHTML(d, T.summary, true))}
-  </div>`;
-}
-function factsHTML(F) {
-  const what = F.kind === 'answer' ? 'Your product shows the answer below. Check it is the right one.' : F.kind === 'place' ? 'The task ends on a page. Check how we recognise it.'
-    : 'When you finished, your product saved the following. Tick what the task requires.';
-  return `<p class="lead">${what} After every run we check these in what was saved, not by which page the person ends on: reaching the right page with the wrong settings is the mistake we most want to catch.</p>
-    <div class="card" id="facts">${F.facts.map(f => `<div class="fact">
-      ${f.fixed ? '<span class="ms" style="color:var(--md-sys-color-primary);justify-self:center">key</span>' : `<md-checkbox data-fact="${esc(f.key)}" ${f.on ? 'checked' : ''} touch-target="wrapper"></md-checkbox>`}
-      <label>${esc(f.text)}</label>
-      <div class="why"><span class="ms">auto_awesome</span>${esc(f.why || '')}</div>
-      ${f.answer ? `<div style="grid-column:2"><md-outlined-text-field data-answer-key="${esc(f.key)}" label="Right answers, separated by commas" value="${esc(f.answer.join(', '))}" style="width:100%"></md-outlined-text-field></div>` : ''}
-      ${f.unique || f.isUnique ? `<label class="row small" style="grid-column:2;gap:8px"><md-switch data-unique="${esc(f.key)}" ${f.isUnique ? 'selected disabled' : 'selected'}></md-switch>Different in every run, so runs never meet each other's data</label>` : ''}
-    </div>`).join('')}</div>
-    ${F.noReset ? '<p class="muted small">Your product has no reset address: runs leave what they saved. Make the identifying value different in every run, or record a clean-up in step 2.</p>' : ''}
-    <div class="actions" style="justify-content:flex-start;margin-top:20px"><md-filled-button data-act="save-facts">Continue</md-filled-button></div>`;
-}
-function prepHTML(lines, running) {
-  const WORK = [['flow file', 'Splitting what you did into steps and what a person needs to know'], ['full card', 'Checking that someone who knows everything can finish'],
-    ['locator', 'Checking that every step finds its control on the page'], ['blank card', 'Checking that someone who knows nothing gets stuck']];
-  return `<div class="card prep"><div class="checklist">${WORK.map(([k, w], i) => {
-    const line = lines.find(l => l.toLowerCase().includes(k));
-    const icon = line ? (/\[pass\]/.test(line) ? 'check_circle' : 'error') : running ? (i === 0 || lines.length >= i ? 'progress_activity' : 'radio_button_unchecked') : 'radio_button_unchecked';
-    return `<div class="crow"><span class="ms ${icon === 'check_circle' ? 'ok' : icon === 'error' ? 'bad' : icon === 'progress_activity' ? 'spin' : ''}">${icon}</span><span>${w}</span><span></span></div>`; }).join('')}</div></div>`;
-}
-function notesHTML(d) {
-  const caps = ((d.recording || {}).capabilities) || {};
-  const items = [];
-  if (caps.captcha) items.push(['block', 'Your product shows a CAPTCHA. The engine cannot pass it: turn it off in the test environment.']);
-  if (caps.canvas) items.push(['draw', 'Part of your product is drawn on a canvas. The engine reads its text from the screen itself, which is less exact.']);
-  if (caps.chinese) items.push(['translate', 'Your product is in Chinese. Personas read it with their own level of Chinese.']);
-  for (const n of (d.notes || []).filter(n => !n.startsWith('Engine:'))) items.push(['info', n]);
-  return items.length ? `<details class="more" style="margin-top:12px"><summary><span class="small">${items.length} thing${items.length > 1 ? 's' : ''} we noticed</span><span class="ms">expand_more</span></summary>
-    ${items.map(([i, t]) => `<div class="row small" style="align-items:flex-start;margin-top:8px"><span class="ms" style="font-size:18px">${i}</span><span>${esc(t)}</span></div>`).join('')}</details>` : '';
-}
-function readyHTML(d, S2, legacy) {
-  return `${legacy ? '' : prepHTML((d.check || {}).checks ? d.check.checks.map(c => `[${c.ok ? 'pass' : 'FAIL'}] ${c.name}`) : [], false)}
-    <div class="card" style="${legacy ? '' : 'margin-top:16px'}">
-      <div class="row" style="justify-content:space-between;flex-wrap:wrap"><div class="row"><span class="ms ok" style="font-size:28px">verified</span><div><h2>Ready to test</h2>
-        <p class="muted small" style="margin:2px 0 0">${legacy ? 'Checked against real participants on our own platform.' : 'Someone who knows everything finished; someone who knows nothing got stuck.'}</p></div></div>
-        <md-filled-button data-act="test-use"><span slot="icon" class="ms">play_arrow</span>Choose personas and run</md-filled-button></div>
-      <h3 style="margin:24px 0 4px">The task, step by step</h3>
-      <div class="story">${S2.steps.map((s, i) => `<div class="srow${s.shot ? '' : ' noshot'}"><span class="n">${i + 1}</span>${shotCrop(s.shot, s.shotSize, s.shotBox, `The screen for step ${i + 1}`)}<div>${esc(s.action)}
-        ${s.hard ? `<div style="margin-top:6px"><span class="tag amber"><span class="ms">warning</span>Easy to get wrong: ${esc(s.hard)}</span></div>` : ''}</div></div>`).join('')}</div>
-      <details class="more" style="margin-top:16px"><summary><h3>What a person needs to know</h3><span class="ms">expand_more</span></summary>
-        <ul style="margin:8px 0 0;padding-left:20px;line-height:1.8">${S2.know.map(k => `<li>${esc(k.text)}${k.meaning && k.meaning !== k.text ? ` <span class="muted small">(${esc(k.meaning)})</span>` : ''}</li>`).join('')}</ul>
-        ${S2.traps.length ? `<p class="small" style="margin:12px 0 4px"><b>Habits from other products that may mislead</b></p><ul style="margin:0;padding-left:20px">${S2.traps.map(t => `<li>${esc(t.text)}</li>`).join('')}</ul>` : ''}
-        <p class="muted small">Each persona knows some of these and not others. What they don't know, they see as made-up words or covered icons.</p></details>
-      ${legacy ? '' : notesHTML(d)}
-      <div class="fix"><md-outlined-text-field id="fix" label="Something not right? Tell us in a sentence" placeholder="${legacy ? "e.g. Most people don't know Atlas is a project name" : "e.g. Most people don't know a Viewer can't comment"}"></md-outlined-text-field>
-        <md-filled-tonal-button data-act="test-adjust">Update</md-filled-tonal-button></div>
-    </div>`;
-}
-function failedHTML(d) {
-  const c = d.check;
-  if (!c) return `${prepHTML([], false)}<div class="actions" style="justify-content:flex-start;margin-top:12px"><md-filled-button data-act="test-check">Check it</md-filled-button></div>`;
-  const stale = d.status.key === 'changed';
-  return `${prepHTML(c.checks.map(x => `[${x.ok ? 'pass' : 'FAIL'}] ${x.name}`), false)}
-    <div class="banner ${stale ? 'info' : 'bad'}" style="margin-top:16px"><span class="ms">${stale ? 'update' : 'error'}</span><div>
-      ${stale ? 'You changed the test since it was checked.' : '<b>Not ready yet</b>'}
-      <ul>${c.checks.filter(x => !x.ok && x.required).map(x => `<li>${esc(x.name)}: ${esc(x.detail)}${x.run ? ` · <a href="/runs/${esc(x.run.split(/[\\/]/).pop())}/report.html" target="_blank">see the run</a>` : ''}</li>`).join('')}</ul>
-      <div class="row" style="margin-top:8px;flex-wrap:wrap"><md-filled-tonal-button data-act="test-check">Check again</md-filled-tonal-button><md-text-button data-act="test-record">Record again</md-text-button></div></div></div>${notesHTML(d)}`;
-}
-async function pollTest(jid) {
-  clearTimeout(T.poll);
-  if (!location.hash.startsWith('#test/')) return;
-  try {
-    const j = await api(`/api/wjob?id=${jid}`);
-    if (j.state === 'running') {
-      if (j.kind === 'record' && $('#rec-live')) $('#rec-live').innerHTML = (j.view.actions || []).map(actionLine).join('') || '<div class="muted">Waiting for the first step…</div>';
-      if (j.kind === 'check' && $('#s4 .prep')) $('#s4 .body').innerHTML = prepHTML(j.view.lines || [], true);
-      T.poll = setTimeout(() => pollTest(jid), 1200);
-      return;
-    }
-    if (j.kind === 'record' && j.state !== 'failed') {
-      if (j.view.name === 'recording' && j.view.stuck) { snack(j.view.stuck); T.edit = 2; }
-      else if (j.view.name === 'recording') { if ((j.view.actions || []).length) { await api('/api/workflows/draft', {id: T.id}); T.edit = 0; } }
-      else if (T.d.flow) { await api('/api/workflows/steps', {id: T.id, name: j.view.name}); snack(`${j.view.name === 'setup' ? 'Set-up' : 'Clean-up'} recorded. The test will be checked again.`); await api('/api/workflows/check', {id: T.id}); }
-    } else if (j.kind === 'check' && j.state === 'completed') snack('Ready to test.');
-    else if (j.state === 'failed' && j.kind !== 'check') snack(`That did not work: ${(j.log || '').trim().split('\n').slice(-1)[0].slice(0, 160)}`);
-    render();
-  } catch (e) { fail(e); }
-}
-async function testAct(name, t) {
-  switch (name) {
-    case 'test-record': if (T.d.recording && T.d.recording.actions.length && !(await confirmBox('Record the task again?', 'The new recording replaces this one, and the test is worked out again from it.', 'Record'))) return;
-      await api('/api/workflows/record', {id: T.id}); T.edit = 2; snack('A browser window is opening. Do the task there.'); return render();
-    case 'test-record-setup': case 'test-record-cleanup': {
-      const which = name.endsWith('setup') ? 'setup' : 'cleanup';
-      await api('/api/workflows/record', {id: T.id, name: which});
-      snack(which === 'setup' ? 'Do what must exist before each run (for example, create the request to approve).' : 'Undo what the task did (for example, delete the invite).');
-      return render();
-    }
-    case 'signed-in': await api('/api/workflows/signed-in', {id: T.id}); return snack('Thanks. Now do the task.');
-    case 'stop-test-job': return api('/api/jobs/stop', {id: T.d.job});
-    case 'save-facts': {
-      const facts = T.facts.facts.map(f => {
-        const box = document.querySelector(`[data-fact="${CSS.escape(f.key)}"]`), ans = document.querySelector(`[data-answer-key="${CSS.escape(f.key)}"]`);
-        const uniq = document.querySelector(`[data-unique="${CSS.escape(f.key)}"]`);
-        return {key: f.key, on: box ? box.checked : true, answer: ans ? ans.value.split(',').map(x => x.trim()).filter(Boolean) : undefined, unique: uniq ? uniq.selected : false};
-      });
-      await api('/api/workflows/facts', {id: T.id, facts});
-      await api('/api/workflows/check', {id: T.id}); T.edit = 0; return render();
-    }
-    case 'test-check': await api('/api/workflows/check', {id: T.id}); return render();
-    case 'test-written': {
-      const text = ($('#w-steps').value || '').trim();
-      if (!text) return snack('Write the steps first, one per line.');
-      await api('/api/workflows/record', {id: T.id, written: text}); T.edit = 2;
-      snack('A browser window is opening. AI is doing your steps there.'); return render();
-    }
-    case 'test-import': $('#import-file').click(); return;
-    case 'test-use': await api('/api/workflows/select', {id: T.id}); location.hash = 'run'; return location.reload();
-    case 'test-adjust': {
-      const text = ($('#fix').value || '').trim(); if (!text) return;
-      t.disabled = true;
-      try { const r = await api('/api/workflows/adjust', {id: T.id, text});
-        snack(`Updated: ${r.added.length} added, ${r.changed} changed, ${r.removed.length} removed.${T.d.legacy ? '' : ' Checking again.'}`);
-        if (!T.d.legacy) await api('/api/workflows/check', {id: T.id});
-        render(); } finally { t.disabled = false; }
-      return;
-    }
-    case 'test-save-task': await api('/api/workflows/text', {id: T.id, task: $('#l-task').value}); T.edit = 0; snack('Saved.'); return render();
-    case 'test-save-steps': {
-      const steps = $$('[data-step-action]').map(f => ({id: f.dataset.stepAction, action: f.value,
-        hard: document.querySelector(`[data-step-hard="${CSS.escape(f.dataset.stepAction)}"]`).value}));
-      await api('/api/workflows/text', {id: T.id, steps}); T.edit = 0; snack('Saved.'); return render();
-    }
-    case 'test-save-checks': {
-      const ignored = $$('[data-count]').filter(c => !c.checked).map(c => c.dataset.count);
-      await api('/api/workflows/text', {id: T.id, ignored}); T.edit = 0; snack('Saved. Results count only the checks you kept.'); return render();
-    }
-  }
-}
-
 /* ---- personas ---- */
 pages.personas = async () => {
   await loadPersonas();
@@ -1172,7 +490,6 @@ function setupRun() {
   $('#runs-minus').addEventListener('click', () => { runs = Math.max(1, runs - 1); $('#runs-n').textContent = runs; summary(); });
   $('#runs-plus').addEventListener('click', () => { runs = Math.min(10, runs + 1); $('#runs-n').textContent = runs; summary(); });
   $$('[data-pick]').forEach(c => c.addEventListener('change', summary));
-  const cf = $('#change-flow'); if (cf) cf.addEventListener('click', openPicker);
   $('#start-run').addEventListener('click', async () => {
     try { const r = await api('/api/tests/start', {cards: chosen(), runs}); S.runJob = {id: r.id, cards: chosen(), runs}; showProgress(); } catch (e) { fail(e); }
   });
@@ -1281,15 +598,7 @@ async function startLive() {
   };
   tick();
 }
-function toggleLiveSize() {
-  const d = $('#live-dialog'), big = !d.classList.contains('big');
-  d.classList.toggle('big', big);
-  $('#live-size').innerHTML = `<span class="ms">${big ? 'close_fullscreen' : 'open_in_full'}</span>`;
-  $('#live-size').setAttribute('aria-label', big ? 'Make smaller' : 'Enlarge'); $('#live-size').title = big ? 'Make smaller' : 'Enlarge';
-}
-
 /* ---- results ---- */
-const GRADE_LABEL = () => ((S.flow || {}).engine || {}).grading || {};
 pages.results = async () => {
   await loadResults();
   if (!S.results.length) return `<div class="page"><div class="page-head"><div><h1>Results</h1></div></div>
@@ -1297,125 +606,9 @@ pages.results = async () => {
     <md-filled-button data-go="run"><span slot="icon" class="ms">play_arrow</span>Run a test</md-filled-button></div></div>`;
   return pages.result(S.results[0].id);
 };
-let RES = null;
 /* What happened at a step of the task in one run, as the researcher reads it. */
-const STATUS = {
-  ok: {icon: 'check_circle', label: 'Smooth', cls: 'ok'},
-  hesitated: {icon: 'help', label: 'Hesitated', cls: 'warn'},
-  wrong: {icon: 'error', label: 'Went wrong', cls: 'bad'},
-  stopped: {icon: 'block', label: 'Stopped here', cls: 'stop'},
-  skipped: {icon: 'remove', label: 'Not reached', cls: 'skip'},
-};
-const TROUBLE = new Set(['wrong', 'stopped']);
-function statusIcon(st, title) { const s = STATUS[st] || STATUS.skipped; return `<span class="jstat ${s.cls}" title="${esc(title || s.label)}"><span class="ms">${s.icon}</span></span>`; }
-function stepTrouble(i) {
-  const runs = RES.all.filter(r => r.path), at = r => r.path[i] || {};
-  return {trouble: runs.filter(r => TROUBLE.has(at(r).status)), hesitated: runs.filter(r => at(r).status === 'hesitated')};
-}
-pages['result-journey'] = async (id) => {
-  if (!S.results.length) await loadResults();
-  RES = await api(`/api/result?id=${encodeURIComponent(id)}`);
-  RES.all = RES.cards.flatMap(c => c.runList.map((r, i) => ({...r, name: c.name, card: c.card, n: i + 1})));
-  const all = RES.all, N = all.length, passed = all.filter(r => (r.evaluation || {}).overall).length;
-  // The step that went wrong most often, then the one people hesitated at most.
-  const ranked = RES.steps.map((s, i) => ({i, s, ...stepTrouble(i)})).sort((a, b) => b.trouble.length - a.trouble.length || b.hesitated.length - a.hesitated.length);
-  const worst = ranked[0] && (ranked[0].trouble.length || ranked[0].hesitated.length) ? ranked[0] : null;
-  const earlier = S.results.filter(r => r.id !== id).slice(0, 8);
-  const persons = [...new Set(all.map(r => r.name))];
-  return `<div class="page">
-    <div class="page-head"><div><h1>Results</h1><p class="muted">${esc(RES.workflow)} · ${esc(persons.join(', '))} · ${N} run${N === 1 ? '' : 's'} · ${esc(when(RES.at))}</p></div>
-      <div class="actions">${earlier.length ? `<md-outlined-select id="res-pick" label="Earlier tests" style="min-width:220px">${S.results.map(r => `<md-select-option value="${r.id}" ${r.id === id ? 'selected' : ''}><div slot="headline">${esc(when(r.at))} · ${r.runs} runs</div></md-select-option>`).join('')}</md-outlined-select>` : ''}
-        <md-filled-tonal-button data-go="run"><span slot="icon" class="ms">replay</span>Run again</md-filled-tonal-button></div></div>
-    <div class="card headline" style="margin-bottom:16px">
-      <div class="big" style="${passed === N ? 'color:var(--md-sys-color-tertiary)' : ''}">${passed} of ${N}</div>
-      <div><p class="insight" style="margin:0 0 6px">${passed === N ? 'runs did the task right.' : `runs did the task right; ${N - passed} did not.`}</p>
-        <p class="muted" style="margin:0">${worst ? (worst.trouble.length
-          ? `The most trouble was at step ${worst.i + 1}, “${esc(worst.s.action)}”: ${worst.trouble.length} of ${N} runs went wrong or stopped there.`
-          : `Nothing went wrong; people hesitated most at step ${worst.i + 1}, “${esc(worst.s.action)}”.`) : 'Every run went through every step smoothly.'}</p>
-        ${worst ? `<md-text-button data-jopen="${worst.i}" style="margin:8px 0 0 -12px">See what happened at step ${worst.i + 1}<span slot="icon" class="ms">arrow_downward</span></md-text-button>` : ''}</div></div>
-    <div class="tabs-wrap"><md-tabs id="res-tabs"><md-primary-tab>Step by step</md-primary-tab><md-primary-tab>By persona</md-primary-tab><md-primary-tab>Every run</md-primary-tab></md-tabs></div>
-    <div id="res-body">${resultsBody(0)}</div></div>`;
-};
-function journeyHTML() {
-  const runs = RES.all.filter(r => r.path), N = RES.all.length;
-  if (!runs.length) return '<div class="card empty"><span class="ms">insights</span><h2>No step-by-step record</h2><p class="muted">These runs were made before steps were recorded. Run the test again.</p></div>';
-  const legend = ['ok', 'hesitated', 'wrong', 'stopped', 'skipped'].map(k => `<span class="row small" style="gap:6px">${statusIcon(k)}${STATUS[k].label}</span>`).join('');
-  return `<div class="card" style="padding:0">
-    <div class="row" style="flex-wrap:wrap;gap:16px;padding:16px 20px 8px">${legend}</div>
-    <div class="jwrap"><table class="journey">
-      <thead><tr><th class="jstep">The task, step by step</th>${runs.map(r => `<th class="jrun" title="${esc(r.name)} · run ${r.n}">${avatar({id: r.card, name: r.name}, 28)}<div class="small muted">${esc(r.name)}${runs.filter(x => x.card === r.card).length > 1 ? ` · ${r.n}` : ''}</div></th>`).join('')}<th class="jcount">Went wrong</th></tr></thead>
-      <tbody>${RES.steps.map((s, i) => { const t = stepTrouble(i);
-        return `<tr class="jrow ${t.trouble.length ? 'has' : t.hesitated.length ? 'some' : ''}" data-jstep="${i}" tabindex="0" aria-expanded="false">
-          <td class="jstep"><span class="n">${i + 1}</span><span>${esc(s.action)}</span><span class="ms chev">expand_more</span></td>
-          ${runs.map(r => `<td class="jcell">${statusIcon((r.path[i] || {}).status, `${r.name} · run ${r.n}: ${(STATUS[(r.path[i] || {}).status] || STATUS.skipped).label}`)}</td>`).join('')}
-          <td class="jcount">${t.trouble.length ? `<b>${t.trouble.length}</b> of ${N}` : t.hesitated.length ? `<span class="muted">${t.hesitated.length} hesitated</span>` : '<span class="muted">none</span>'}</td></tr>
-        <tr class="jdetail" id="jd-${i}" hidden><td colspan="${runs.length + 2}"></td></tr>`; }).join('')}</tbody></table></div></div>`;
-}
 /* Everything that happened at one step: per run with trouble, the screen they saw, where they
    clicked, what they were thinking, and what should have happened. */
-function stepDetailHTML(i) {
-  const s = RES.steps[i], runs = RES.all.filter(r => r.path && !['ok', 'skipped'].includes((r.path[i] || {}).status));
-  const head = s.hard ? `<div class="banner info" style="margin:0 0 12px"><span class="ms">lightbulb</span><div><b>Easy to get wrong here:</b> ${esc(s.hard)}</div></div>` : '';
-  if (!runs.length) return `${head}<p class="muted" style="margin:4px 0">Every run that reached this step got through it smoothly.</p>`;
-  return head + runs.map(r => {
-    const p = r.path[i], st = STATUS[p.status];
-    const what = [
-      ...p.missed.map(m => `<li><b>Left “${esc(m.text)}” as it was.</b> ${m.why ? `What the task needed: ${esc(m.why)}` : ''}</li>`),
-      ...p.failed.map(f => `<li><b>Not right at the end:</b> ${esc(f.text)}${f.detail ? ` <span class="muted">(${esc(f.detail)})</span>` : ''}</li>`),
-      ...(p.stopped ? [`<li><b>Stopped here:</b> ${esc((r.stop || {}).why || (r.stop || {}).reason || '')}</li>`] : []),
-      ...(p.wrong ? [`<li>Took ${p.wrong} wrong turn${p.wrong > 1 ? 's' : ''}</li>`] : []),
-      ...(p.backs ? [`<li>Went back ${p.backs} time${p.backs > 1 ? 's' : ''}</li>`] : []),
-      ...(p.slips ? [`<li>Missed what they meant to click ${p.slips} time${p.slips > 1 ? 's' : ''}</li>`] : []),
-    ];
-    const key = p.moves.find(m => m.misclick) || p.moves[p.moves.length - 1];
-    return `<div class="jcase">
-      <div class="row" style="gap:10px;flex-wrap:wrap">${avatar({id: r.card, name: r.name}, 32)}<b>${esc(r.name)}</b><span class="muted small">run ${r.n}</span><span class="tag ${st.cls === 'warn' ? 'amber' : st.cls === 'ok' ? 'green' : 'red'}"><span class="ms">${st.icon}</span>${st.label}</span>
-        <span class="grow"></span>${r.report ? `<md-text-button href="${r.report}" target="_blank"><span slot="icon" class="ms">play_circle</span>Watch the whole run</md-text-button>` : ''}</div>
-      <div class="jcase-body">
-        ${key && key.shot ? `<figure class="jshot">${shotCrop(key.shot, key.size, key.box, `What ${r.name} saw at step ${i + 1}`, 900)}
-          <figcaption class="small muted">What they saw when they ${esc(key.did.charAt(0).toLowerCase() + key.did.slice(1))}${key.box ? '; the ring is where they clicked' : ''}. Click to see the whole screen.</figcaption></figure>` : ''}
-        <div style="min-width:0">
-          ${what.length ? `<ul class="jwhat">${what.join('')}</ul>` : ''}
-          <h4 style="margin:12px 0 6px">What they did and thought</h4>
-          <ol class="jmoves">${p.moves.map(m => `<li><span>${esc(m.did)}</span>${m.why ? `<div class="small" style="margin-top:2px">“${esc(m.why)}”</div>` : ''}</li>`).join('') || '<li class="muted">Nothing: they did not act on this step.</li>'}</ol>
-        </div></div></div>`;
-  }).join('');
-}
-function placeMark(img) {
-  const box = JSON.parse(img.dataset.box || 'null'), mark = img.parentElement.querySelector('.mark');
-  if (!box || !mark || !img.naturalWidth) return;
-  const W = img.naturalWidth, H = img.naturalHeight, cx = box.x + box.w / 2, cy = box.y + box.h / 2;
-  if (cx > W || cy > H) return;
-  Object.assign(mark.style, {left: `${cx / W * 100}%`, top: `${cy / H * 100}%`}); mark.hidden = false;
-}
-function toggleJourneyStep(i, force) {
-  const row = document.querySelector(`.jrow[data-jstep="${i}"]`), det = $(`#jd-${i}`); if (!row || !det) return;
-  const open = force ?? det.hidden;
-  det.hidden = !open; row.setAttribute('aria-expanded', String(open)); row.classList.toggle('open', open);
-  if (open) {
-    det.firstElementChild.innerHTML = stepDetailHTML(i);
-  }
-}
-function resultsBody(tab) {
-  const all = RES.all, N = all.length;
-  if (tab === 0) return journeyHTML();
-  if (tab === 1) {
-    const labels = GRADE_LABEL(), off = new Set((((S.flow || {}).engine || {}).gradingIgnored) || []);
-    const checks = [...new Set(all.flatMap(r => Object.keys((r.evaluation || {}).criteria || {})))];
-    return `<div class="card" style="overflow-x:auto"><table class="matrix"><tr><th>What must be right at the end</th>${RES.cards.map(c => `<th><span class="row" style="gap:8px">${avatar({id: c.card, name: c.name}, 28)}${esc(c.name)}</span></th>`).join('')}</tr>
-      ${checks.map(k => `<tr><td>${esc(labels[k] || k)}${off.has(k) ? ' <span class="muted small">(not counted)</span>' : ''}</td>${RES.cards.map(c => { const n = c.runList.filter(r => ((r.evaluation || {}).criteria || {})[k]).length, ok = n === c.runList.length;
-        return `<td><span class="cell ${ok ? 'ok' : 'bad'}"><span class="ms">${ok ? 'check_circle' : 'error'}</span>${n} of ${c.runList.length}</span></td>`; }).join('')}</tr>`).join('')}
-      <tr><td><b>Did the task right</b></td>${RES.cards.map(c => `<td><b>${c.runList.filter(r => (r.evaluation || {}).overall).length} of ${c.runList.length}</b></td>`).join('')}</tr></table></div>`;
-  }
-  return `<div class="card"><md-list style="background:transparent">${all.map(r => { const pass = (r.evaluation || {}).overall;
-    const where = (r.path || []).map((p, i) => TROUBLE.has(p.status) ? i + 1 : null).filter(Boolean);
-    return `<md-list-item type="link" href="${r.report || '#'}" target="_blank"><span slot="start">${avatar({id: r.card, name: r.name}, 32)}</span>
-      <div slot="headline">${esc(r.name)} · run ${r.n}</div>
-      <div slot="supporting-text">${pass ? 'Did the task right' : where.length ? `Went wrong at step ${where.join(', ')}` : esc((r.stop || {}).why || 'Did not finish')} · ${r.actions} actions${r.seconds ? ` · ${Math.round(r.seconds / 60)} min` : ''}
-        ${r.path ? `<div class="jstrip">${r.path.map((p, i) => statusIcon(p.status, `Step ${i + 1}: ${(STATUS[p.status] || STATUS.skipped).label}`)).join('')}</div>` : ''}</div>
-      <span slot="end" class="ms ${pass ? 'ok' : 'bad'}">${pass ? 'check_circle' : 'error'}</span></md-list-item>`; }).join('')}</md-list></div>`;
-}
-
 /* ---------------- the result page: three questions, the computation behind every cell (2026-11-01) ---------------- */
 const PLAIN = {'Before the form': 'Finding the budget page', Define: 'Naming', Scope: 'Time, project, services', Amount: 'The amount', Actions: 'The alert', 'After the save': 'After the save'};
 const KIND = {'lost the way': 'lost the way', 'changed a value': 'changed a value', 'went back': 'went back', 'left unsaved': 'left unsaved', 'wrong when saved': 'saved wrong'};
@@ -1490,18 +683,6 @@ pages.result = async (id) => {
     ${tablesHTML(T)}</div>`;
 };
 
-/* ---------------- workflow picker ---------------- */
-function openPicker() {
-  $('#workflow-list').innerHTML = S.workflows.map(w => `<md-list-item type="button" data-flow="${esc(w.id)}" ${w.steps ? '' : 'disabled'}><span slot="start" class="ms">account_tree</span>
-    <div slot="headline">${esc(w.name)}</div><div slot="supporting-text">${esc(w.status.label)} · ${w.items} knowledge items</div>${w.current ? '<span slot="end" class="ms" style="color:var(--md-sys-color-primary)">check</span>' : ''}</md-list-item>`).join('')
-    + '<md-list-item type="button" data-go="new-test"><span slot="start" class="ms">add</span><div slot="headline">New test</div><div slot="supporting-text">Do a task once on any web product</div></md-list-item>';
-  $('#workflow-dialog').show();
-}
-async function useWorkflow(id) {
-  await api('/api/workflows/select', {id});
-  location.reload();  // the persona builder and the knowledge groups follow the workflow
-}
-
 /* ---------------- router ---------------- */
 function go(name) { location.hash = name; }
 let rendering = 0;
@@ -1510,40 +691,22 @@ async function render() {
   let [name, arg] = (location.hash || '#workflow').slice(1).split('/');
   name = {home: 'workflow', tests: 'workflow', workflows: 'workflow', 'new-test': 'workflow', test: 'workflow', 'new-workflow': 'workflow'}[name] || name;  // one workflow: those pages are gone
   const page = pages[name] ? name : 'workflow';
-  if (!(name === 'workflow' && arg === W.id)) { W.picking = null; }
   try {
     const html = await pages[page](arg && decodeURIComponent(arg));
     if (n !== rendering) return;
     $('#main').innerHTML = html;
   } catch (e) { $('#main').innerHTML = `<div class="page"><div class="banner bad" style="margin-top:24px"><span class="ms">error</span><div>${esc(e.message)}</div></div></div>`; return; }
-  const nav = {new: 'personas', workflow: 'tests', 'new-test': 'tests', test: 'tests', result: 'results'}[page] || page;
+  const nav = {new: 'personas', result: 'results'}[page] || page;
   $$('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === nav));
-  if (page === 'new' || page === 'home') setupComposer();
+  if (page === 'new') setupComposer();
   if (page === 'run') setupRun();
-  if (page === 'results' || page === 'result') {
-    const tabs = $('#res-tabs'); if (tabs) tabs.addEventListener('change', e => { $('#res-body').innerHTML = resultsBody(e.target.activeTabIndex); });
-    const pick = $('#res-pick'); if (pick) pick.addEventListener('change', () => go('result/' + pick.value));
-  }
-  if (page === 'workflow') { const t = $('#wf-tabs'); if (t) t.addEventListener('change', e => { W.tab = e.target.activeTabIndex; W.picking = null; rerenderTab(); }); }
-  if ($('#b-login-on')) { const sw = $('#b-login-on'); if (sw) sw.addEventListener('change', () => { $('#b-login').hidden = !sw.selected; }); }
 }
 
 /* ---------------- events ---------------- */
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-param],[data-vocab-clear],[data-signin],[data-test-edit],#create-test,#save-test,[data-go],[data-open],[data-remove],[data-act],[data-know],[data-english],[data-group-default],[data-state-of],[data-pick-state],.watch-btn,#create,#create-run,#rail-fab,#workflow-pick,#help-btn,#live-close,#live-size,#workflow-close,[data-flow],#scrim,#sheet-close,#sheet-cancel,#sheet-save,#sheet-dup,#sheet-run,#discard-keep,#discard-yes,#save-basics');
+  const t = e.target.closest('[data-param],[data-vocab-clear],[data-go],[data-open],[data-remove],[data-know],[data-english],#rail-fab,#scrim,#sheet-close,#sheet-cancel,#sheet-save,#sheet-dup,#sheet-run,#discard-keep,#discard-yes,#create,#create-run,#help-btn');
   if (!t) return;
   try {
-    if (t.matches('[data-signin]')) {
-      t.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === t));
-      $('#signin-form').hidden = t.dataset.signin !== 'form';
-      $('#signin-note').textContent = {hand: 'For single sign-on or a second step: you sign in once in the recording window and the runs reuse it.',
-        form: 'The engine signs in with this test account before every run.', none: 'The product opens without signing in.'}[t.dataset.signin];
-      return;
-    }
-    if (t.matches('[data-test-edit]')) { T.edit = Number(t.dataset.testEdit); return render(); }
-    if (t.matches('#create-test')) { const r = await api('/api/workflows/create', readTestForm()); return go('test/' + r.id); }
-    if (t.matches('#save-test')) { await api('/api/workflows/basics', {id: T.id, ...readTestForm()}); T.edit = 0; snack('Saved.'); return render(); }
-    if (t.matches('[data-act^="test-"],[data-act="signed-in"],[data-act="stop-test-job"],[data-act="save-facts"]')) { e.preventDefault(); return await testAct(t.dataset.act, t); }
     if (t.matches('[data-remove]')) {
       e.stopPropagation();
       const p = S.personas.find(x => x.id === t.dataset.remove);
@@ -1551,8 +714,7 @@ document.addEventListener('click', async e => {
       snack(`Deleted “${p.name}”`, async () => { await api('/api/personas/restore', {id: p.id}); render(); });
       return;
     }
-    if (t.matches('[data-flow]')) { $('#workflow-dialog').close(); if (t.dataset.flow !== S.current) await useWorkflow(t.dataset.flow); return; }
-    if (t.matches('[data-go]')) { $('#workflow-dialog').open && $('#workflow-dialog').close(); return go(t.dataset.go); }
+    if (t.matches('[data-go]')) return go(t.dataset.go);
     if (t.matches('#rail-fab')) return go('new');
     if (t.matches('[data-open]')) return openSheet(t.dataset.open);
     if (t.matches('#scrim,#sheet-close,#sheet-cancel')) return tryClose();
@@ -1567,9 +729,7 @@ document.addEventListener('click', async e => {
       return;
     }
     if (t.matches('#sheet-run')) { const id = sheetFor.id; if (sheetDirty) await saveSheet(); else closeSheet(); preselect = id; return go('run'); }
-    if (t.matches('#workflow-pick')) return openPicker();
-    if (t.matches('#workflow-close')) return $('#workflow-dialog').close();
-    if (t.matches('#help-btn')) return snack('Add a workflow by doing its task once; describe personas in plain words; run; read what went wrong.');
+    if (t.matches('#help-btn')) return snack('Personas run the workflow; watch a run on the Run page; the results read each run against the people who did the task.');
     if (t.matches('[data-know]')) {
       const p = editing(t); if (!p) return;
       PersonaParameters.setGroup(p, t.dataset.know, Number(t.dataset.v));
@@ -1606,68 +766,8 @@ document.addEventListener('click', async e => {
       preselect = t.id === 'create-run' ? r.id : null;
       return go(t.id === 'create-run' ? 'run' : 'personas');
     }
-    if (t.matches('#save-basics')) { await api('/api/workflows/basics', {id: W.id, ...readBasics()}); $('#confirm-dialog').close(); snack('Product details saved.'); W.edit = null; return render(); }
-    if (t.matches('[data-state-of]')) { W.stepState[t.dataset.stateOf] = Number(t.dataset.state); return rerenderTab(); }
-    if (t.matches('[data-pick-state]')) {
-      const it = W.edit.items.find(i => i.id === W.picking.item), step = W.edit.steps.find(s => s.id === it.step);
-      const r = await api('/api/workflows/pick', {id: W.id, state: Number(t.dataset.pickState), control: Number(t.dataset.pickControl)});
-      it.locate = r.locate; if (r.route !== routeOfScreen(step.screen)) it.locate.route = r.route;
-      W.picking = null; markDirtyFlow(); return rerenderTab();
-    }
-    if (t.matches('[data-group-default]')) { W.edit.knowledgeGroups[Number(t.dataset.groupDefault)].default = Number(t.dataset.v); markDirtyFlow(); return rerenderTab(); }
-    if (t.matches('[data-act]')) return await act(t.dataset.act, t, e);
   } catch (err) { fail(err); }
 });
-async function act(name, t, e) {
-  const f = W.edit;
-  switch (name) {
-    case 'record': {
-      if (W.d.flow && !(await confirmBox('Record the task again?', 'The new recording replaces this one. The workflow is drafted again from it; your review edits are kept until then in flow.prev.json.', 'Record'))) return;
-      await api('/api/workflows/record', {id: W.id}); snack('A browser window is opening. Do the task there.'); return render();
-    }
-    case 'draft': await api('/api/workflows/draft', {id: W.id}); return render();
-    case 'redraft': if (await confirmBox('Draft again?', 'Gemini drafts the workflow again from the recording. Your edits are replaced (kept in flow.prev.json).', 'Draft')) { await api('/api/workflows/draft', {id: W.id}); W.edit = null; W.dirty = false; return render(); } return;
-    case 'stop-job': await api('/api/jobs/stop', {id: W.d.job}); return;
-    case 'edit-basics': {
-      $('#confirm-title').textContent = 'Product details';
-      $('#confirm-text').innerHTML = basicsForm(W.d.basics) + '<div class="actions" style="margin-top:12px"><md-filled-button id="save-basics">Save</md-filled-button></div>';
-      $('#confirm-yes').hidden = true; $('#confirm-no').onclick = () => { $('#confirm-dialog').close(); $('#confirm-yes').hidden = false; };
-      $('#confirm-dialog').show();
-      const sw = $('#b-login-on'); sw.addEventListener('change', () => { $('#b-login').hidden = !sw.selected; });
-      return;
-    }
-    case 'use-wf': return useWorkflow(W.id);
-    case 'save-flow': { const r = await api('/api/workflows/save', {id: W.id, flow: strip(f)}); W.dirty = false; snack(r.problems.length ? `Saved, with ${r.problems.length} things to fix.` : 'Saved.'); return render(); }
-    case 'confirm-flow': {
-      if (W.dirty) { const r = await api('/api/workflows/save', {id: W.id, flow: strip(f)}); W.dirty = false; if (r.problems.length) { snack('Fix the problems listed at the top first.'); return render(); } }
-      await api('/api/workflows/check', {id: W.id}); W.tab = 0; return render();
-    }
-    case 'pick': W.picking = {item: t.dataset.itemId, step: f.items.find(i => i.id === t.dataset.itemId).step}; rerenderTab();
-      document.querySelector(`[data-step="${CSS.escape(W.picking.step)}"]`).scrollIntoView({behavior: 'smooth', block: 'start'}); return;
-    case 'cancel-pick': e.preventDefault(); W.picking = null; return rerenderTab();
-    case 'unpick': { const it = f.items.find(i => i.id === t.dataset.itemId); delete it.locate; markDirtyFlow(); return rerenderTab(); }
-    case 'del-item': {
-      const id = t.dataset.itemId; f.items = f.items.filter(i => i.id !== id);
-      for (const g of f.knowledgeGroups) g.items = g.items.filter(x => x !== id);
-      f.knowledgeGroups = f.knowledgeGroups.filter(g => g.items.length);
-      for (const k of ['entry', 'help', 'review']) f.engine.items[k] = (f.engine.items[k] || []).filter(x => x !== id);
-      markDirtyFlow(); return rerenderTab();
-    }
-    case 'add-item': {
-      const it = {id: nextItemId(), step: t.dataset.stepId, way: null, needed: true, kind: 'concept', text: '', meaning: '', everyday: '', common: '', altOf: null, exps: [], basis: 'Added in review'};
-      f.items.push(it); regroup(it); markDirtyFlow(); return rerenderTab();
-    }
-    case 'add-group': { const word = t.dataset.word === '1'; f.knowledgeGroups.push({key: (word ? 'terms-' : 'knowledge-') + (f.knowledgeGroups.length + 1), title: word ? 'New word group' : 'New knowledge group', word, default: 1, description: 'Added in review', examples: '', items: []}); markDirtyFlow(); return rerenderTab(); }
-    case 'add-exp': { const g = f.groups[0]; if (!g) return snack('Add a group of experience first.'); const n = Math.max(0, ...f.experiences.map(x => Number(x.id.slice(1)) || 0)) + 1;
-      f.experiences.push({id: 'X' + String(n).padStart(2, '0'), group: g.id, text: '', question: {en: '', zh: ''}}); markDirtyFlow(); return rerenderTab(); }
-    case 'del-exp': { const ex = f.experiences.splice(Number(t.dataset.expI), 1)[0]; for (const i of f.items) i.exps = (i.exps || []).filter(x => x !== ex.id); markDirtyFlow(); return rerenderTab(); }
-    case 'add-plain': f.checks.push(''); markDirtyFlow(); return rerenderTab();
-    case 'del-plain': f.checks.splice(Number(t.dataset.i), 1); markDirtyFlow(); return rerenderTab();
-    case 'add-check': f.engine.target.success.push({name: 'New check', type: 'text', url: (f.engine.routes.list || [])[0] || '/', contains: ''}); markDirtyFlow(); return rerenderTab();
-    case 'del-check': f.engine.target.success.splice(Number(t.dataset.i), 1); markDirtyFlow(); return rerenderTab();
-  }
-}
-function strip(f) { const out = clone(f); delete out.__id; return out; }
 const fieldValue = el => el.matches('md-checkbox') ? el.checked : el.matches('md-switch') ? el.selected : el.value;
 document.addEventListener('input', e => {
   const el = e.target;
@@ -1680,72 +780,14 @@ document.addEventListener('input', e => {
     if (r && t) r.textContent = readout(t, s.value);
     return refreshChips(s);
   }
-  if (location.hash.startsWith('#workflow/') && W.edit) editFlowField(el);
-});
-document.addEventListener('change', e => {
-  const el = e.target;
-  const way = el.closest && el.closest('md-filter-chip[data-way]');
-  if (way) return;
-  if (location.hash.startsWith('#workflow/') && W.edit) editFlowField(el, true);
 });
 document.addEventListener('click', e => {
   const chip = e.target.closest && e.target.closest('md-filter-chip[data-way]');
   if (chip) setTimeout(() => { const p = editing(chip); if (!p) return; const on = $$('[data-editor] md-filter-chip[data-way]').filter(c => c.closest('[data-editor]') === chip.closest('[data-editor]') && c.selected).map(c => c.dataset.way);
     if (!on.length) { chip.selected = true; return snack('Keep at least one way of making sure.'); } p.confirmBy = on; refreshChips(chip); });
-  const teach = e.target.closest && e.target.closest('md-filter-chip[data-teach]');
-  if (teach) setTimeout(() => { const it = W.edit.items.find(i => i.id === teach.dataset.teachItem); const x = teach.dataset.teach;
-    it.exps = teach.selected ? [...new Set([...(it.exps || []), x])] : (it.exps || []).filter(v => v !== x); markDirtyFlow(); });
-  const sig = e.target.closest && e.target.closest('md-filter-chip[data-signal]');
-  if (sig) setTimeout(() => { W.edit.signals[sig.dataset.signal] = sig.selected; markDirtyFlow(); });
 });
-document.addEventListener('change', e => {
-  const sel = e.target.closest && e.target.closest('select[data-move]');
-  if (!sel || !W.edit) return;
-  const id = sel.dataset.move;
-  for (const g of W.edit.knowledgeGroups) g.items = g.items.filter(x => x !== id);
-  W.edit.knowledgeGroups[Number(sel.value)].items.push(id);
-  markDirtyFlow(); rerenderTab();
-});
-function editFlowField(el, committed) {
-  const f = W.edit, v = fieldValue(el);
-  const row = el.closest('[data-item]');
-  if (row && el.dataset.field) {
-    const it = f.items.find(i => i.id === row.dataset.item); const k = el.dataset.field;
-    it[k] = v;
-    if (k === 'kind') { if (it.kind !== 'word') it.common = ''; else it.common = it.common || 'none'; regroup(it); if (committed) rerenderTab(); }
-    return markDirtyFlow();
-  }
-  const step = el.closest('[data-step]');
-  if (step && el.dataset.stepField) { f.steps.find(s => s.id === step.dataset.step)[el.dataset.stepField] = v; return markDirtyFlow(); }
-  const g = el.closest('[data-group]');
-  if (g && el.dataset.groupField) { f.knowledgeGroups[Number(g.dataset.group)][el.dataset.groupField] = v; return markDirtyFlow(); }
-  const eg = el.closest('[data-egroup]');
-  if (eg && el.dataset.egField) { const grp = f.groups[Number(eg.dataset.egroup)]; if (el.dataset.egField === 'source') grp.source = v; else grp.label[el.dataset.egField] = v; return markDirtyFlow(); }
-  const ex = el.closest('[data-exp]');
-  if (ex && el.dataset.expField) { const x = f.experiences[Number(ex.dataset.exp)]; if (el.dataset.expField === 'text') x.text = v; else x.question[el.dataset.expField] = v; return markDirtyFlow(); }
-  if (el.dataset.plain !== undefined) { f.checks[Number(el.dataset.plain)] = v; return markDirtyFlow(); }
-  const ck = el.closest('[data-check]');
-  if (ck && el.dataset.ck) {
-    const c = f.engine.target.success[Number(ck.dataset.check)], k = el.dataset.ck;
-    if (k === 'where' || k === 'expect') c[k] = kvParse(v); else if (k === 'list' && !v) delete c.list; else c[k] = v;
-    if (k === 'type' && committed) {
-      for (const x of ['url', 'list', 'where', 'expect', 'contains', 'matches']) if (x !== 'url') delete c[x];
-      if (v === 'json') { c.where = {}; c.expect = {}; } if (v === 'text') c.contains = ''; if (v === 'url') { delete c.url; c.matches = ''; }
-      rerenderTab();
-    }
-    return markDirtyFlow();
-  }
-  if (el.dataset.eng === 'created') { f.engine.created = v; return markDirtyFlow(); }
-  if (el.dataset.eng === 'list') { f.engine.routes.list = v ? [v] : []; return markDirtyFlow(); }
-  if (el.dataset.list) { const [a, b] = el.dataset.list.split('.'); f.engine[a] = f.engine[a] || {}; f.engine[a][b] = String(v).split(',').map(x => x.trim()).filter(Boolean); return markDirtyFlow(); }
-  if (el.dataset.top) { f[el.dataset.top] = v; return markDirtyFlow(); }
-  if (el.dataset.sit) { f.situation = f.situation || {}; f.situation[el.dataset.sit] = v; return markDirtyFlow(); }
-}
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetFor && !$('#discard-dialog').open) tryClose(); });
 window.addEventListener('hashchange', render);
-document.addEventListener('close', e => { if (e.target && e.target.id === 'live-dialog') { LIVE.on = false; clearTimeout(liveTimer); } }, true);
-window.addEventListener('beforeunload', e => { if (W.dirty) { e.preventDefault(); e.returnValue = ''; } });
-
 /* ---------------- start ---------------- */
 (async () => {
   try {
@@ -1756,35 +798,3 @@ window.addEventListener('beforeunload', e => { if (W.dirty) { e.preventDefault()
   } catch (e) { fail(e); }
   render();
 })();
-
-/* results: a step of the task opens to show what happened there */
-document.addEventListener('click', e => {
-  const open = e.target.closest('[data-jopen]');
-  if (open) {
-    const i = Number(open.dataset.jopen), tabs = $('#res-tabs');
-    if (tabs && tabs.activeTabIndex !== 0) { tabs.activeTabIndex = 0; $('#res-body').innerHTML = resultsBody(0); }
-    toggleJourneyStep(i, true);
-    document.querySelector(`.jrow[data-jstep="${i}"]`).scrollIntoView({behavior: 'smooth', block: 'start'});
-    return;
-  }
-  const row = e.target.closest('.jrow');
-  if (row) toggleJourneyStep(Number(row.dataset.jstep));
-});
-document.addEventListener('keydown', e => {
-  const row = e.target.closest && e.target.closest('.jrow');
-  if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleJourneyStep(Number(row.dataset.jstep)); }
-});
-
-/* new test from a workflow file */
-document.addEventListener('change', async e => {
-  if (e.target.id !== 'import-file') return;
-  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try {
-    let flow;
-    try { flow = JSON.parse(await f.text()); } catch (err) { throw Error('That file is not JSON.'); }
-    const r = await api('/api/workflows/import', {flow, user: ($('#b-login-user') || {}).value || '', password: ($('#b-login-pass') || {}).value || ''});
-    if (!r.needsAccount) await api('/api/workflows/check', {id: r.id});
-    snack(r.needsAccount ? 'Imported. Add the test account in step 1, then check it.' : 'Imported. Checking it on your product now.');
-    T.edit = r.needsAccount ? 1 : 0; go('test/' + r.id);
-  } catch (err) { fail(err); }
-});

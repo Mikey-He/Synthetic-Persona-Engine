@@ -299,28 +299,14 @@ def status():
 
 def platform_job(jid):
     job = api.get_job(jid)
-    view = {'record': api.record_view, 'check': api.check_view, 'run': api.run_view}.get(job['kind'], lambda j: {})(job)
+    view = {'run': api.run_view}.get(job['kind'], lambda j: {})(job)
     text = api.log_text(job)
     return {'id': jid, 'kind': job['kind'], 'workflow': job.get('workflow'), 'state': api.job_state(job),
             'log': text[-4000:], 'view': view, 'elapsed': round(time.time() - job['started'])}
 
 
 PLATFORM_POST = {
-    '/api/workflows/create': api.create,
-    '/api/workflows/import': api.import_flow,
-    '/api/workflows/select': api.select,
-    '/api/workflows/basics': lambda b: api.update_basics(b.get('id'), b),
-    '/api/workflows/save': lambda b: api.save_flow(b.get('id'), b),
-    '/api/workflows/pick': lambda b: api.pick_control(b.get('id'), b),
-    '/api/workflows/record': lambda b: api.record(b.get('id'), b),
-    '/api/workflows/draft': lambda b: api.draft(b.get('id'), b),
-    '/api/workflows/check': lambda b: api.check(b.get('id'), b),
     '/api/jobs/stop': api.stop_job,
-    '/api/workflows/facts': api.save_facts,
-    '/api/workflows/signed-in': api.signed_in,
-    '/api/workflows/steps': api.use_steps,
-    '/api/workflows/adjust': api.adjust,
-    '/api/workflows/text': api.edit_text,
     '/api/personas/draft': api.draft_persona,
     '/api/personas/save': lambda b: api.save_persona(b, save_card),
     '/api/personas/save-participant': api.save_participant,
@@ -384,9 +370,6 @@ class Handler(BaseHTTPRequestHandler):
                 '/api/live': lambda: api.live_view(api.get_job(q('id'))),
                 '/api/personas': lambda: api.list_personas(),
                 '/api/results': lambda: api.list_results(),
-                '/api/result': lambda: api.result_detail(q('id')),
-                '/api/facts': lambda: api.facts(q('id')),
-                '/api/summary': lambda: api.summary_view(q('id')),
             }
             if url.path in platform_get:
                 self.send_json(platform_get[url.path]())
@@ -396,14 +379,6 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if url.path == '/questionnaire':
                 self.send_bytes(api.questionnaire_page(), 'text/html; charset=utf-8')
-                return
-            if url.path.startswith('/wf/'):
-                parts = url.path.split('/')
-                target = api.shot_path(parts[2], parts[3]) if len(parts) == 4 else None
-                if target is None:
-                    self.send_json({'error': 'Not found.'}, 404)
-                    return
-                self.send_bytes(target.read_bytes(), 'image/png')
                 return
             if url.path == '/report':
                 self.send_bytes(report_page((query.get('job') or [''])[0]).encode('utf-8'), 'text/html; charset=utf-8')
