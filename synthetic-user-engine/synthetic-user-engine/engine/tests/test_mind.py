@@ -84,10 +84,15 @@ def test_doubt_takes_hope_off_only_outside_a_form_for_someone_unsure():
     assert appraise(move("Field", 9), outlook(unsure=1.0, in_form=True), None, 1) == 9
 
 
-def test_folding_a_section_is_leaving_it_and_a_look_that_ticks_a_box_is_not_just_a_look():
-    fold = move("3 Amount", 8)
+def test_another_section_of_the_form_is_not_elsewhere_but_the_menu_is_and_a_look_that_ticks_a_box_is_not_just_a_look():
+    # Going back to Amount once the task has been taken to mean $1,000 is a correction, not leaving the
+    # form; it counted as leaving (worth 1.6) and was all but never taken (2026-11-05).
+    fold = move("3 Amount", 8, purpose="fix")
     fold.element["expanded"] = False
-    assert appraise(fold, outlook(in_form=True), None, 1) == 8 * 0.2
+    assert appraise(fold, outlook(in_form=True, check=10), None, 1) == 8
+    menu = move("Billing", 8)
+    menu.element["region"] = {"kind": "nav"}
+    assert appraise(menu, outlook(in_form=True), None, 1) == 8 * 0.2
     opens = move("Budget type", 8)
     opens.element.update(expanded=False, dropdown=True)
     assert appraise(opens, outlook(in_form=True), None, 1) == 8
@@ -109,3 +114,20 @@ def test_scrolling_in_a_form_is_looking_and_can_be_done_again():
     down = move("scroll", 6, action="scroll")
     assert appraise(down, outlook(in_form=True), 5, 6) > 0
     assert appraise(move("Next", 6), outlook(in_form=True), 5, 6) == 0
+
+
+def test_scrolling_up_comes_before_the_piece_so_a_value_seen_as_wrong_above_is_fixed_first():
+    # On Actions, the task reading has turned to $1,000 and the amount typed above is $800: the model
+    # says go up and change it (a fix, worth about 8). Before, every field on the piece came first in
+    # reading order and one of them was good enough; the old value was saved (m5f, 6 runs of 18).
+    o = outlook(in_form=True, check=10)
+    up = lambda: Move({"action": "scroll", "value": "up", "purpose": "fix", "hope": 8}, None, "sure", ("up",), [])  # noqa: E731
+    make = lambda: [up(), move("Delete", 6, 300, purpose="fix"), move("Percent of budget", 5, 400, purpose="fix", action="choose")]  # noqa: E731
+    assert share_taken(make, o) > 0.9
+    # A scroll up the model gives little hope for (a look back over the form) is skipped like any poor move
+    # (at the group's aspiration in a form, 6).
+    weak = lambda: [Move({"action": "scroll", "value": "up", "purpose": "check", "hope": 3}, None, "sure", ("up",), []), move("Next", 8, 300)]  # noqa: E731
+    assert share_taken(weak, outlook(in_form=True, check=10, params={**PARAMS, "aspiration_form": 6.0})) < 0.05
+    # Scrolling on still comes after everything on the piece.
+    down = lambda: [Move({"action": "scroll", "value": "down", "purpose": "advance", "hope": 8}, None, "sure", ("down",), []), move("Next", 8, 300)]  # noqa: E731
+    assert share_taken(down, o) < 0.1

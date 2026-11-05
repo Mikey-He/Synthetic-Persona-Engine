@@ -92,13 +92,17 @@ AROUND = ("nav", "header", "aside")  # the frame around every page: the menu, th
 
 
 def elsewhere(move: Move, o: Outlook) -> bool:
-    """Leaves what they are working on: a look around, folding this section for another, or, from
-    inside a form, anything in the frame around the page. By where the element is, not by what the
-    model called the move: runs left Actions through the menu with the move labelled advance."""
+    """Leaves what they are working on: a look around, or, from inside a form, anything in the frame
+    around the page. By where the element is, not by what the model called the move: runs left Actions
+    through the menu with the move labelled advance. Another section of the same form is not elsewhere
+    (2026-11-05): it counted as leaving, so going back to Amount to change the value, once the task had
+    been taken to mean $1,000, was worth 1.6 and all but never taken; P001, P003 and P006 went back to
+    earlier sections 1, 6 and 26 times. Going round the sections is held by freshness: a section
+    opened from the same state stays opened."""
     e = move.element or {}
     if move.purpose == EXPLORE:
         return True
-    return o.in_form and ((e.get("expanded") is not None and not e.get("dropdown")) or (e.get("region") or {}).get("kind") in AROUND)
+    return o.in_form and (e.get("region") or {}).get("kind") in AROUND
 
 
 def changes_value(move: Move) -> bool:
@@ -150,10 +154,18 @@ def appraise(move: Move, o: Outlook, last: int | None, now: int) -> float:
 
 
 def reading_order(moves: list[Move]) -> list[Move]:
-    """Down the piece; what has no place on it (scrolling on, going back) after what has."""
+    """Down the piece. A move with no place on it has the place of what it leads to: scrolling up leads
+    to what is above the piece, so it comes before everything on it; scrolling on and going back lead
+    past it, so they come after. Scrolling up was placed last with the rest (2026-11-05): on Actions,
+    a run that had just taken the task to mean $1,000 saw the amount it typed as wrong, and the model
+    said so, at a worth it would nearly always have taken; but every field on the piece came first in
+    the order, one of them was good enough, and the old value was saved. P001 went back up."""
     def place(m: Move) -> tuple[float, float]:
         box = (m.element or {}).get("box")
-        return (box["y"], box["x"]) if box else (math.inf, math.inf)
+        if box:
+            return (box["y"], box["x"])
+        up = m.action == "scroll" and str(m.candidate.get("value") or "").lower() == "up"
+        return (-math.inf, -math.inf) if up else (math.inf, math.inf)
     return sorted(moves, key=place)
 
 
