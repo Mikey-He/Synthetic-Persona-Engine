@@ -74,12 +74,26 @@ def platform_url() -> str:
     return load_config()['platform']['base_url']
 
 
-def platform_up() -> bool:
+_UP = {'value': False, 'at': 0.0, 'busy': False}
+
+
+def _probe_platform() -> None:
     try:
         with urlopen(platform_url(), timeout=2) as r:
-            return r.status < 500
+            _UP['value'] = r.status < 500
     except Exception:  # noqa: BLE001 - any failure means not reachable
-        return False
+        _UP['value'] = False
+    _UP['at'] = time.time()
+    _UP['busy'] = False
+
+
+def platform_up() -> bool:
+    """The UAT platform's reachability, from a probe that runs in the background: the page's first call
+    used to wait two seconds on a dead port before anything was drawn (2026-11-08)."""
+    if not _UP['busy'] and time.time() - _UP['at'] > 60:
+        _UP['busy'] = True
+        threading.Thread(target=_probe_platform, daemon=True).start()
+    return _UP['value']
 
 
 # ---- saving -------------------------------------------------------------------------
@@ -312,6 +326,8 @@ PLATFORM_POST = {
     '/api/personas/save-participant': api.save_participant,
     '/api/personas/update': api.update_persona,
     '/api/personas/delete': api.delete_persona,
+    '/api/personas/group': api.group_plan,
+    '/api/personas/update-record': api.update_record,
     '/api/personas/restore': lambda b: api.delete_persona(b, restore=True),
     '/api/tests/start': api.start_tests,
 }

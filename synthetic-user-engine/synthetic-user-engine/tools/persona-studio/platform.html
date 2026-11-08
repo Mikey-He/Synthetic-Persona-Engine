@@ -20,9 +20,9 @@
 
 <div class="shell">
   <nav class="rail" aria-label="Main">
-    <div class="fab-slot"><md-fab size="medium" aria-label="New persona" id="rail-fab"><span slot="icon" class="ms">edit</span></md-fab></div>
-    <a href="#workflow" data-nav="workflow"><span class="pill"><span class="ms">account_tree</span></span>Workflow</a>
+    <div class="fab-slot"><md-fab size="medium" aria-label="Who do you want to test with?" id="rail-fab"><span slot="icon" class="ms">edit</span></md-fab></div>
     <a href="#personas" data-nav="personas"><span class="pill"><span class="ms">groups</span></span>Personas</a>
+    <a href="#workflow" data-nav="workflow"><span class="pill"><span class="ms">account_tree</span></span>Workflow</a>
     <a href="#run" data-nav="run"><span class="pill"><span class="ms">play_circle</span></span>Run</a>
     <a href="#results" data-nav="results"><span class="pill"><span class="ms">insights</span></span>Results</a>
   </nav>
@@ -33,6 +33,12 @@
   <div slot="headline" id="confirm-title"></div>
   <div slot="content" id="confirm-text"></div>
   <div slot="actions"><md-text-button id="confirm-no">Cancel</md-text-button><md-text-button id="confirm-yes">OK</md-text-button></div>
+</md-dialog>
+
+<md-dialog id="group-dialog">
+  <div slot="headline" id="group-title">Make a group</div>
+  <div slot="content" id="group-body"></div>
+  <div slot="actions"><md-text-button id="group-cancel">Cancel</md-text-button><md-filled-button id="group-go">Generate</md-filled-button></div>
 </md-dialog>
 
 <div class="scrim" id="scrim"></div>

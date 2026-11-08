@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 import os
 import re
 import shutil
@@ -156,9 +157,54 @@ def detail(wid: str) -> dict:
 
 # ---- jobs: run -------------------------------------------------------------------------------------
 
+def _procs(job: dict) -> list:
+    return [c['proc'] for c in job.get('children') or []] or [job['proc']]
+
+
 def busy() -> dict | None:
     with LOCK:
-        return next((j for j in JOBS.values() if j['proc'].poll() is None), None)
+        return next((j for j in JOBS.values() if any(p.poll() is None for p in _procs(j))), None)
+
+
+def start_many(kind: str, cmds: list, **meta) -> dict:
+    """One job, several engine processes side by side (one per card), so a group of six runs in the time
+    of one (2026-11-08). Each child keeps its own log; the views merge them."""
+    other = busy()
+    if other:
+        raise ValueError(f'The engine is busy ({other["kind"]} {other.get("label", "")}). Wait for it or stop it first.')
+    RUNS.mkdir(parents=True, exist_ok=True)
+    jid = uuid.uuid4().hex[:12]
+    env = dict(os.environ, PYTHONIOENCODING='utf-8', PYTHONUNBUFFERED='1', SUE_FLOW=meta.pop('flow', os.environ.get('SUE_FLOW', '')))
+    if not env['SUE_FLOW']:
+        env.pop('SUE_FLOW')
+    job = {'id': jid, 'kind': kind, 'children': [], 'pending': list(cmds), 'env': env, 'started': time.time(), 'stopped': False, **meta}
+    _advance(job)
+    job.update(proc=job['children'][0]['proc'], log=job['children'][0]['log'], logfile=job['children'][0]['logfile'])
+    with LOCK:
+        JOBS[jid] = job
+    return {'id': jid}
+
+
+SIDE_BY_SIDE = 6  # engines at once: each is a browser and a stream of model calls; more would slow them all
+
+
+def _advance(job: dict) -> None:
+    """Starts queued cards while fewer than SIDE_BY_SIDE engines run. Called when the job is started and
+    whenever its state is read (the Run page polls every two seconds)."""
+    if job.get('stopped'):
+        job['pending'] = []
+        return
+    running = sum(1 for c in job['children'] if c['proc'].poll() is None)
+    while job.get('pending') and running < SIDE_BY_SIDE:
+        card, cmd = job['pending'].pop(0)
+        n = len(job['children']) + 1
+        log_path = RUNS / f"platform-{job['kind']}-{job['id']}-{n}.log"
+        log = log_path.open('w', encoding='utf-8')
+        proc = subprocess.Popen(cmd, cwd=ENGINE, stdout=log, stderr=subprocess.STDOUT, env=job['env'],
+                                creationflags=getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0))
+        job['children'].append({'card': card, 'proc': proc, 'log': log_path, 'logfile': log})
+        running += 1
+        time.sleep(1.2)  # the engine names a batch folder by the second
 
 
 def start(kind: str, cmd: list[str], **meta) -> dict:
@@ -181,10 +227,17 @@ def start(kind: str, cmd: list[str], **meta) -> dict:
 
 
 def job_state(job: dict) -> str:
-    code = job['proc'].poll()
-    if code is not None and not job['logfile'].closed:
-        job['logfile'].close()
-    return 'running' if code is None else 'stopped' if job['stopped'] else 'completed' if code == 0 else 'failed'
+    if job.get('children'):
+        _advance(job)
+    codes = []
+    for c in job.get('children') or [{'proc': job['proc'], 'logfile': job['logfile']}]:
+        code = c['proc'].poll()
+        if code is not None and not c['logfile'].closed:
+            c['logfile'].close()
+        codes.append(code)
+    if any(code is None for code in codes) or job.get('pending'):
+        return 'running'
+    return 'stopped' if job['stopped'] else 'completed' if all(code == 0 for code in codes) else 'failed'
 
 
 def get_job(jid: str) -> dict:
@@ -195,18 +248,24 @@ def get_job(jid: str) -> dict:
     return job
 
 
+def _log_texts(job: dict) -> list:
+    logs = [c['log'] for c in job.get('children') or []] or [job['log']]
+    return [p.read_text(encoding='utf-8', errors='replace') if p.exists() else '' for p in logs]
+
+
 def log_text(job: dict) -> str:
-    return job['log'].read_text(encoding='utf-8', errors='replace') if job['log'].exists() else ''
+    return '\n'.join(_log_texts(job))
 
 
 def stop_job(body) -> dict:
     job = get_job(body.get('id'))
-    if job['proc'].poll() is None:
-        job['stopped'] = True
-        if job['kind'] == 'record':
-            (wf_dir(job['workflow']) / 'recording' / 'STOP').write_text('stop', encoding='utf-8')
-        else:
-            job['proc'].terminate()
+    for proc in _procs(job):
+        if proc.poll() is None:
+            job['stopped'] = True
+            if job['kind'] == 'record':
+                (wf_dir(job['workflow']) / 'recording' / 'STOP').write_text('stop', encoding='utf-8')
+            else:
+                proc.terminate()
     return {'stopped': True}
 
 
@@ -239,6 +298,7 @@ def persona_entry(path: Path, card: dict) -> dict:
     return {'id': cid, 'name': (card.get('persona') or {}).get('name') or cid, 'kind': kind, 'version': card.get('version'),
             'description': (record or {}).get('description') or '', 'parameters': (record or {}).get('parameters'),
             'from': (record or {}).get('source'),
+            'group': (record or {}).get('group'), 'groupName': (record or {}).get('groupName'), 'base': (record or {}).get('base'), 'variant': (record or {}).get('variant'),
             'scores': scores_of(card), 'known': known_share(card), 'builtAt': card.get('builtAt')}
 
 
@@ -266,6 +326,41 @@ def draft_persona(body) -> dict:
     return {'settings': result}
 
 
+def group_plan(body) -> dict:
+    """Variants around a base persona: Gemini plans which of the chosen settings take which values, code keeps
+    the combinations distinct (persona_batch). The participants of this workflow, if any, are passed as evidence
+    of plausible ranges; with none, the plan rests on the description alone and the group says so."""
+    from persona_batch import generate_batch
+    baseline, fields, count = body.get('baseline'), body.get('fields'), body.get('count')
+    if not isinstance(baseline, dict) or not isinstance(fields, list) or not fields or type(count) is not int or not 2 <= count <= 60:
+        raise ValueError('Choose 2 to 60 people and at least one setting that may differ.')
+    references = []
+    if body.get('useParticipants'):  # only when asked: the group is the role's, not the participants'
+        for path in sorted(RECORDS.glob('studio-*.json')):
+            rec = read_json(path, {}) or {}
+            card = read_json(PERSONAS / path.name, {}) or {}
+            if rec.get('source') in ('questionnaire', 'survey') and card.get('flow') == current_name() and rec.get('parameters'):
+                references.append({'id': path.stem, 'name': rec['parameters'].get('name'), 'parameters': rec['parameters'], 'description': rec.get('description', '')})
+    plan = generate_batch({'count': min(200, count * 3), 'requestedCount': count, 'fields': fields, 'instructions': body.get('instructions') or '',
+                           'baseline': baseline, 'role': {'title': str(body.get('title') or baseline.get('name') or ''), 'background': str(body.get('description') or '')},
+                           'references': references}, HERE / '.extraction-cache')
+    plan['references'] = len(references)
+    return plan
+
+
+def update_record(body) -> dict:
+    """A persona's record fields that are not settings: which group it belongs to, and the group's name."""
+    cid = body.get('id')
+    if not isinstance(cid, str) or not CARD.match(cid) or not (RECORDS / f'{cid}.json').exists():
+        raise ValueError('No such persona.')
+    data = read_json(RECORDS / f'{cid}.json', {}) or {}
+    for key in ('group', 'groupName'):
+        if key in body:
+            data[key] = body[key]
+    write_json(RECORDS / f'{cid}.json', data)
+    return {'ok': True}
+
+
 def save_persona(body, save_card) -> dict:
     description = (body.get('description') or '').strip()[:2000]
     card = body.get('card') or {}
@@ -277,6 +372,11 @@ def save_persona(body, save_card) -> dict:
     data['description'] = description
     if body.get('source') == 'survey':  # built from a real participant's survey answers
         data['source'] = 'survey'
+    # A variant made from a base persona: which group it belongs to, which card it was made from, and what
+    # was changed (the base persona + small changes make up a group, which runs as one; 2026-11-08).
+    for key in ('group', 'base', 'variant', 'groupName'):
+        if body.get(key) is not None:
+            data[key] = body[key]
     write_json(record, data)
     return result
 
@@ -340,8 +440,8 @@ def start_tests(body) -> dict:
     if status(wid)['key'] not in ('ready', 'changed'):  # one workflow; the checks step is gone from this platform
         raise ValueError('This workflow is not ready: run its checks first.')
     cards, runs = body.get('cards'), body.get('runs', 5)
-    if not isinstance(cards, list) or not 1 <= len(cards) <= 20 or type(runs) is not int or not 1 <= runs <= 10:
-        raise ValueError('Choose 1 to 20 personas and 1 to 10 runs each.')
+    if not isinstance(cards, list) or not 1 <= len(cards) <= 60 or type(runs) is not int or not 1 <= runs <= 10:
+        raise ValueError('Choose 1 to 60 personas and 1 to 10 runs each.')
     name = current_name()
     for c in cards:
         if c in ('full', 'blank'):
@@ -353,15 +453,12 @@ def start_tests(body) -> dict:
     up, url = reachable(flow)
     if not up:
         raise ValueError(f'The product is not reachable at {url}. Start it and try again.')
-    cmd = [str(engine_python()), '-m', 'sue.batch', '--flow', str(current_flow_path()), '--runs', str(runs), '--live']
-    for c in cards:
-        cmd += ['--card', c]
-    return start('run', cmd, workflow=wid, label=f'{len(cards)} personas', cards=cards, runs=runs, flow=str(current_flow_path()))
+    base = [str(engine_python()), '-m', 'sue.batch', '--flow', str(current_flow_path()), '--runs', str(runs), '--live']
+    return start_many('run', [(c, base + ['--card', c]) for c in cards], workflow=wid, label=f'{len(cards)} personas', cards=cards, runs=runs,
+                      flow=str(current_flow_path()), group=body.get('group'))
 
 
-def run_view(job: dict) -> dict:
-    text = log_text(job)
-    done, current = [], None
+def _parse_run_log(text: str, done: list, current: list) -> list:
     for block in re.split(r'^##### ', text, flags=re.M)[1:]:
         head = re.match(r'(.+?), run (\d+) of (\d+)', block)
         if not head:
@@ -375,15 +472,51 @@ def run_view(job: dict) -> dict:
                          'stop': finished.group(1) if finished else '', 'why': finished.group(2) if finished else ''})
         else:
             last = steps[-1] if steps else None
-            current = {'card': card, 'run': n, 'step': int(last[0]) if last else 0, 'route': last[1] if last else '',
-                       'did': last[2][:140] if last else 'Opening the product'}
-    batch = re.findall(r'^Saved to (.+batch-[0-9-]+)\s*$', text, flags=re.M)
+            current.append({'card': card, 'run': n, 'step': int(last[0]) if last else 0, 'route': last[1] if last else '',
+                            'did': last[2][:140] if last else 'Opening the product'})
+    return re.findall(r'^Saved to (.+batch-[0-9-]+)\s*$', text, flags=re.M)
+
+
+def _merge_batches(job: dict, folders: list) -> str | None:
+    """The children's result folders become one result: the group's cards together, as the Results page
+    reads them. The children's folders go; their runs stay where they are."""
+    if job.get('merged'):
+        return job['merged']
+    cards, first = [], None
+    for f in folders:
+        data = read_json(RUNS / Path(f).name)
+        if not data:
+            continue
+        first = first or data
+        cards += data.get('cards') or []
+    if not first:
+        return None
+    out = RUNS / f'batch-{datetime.now():%Y%m%d-%H%M%S}'
+    out.mkdir(parents=True, exist_ok=True)
+    write_json(out / 'batch.json', {**first, 'at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'cards': cards, 'group': job.get('group')})
+    for f in folders:
+        shutil.rmtree(RUNS / Path(f).name, ignore_errors=True)
+    job['merged'] = out.name
+    return out.name
+
+
+def run_view(job: dict) -> dict:
+    done, current, batches = [], [], []
+    texts = _log_texts(job)
+    for text in texts:
+        found = _parse_run_log(text, done, current)
+        batches.append(Path(found[-1].strip()) if found else None)
+    state = job_state(job)
+    batch = None
+    if len(texts) == 1 and batches[0]:
+        batch = batches[0].name
+    elif len(texts) > 1 and state == 'completed' and all(batches):
+        batch = _merge_batches(job, batches)
     error = None
-    if job_state(job) == 'failed':
-        tail = [ln for ln in text.strip().splitlines() if ln.strip()][-3:]
+    if state == 'failed':
+        tail = [ln for t in texts for ln in t.strip().splitlines() if ln.strip()][-3:]
         error = ' '.join(tail)[-400:]
-    return {'done': done, 'current': current, 'cards': job.get('cards'), 'runs': job.get('runs'),
-            'batch': Path(batch[-1].strip()).name if batch else None, 'error': error}
+    return {'done': done, 'current': current, 'cards': job.get('cards'), 'runs': job.get('runs'), 'batch': batch, 'error': error}
 
 
 def live_view(job: dict) -> dict:
@@ -392,6 +525,12 @@ def live_view(job: dict) -> dict:
     dirs = [d for d in RUNS.iterdir() if d.is_dir() and re.match(r'^\d{8}-\d{6}-', d.name) and d.stat().st_mtime >= job['started'] - 2]
     if not dirs:
         return {'frame': None, 'state': None, 'steps': []}
+    if job.get('children'):  # several cards side by side: watch the first one still running, steadily
+        for c in job['children']:
+            mine = [d for d in dirs if d.name.endswith(c['card'])]
+            if c['proc'].poll() is None and mine:
+                dirs = mine
+                break
     d = max(dirs, key=lambda p: p.stat().st_mtime)
     steps = []
     path = d / 'steps.jsonl'
@@ -498,18 +637,7 @@ def tables_view(bid: str) -> dict:
                          'moves': engine_parts(steps, parts, commit)['moves'], 'seconds': engine_parts(steps, parts, commit)['seconds'],
                          'trouble': [list(t) for t in tr], 'saved': _saved((s.get('stored') or {}).get(storage_key)),
                          **_route(engine_facts(steps, parts, c.get('options') or {}, commit), BEFORE, entry_label)})
-    wanted = set(names.values())
-    people = []
-    for d in _people_files():
-        name = ((d.get('questionnaire') or {}).get('answers') or {}).get('name')
-        if name not in wanted:
-            continue
-        ev = d.get('events') or []
-        checks = {s['name']: json_check((d.get('product') or {}).get(s['key']), s)[0] for s in success if s.get('type') == 'storage'}
-        people.append({'name': name, 'passed': all(checks.values()), 'checks': checks,
-                       'moves': person_parts(ev, parts)['moves'], 'seconds': person_parts(ev, parts)['seconds'],
-                       'trouble': [list(t) for t in person_trouble(d, config)], 'saved': _saved((d.get('product') or {}).get(storage_key)),
-                       **_route(person_facts(ev, parts, c.get('options') or {}), BEFORE, entry_label)})
+    people = []  # the platform reports the simulation; real people are compared outside it (2026-11-08)
     return {'id': bid, 'at': data.get('at') or bid[6:], 'parts': [BEFORE, *parts, AFTER], 'runs': runs, 'people': people, 'checks': [s.get('name') for s in success],
             'definitions': {'lost the way': f"before the form, a click that is not on the way to it (the way: {', '.join(c.get('way') or [])})",
                             'changed a value': 'the same setting given one value, then another (typing the same value again is not one)',
@@ -534,8 +662,10 @@ def list_results() -> dict:
                 continue  # the engine's own research runs, not tests of the platform's personas
             cards = data.get('cards') or []
             runs = sum(c.get('runs', 0) for c in cards)
+            group = data.get('group')
+            group_name = next((r.get('groupName') for r in (read_json(RECORDS / f"{c['card']}.json", {}) or {} for c in cards) if r.get('group') == group), None) if group else None
             out.append({'id': d.name, 'at': data.get('at') or d.name[6:], 'runs': runs, 'passed': sum(c.get('passed', 0) for c in cards),
-                        'cards': [c['card'] for c in cards]})
+                        'cards': [c['card'] for c in cards], 'group': group, 'groupName': group_name})
     return {'workflow': name, 'results': out[:50]}
 
 

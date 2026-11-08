@@ -95,12 +95,126 @@ function personaCard(p) {
     <div class="row" style="padding-right:36px">${avatar(p)}<div style="min-width:0"><h3>${esc(p.name)}</h3><div class="muted small">${kindLabel(p)}</div></div></div>
     <p class="muted">${esc(p.description)}</p>
     <div class="chips">${chipsFor(p.scores, p.known, (p.parameters || {}).humanFactors)}</div>
+    ${p.from !== 'questionnaire' && p.from !== 'survey' && !p.base ? `<md-icon-button class="make-group" data-make-group="${esc(p.id)}" aria-label="Make a group from this persona" title="Make a group: this persona plus variants of it"><span class="ms">group_add</span></md-icon-button>` : ''}
     <md-icon-button data-remove="${esc(p.id)}" aria-label="Delete persona" style="position:absolute;top:8px;right:8px"><span class="ms">delete</span></md-icon-button>
   </div>`;
 }
+/* ---- groups: a base persona and the variants made from it (the designed path: one base, small changes, a group that runs as one) ---- */
+function groupsOf(personas) {
+  const groups = {};
+  for (const p of personas) {
+    if (!p.group) continue;
+    const g = groups[p.group] = groups[p.group] || {id: p.group, name: p.groupName || '', base: null, variants: []};
+    if (p.base) g.variants.push(p); else g.base = p;
+  }
+  return Object.values(groups).filter(g => g.variants.length).map(g => ({...g, name: g.name || (g.base || g.variants[0]).name}));
+}
+const inGroup = p => !!(p.group && (p.base || S.personas.some(x => x.base === p.id)));
+function groupFieldLabel(key) {
+  if (key.startsWith('knowledge.')) { const g = PersonaParameters.GROUPS.find(x => x.key === key.slice(10)); return g ? g.title : key; }
+  if (key === 'english') return 'English';
+  const t = TRAITS.find(x => x.key === key) || STATES.find(x => x.key === key);
+  return t ? t.title : key;
+}
+function groupValueLabel(key, v) {
+  if (key.startsWith('knowledge.')) { const g = PersonaParameters.GROUPS.find(x => x.key === key.slice(10)); return LEVEL_WORDS[!!(g && g.word)][v] || v; }
+  if (typeof v === 'number') return v <= 2.5 ? 'low' : v >= 7.5 ? 'high' : 'medium';
+  return String(v);
+}
+function diffText(p) {
+  const base = S.personas.find(x => x.id === p.base), changes = p.variant || {};
+  const parts = [];
+  for (const [k, v] of Object.entries(changes)) {
+    const was = base && base.parameters ? (k.startsWith('knowledge.') ? base.parameters.knowledge[k.slice(10)] : base.parameters[k]) : undefined;
+    if (JSON.stringify(was) === JSON.stringify(v)) continue;
+    parts.push(`${groupFieldLabel(k)}: ${groupValueLabel(k, v)}`);
+  }
+  return parts.join(' · ') || 'Same as the base';
+}
+function personTile(p, label) {
+  const chips = chipsFor(p.scores, p.known, (p.parameters || {}).humanFactors) || '<span class="tag"><span class="ms">person</span>Typical</span>';
+  return `<div class="ptile ${label === 'Base' ? 'base' : ''}" data-open="${esc(p.id)}" title="Open to adjust their settings">
+    ${avatar(p, 40)}<div class="pt-name">${esc(label)}</div><div class="chips">${chips}</div><span class="ms pt-edit" aria-hidden="true">tune</span></div>`;
+}
+function groupCard(g) {
+  const head = g.base || g.variants[0];
+  return `<div class="card group">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div class="row ghead" style="min-width:0" ${g.base ? `data-open="${esc(g.base.id)}" title="Open the group's settings"` : ''}>${avatar(head, 56)}<div style="min-width:0"><h3>${esc(g.name)}</h3><div class="muted small">${g.variants.length} people · click one to adjust</div></div></div>
+      <div class="row"><md-filled-tonal-button data-run-group="${esc(g.id)}"><span slot="icon" class="ms">play_arrow</span>Run this group</md-filled-tonal-button>
+        ${g.base ? `<md-icon-button data-make-group="${esc(g.base.id)}" aria-label="Add people" title="Add more people like the base"><span class="ms">group_add</span></md-icon-button>` : ''}
+        <md-icon-button data-remove-group="${esc(g.id)}" aria-label="Delete this group" title="Delete the group"><span class="ms">delete</span></md-icon-button></div></div>
+    ${head.description ? `<p class="muted small clamp2">${esc(head.description)}</p>` : ''}
+    <div class="ptiles">
+      ${g.variants.map((v, i) => personTile(v, `Person ${i + 1}`)).join('')}
+    </div>
+  </div>`;
+}
+/* the dialog: how many variants, which settings may differ, what to keep in mind */
+let groupFor = null;
+function groupFieldList() {
+  return [...TRAITS.map(t => [t.key, t.title, true]), ['english', 'English', false],
+    ...PersonaParameters.GROUPS.filter(g => !g.hidden).map(g => ['knowledge.' + g.key, g.title, true])];
+}
+/* The variants of a base: Gemini plans which of the chosen settings take which values for people of this
+   kind, code keeps the combinations distinct, the Persona Builder builds each card. From the description
+   alone: the participants are never part of a group. */
+async function generateVariants(base, count, fields, note, status) {
+  const baseline = PersonaParameters.validate(clone(base.parameters));
+  const plan = await api('/api/personas/group', {baseline, fields, count, instructions: note || '', title: base.name, description: base.description || ''});
+  const groupId = base.group || ('group-' + Date.now().toString(36));
+  const existing = S.personas.filter(p => p.base === base.id).length;
+  const seen = new Set(S.personas.filter(p => p.base === base.id).map(p => JSON.stringify(p.variant || {})));
+  let made = 0;
+  for (const changes of plan.variants) {
+    if (made >= count) break;
+    const v = clone(baseline);
+    for (const [path, value] of Object.entries(changes)) {
+      if (!fields.includes(path)) continue;
+      if (path.startsWith('humanFactors.')) v.humanFactors[path.split('.')[1]] = value;
+      else if (path.startsWith('knowledge.')) PersonaParameters.setGroup(v, path.split('.')[1], value);
+      else v[path] = value;
+    }
+    const sig = JSON.stringify(changes);
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    v.name = `${base.name.slice(0, 70)} · ${String(existing + made + 1).padStart(2, '0')}`;
+    status(`Building person ${made + 1} of ${count}…`);
+    await api('/api/personas/save', {...await buildBundle(v), description: base.description || '', group: groupId, groupName: base.name, base: base.id, variant: changes});
+    made++;
+  }
+  if (!base.group) await api('/api/personas/update-record', {id: base.id, group: groupId, groupName: base.name});
+  return {groupId, made, summary: plan.summary};
+}
+function openGroupDialog(baseId) {
+  groupFor = S.personas.find(p => p.id === baseId); if (!groupFor || !groupFor.parameters) return;
+  const fields = groupFieldList();
+  $('#group-title').textContent = `More people like “${groupFor.name}”`;
+  $('#group-body').innerHTML = `<p class="muted small" style="margin:0 0 12px">The base persona stays as it is. Each new person changes only the settings ticked below, the way real people of this kind differ.</p>
+    <md-outlined-text-field id="group-count" label="How many variants" type="number" min="2" max="20" value="6" style="width:200px"></md-outlined-text-field>
+    <p class="small muted" style="margin:14px 0 4px">What may differ between them</p>
+    <div class="gfields">${fields.map(([k, l, on]) => `<md-filter-chip label="${esc(l)}" data-gfield="${esc(k)}" ${on ? 'selected' : ''}></md-filter-chip>`).join('')}</div>
+    <md-outlined-text-field id="group-note" label="Anything to keep in mind (optional)" type="textarea" rows="2" style="width:100%" placeholder="e.g. most know their way around; care when checking varies widely"></md-outlined-text-field>
+    <p id="group-status" class="muted small" style="margin:12px 0 0"></p>`;
+  $('#group-go').disabled = false;
+  $('#group-dialog').show();
+}
+async function makeGroup() {
+  const base = groupFor; if (!base) return;
+  const count = Number($('#group-count').value), fields = $$('#group-body [data-gfield]').filter(c => c.selected).map(c => c.dataset.gfield);
+  if (!Number.isInteger(count) || count < 2 || count > 20 || !fields.length) return snack('Choose 2 to 20 people and at least one setting that may differ.');
+  const status = t => { const el = $('#group-status'); if (el) el.textContent = t; };
+  $('#group-go').disabled = true;
+  try {
+    status('Planning who they are…');
+    const r = await generateVariants(base, count, fields, $('#group-note').value, status);
+    $('#group-dialog').close();
+    await render();
+    snack(`Added ${r.made} ${r.made > 1 ? 'people' : 'person'} like “${base.name}”.`);
+  } catch (e) { fail(e); $('#group-go').disabled = false; status(e.message); }
+}
 function newCard() {
   return `<button class="card tonal pcard" data-go="new" style="display:grid;place-items:center;min-height:200px;border:0;font:inherit;color:inherit">
-    <span style="text-align:center"><span class="ms" style="font-size:36px;color:var(--md-sys-color-primary)">add_circle</span><h3 style="margin-top:8px">New persona</h3></span></button>`;
+    <span style="text-align:center"><span class="ms" style="font-size:36px;color:var(--md-sys-color-primary)">add_circle</span><h3 style="margin-top:8px">Who do you want to test with?</h3></span></button>`;
 }
 /* ---------------- loading ---------------- */
 async function loadWorkflows() {
@@ -129,7 +243,8 @@ pages.workflow = async () => {
   const b = await api('/api/billing');
   const li = (xs, f) => xs.map(x => `<li>${f(x)}</li>`).join('');
   return `<div class="page" style="max-width:960px">
-    <div class="page-head"><div><h1>${esc(b.name)}</h1><p class="muted">The one workflow this platform tests. Personas run it; the results are read against the people who did it.</p></div></div>
+    <div class="page-head"><div><h1>${esc(b.name)}</h1><p class="muted">What the group does.</p></div></div>
+
     <div class="card"><h2>The task, as the participant reads it</h2><p style="white-space:pre-wrap;margin:12px 0">${esc(b.task)}</p><p class="muted small" style="margin:0">Product: <a href="${esc(b.start)}" target="_blank" rel="noopener">${esc(b.start)}</a></p></div>
     <div class="card"><h2>The steps of the task</h2><ol style="margin:12px 0 0;padding-left:22px;line-height:1.7">${li(b.steps, s => esc(s.action))}</ol>
       <p class="muted small" style="margin:12px 0 0">Results are read by the parts of the form: ${b.parts.map(esc).join(' → ')}; before the form and after the save count as parts too.</p></div>
@@ -155,15 +270,19 @@ const LEVEL_WORDS = {true: ['Unknown','Everyday meaning','Knows it'], false: ['U
 /* ---- personas ---- */
 pages.personas = async () => {
   await loadPersonas();
+  const groups = groupsOf(S.personas), grouped = new Set(groups.flatMap(g => [g.base && g.base.id, ...g.variants.map(v => v.id)]));
+  const singles = S.personas.filter(p => !grouped.has(p.id) && p.from !== 'questionnaire' && p.from !== 'survey');
   return `<div class="page">
-    <div class="page-head"><div><h1>Personas</h1><p class="muted">Each persona is one kind of user of ${esc((currentWf() || {}).name || 'this workflow')}.</p></div>
-      <md-filled-button data-go="new"><span slot="icon" class="ms">add</span>New persona</md-filled-button></div>
-    <div class="grid">${S.personas.map(personaCard).join('')}${newCard()}</div>
+    <div class="page-head"><div><h1>Who you test with</h1></div>
+      <md-filled-button data-go="new"><span slot="icon" class="ms">add</span>New group</md-filled-button></div>
+    ${groups.length ? `<div class="grid" style="margin-bottom:28px">${groups.map(groupCard).join('')}</div>` : ''}
+    ${singles.length ? `<h2 style="margin:8px 0 12px">Single personas</h2><div class="grid">${singles.map(personaCard).join('')}</div>` : ''}
+    ${!groups.length && !singles.length ? `<div class="grid">${newCard()}</div>` : ''}
   </div>`;
 };
-const SUGGEST = [['Careful first-time user', 'Someone using this product for the first time who reads carefully and checks every field before saving'],
-  ['Experienced admin in a hurry', 'An experienced admin who knows the product well but is in a hurry and skims the defaults'],
-  ['Tired at the end of the day', 'A tired user at the end of a long day who gets distracted and gives up quickly']];
+const SUGGEST = [['Office managers', 'Office managers who set this up between meetings; they have used the product a few times but never this part of it'],
+  ['Software engineers', 'Software engineers with budget responsibility for their project, new to the billing side of Google Cloud, fluent in English'],
+  ['Product managers', 'Product managers who track their team\'s cloud spend every month and know the console well']];
 let draft = null;
 function groupsVisible() { return PersonaParameters.GROUPS.filter(g => !g.hidden); }
 function sourceTag(src, key) {
@@ -213,8 +332,9 @@ function factor(p, key) {
 }
 function scoresOf(p) { return Object.fromEntries([...TRAITS, ...STATES].map(t => [t.key, p[t.key]])); }
 function knownOf(p) { const g = groupsVisible(); return g.length ? g.reduce((s, x) => s + p.knowledge[x.key], 0) / (2 * g.length) : 0; }
-function buildBundle(p) {
-  if (!S.builder) throw Error('The persona builder is still loading. Try again in a moment.');
+async function buildBundle(p) {
+  if (!S.builder && builderReady) await builderReady;
+  if (!S.builder) throw Error('The persona builder did not load. Reload the page and try again.');
   return PersonaParameters.build(PersonaParameters.validate(p), S.builder, S.flow);
 }
 function renderReview() {
@@ -229,8 +349,17 @@ function renderReview() {
       <div class="row">${avatar({id: 'draft', name: p.name}, 56)}<div style="min-width:0;flex:1"><md-outlined-text-field id="p-name" label="${survey ? 'Code name' : 'Name'}" value="${survey ? '' : esc(p.name)}" ${survey ? 'placeholder="P4" supporting-text="Only a code name is kept, never their name."' : ''} style="width:100%"></md-outlined-text-field></div></div>
       <p style="margin:12px 0">${survey ? esc(draft.description) : `“${esc(draft.description)}”`}</p>
       <div class="chips" id="sum-chips">${chipsFor(scoresOf(p), knownOf(p), p.humanFactors)}</div>
+      ${draft.kind === 'description' ? `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--md-sys-color-outline-variant)">
+        <p class="small muted" style="margin:0 0 10px">The group: people like this, each a little different.</p>
+        <md-outlined-text-field id="group-count" label="How many in the group" type="number" min="2" max="20" value="6" style="width:100%"></md-outlined-text-field>
+        <p class="small muted" style="margin:12px 0 6px">What may differ between them</p>
+        <div class="gfields" style="margin-bottom:6px">${groupFieldList().map(([k, l, on]) => `<md-filter-chip label="${esc(l)}" data-gfield="${esc(k)}" ${on ? 'selected' : ''}></md-filter-chip>`).join('')}</div>
+        <p id="group-status" class="muted small" style="margin:8px 0 0"></p></div>
+      <md-filled-button id="create-group" style="width:100%;margin-top:12px"><span slot="icon" class="ms">groups</span>Create the group</md-filled-button>
+      <md-outlined-button id="create-group-run" style="width:100%;margin-top:8px"><span slot="icon" class="ms">play_arrow</span>Create the group and run it</md-outlined-button>
+      <md-text-button id="create" style="width:100%;margin-top:8px">Create only this one persona</md-text-button>` : `
       <md-filled-button id="create" style="width:100%;margin-top:12px"><span slot="icon" class="ms">check</span>Create persona</md-filled-button>
-      <md-outlined-button id="create-run" style="width:100%;margin-top:8px"><span slot="icon" class="ms">play_arrow</span>Create and run a test</md-outlined-button>
+      <md-outlined-button id="create-run" style="width:100%;margin-top:8px"><span slot="icon" class="ms">play_arrow</span>Create and run a test</md-outlined-button>`}
     </div></div>`;
   $('#draft-area').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
@@ -240,15 +369,11 @@ function composerHTML(hello) {
   return `<div class="composer">
     ${hello ? `<p class="muted" style="margin:0 0 4px;font-size:16px">${esc(hello)}</p>` : ''}
     <h1>Who do you want to <span class="spark">test with?</span></h1>
-    <p class="muted" style="font-size:16px;margin-top:12px">Describe them like you would to a colleague, or paste a participant's survey answers. You can fine-tune everything afterwards.</p>
+    <p class="muted" style="font-size:16px;margin-top:12px">Describe the kind of people: their role, what they have done before, their situation.</p>
     <div class="prompt">
-      <md-icon-button id="attach-btn" aria-label="Attach a participant's answers" title="Attach a participant's answers (.json, .txt, .md, .csv)" style="align-self:flex-end;margin-bottom:4px"><span class="ms">attach_file</span></md-icon-button>
-      <input id="attach" type="file" accept=".json,.txt,.md,.csv" hidden>
-      <textarea id="describe" rows="1" placeholder="e.g. An office manager who sets this up between meetings"></textarea>
-      <md-filled-icon-button id="draft-btn" aria-label="Draft persona" disabled><span class="ms">arrow_upward</span></md-filled-icon-button>
+      <textarea id="describe" rows="1" placeholder="Who are they, what have they done before, what is their situation"></textarea>
+      <md-filled-icon-button id="draft-btn" aria-label="Draft the base persona" disabled><span class="ms">arrow_upward</span></md-filled-icon-button>
     </div>
-    <div class="chips">${SUGGEST.map(([l, t]) => `<md-suggestion-chip label="${esc(l)}" data-text="${esc(t)}"></md-suggestion-chip>`).join('')}</div>
-    <p class="muted small" style="margin-top:14px">A participant filled in the survey? Paste their answers or attach the answer file: the persona is built from what they said.</p>
   </div>`;
 }
 
@@ -292,13 +417,6 @@ function setupComposer() {
   grow();
   box.addEventListener('input', grow);
   box.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && readInput(box.value).kind === 'description') { e.preventDefault(); if (box.value.trim()) start(); } });
-  $$('md-suggestion-chip').forEach(c => c.addEventListener('click', () => { box.value = c.dataset.text; grow(); box.focus(); }));
-  $('#attach-btn').addEventListener('click', () => $('#attach').click());
-  $('#attach').addEventListener('change', async () => {
-    const f = $('#attach').files[0]; if (!f) return;
-    box.value = await f.text(); grow(); $('#attach').value = '';
-    start();
-  });
   btn.addEventListener('click', start);
   const wait = msg => `<div class="drafting card tonal"><div class="row"><md-circular-progress indeterminate style="--md-circular-progress-size:28px"></md-circular-progress><span>${msg}</span></div>
       <div class="shimmer" style="width:90%;margin-top:20px"></div><div class="shimmer" style="width:70%"></div><div class="shimmer" style="width:80%"></div></div>`;
@@ -307,6 +425,7 @@ function setupComposer() {
     let input;
     try { input = readInput(text); }
     catch (e) { $('#draft-area').innerHTML = `<div class="banner bad" style="margin-top:24px"><span class="ms">error</span><div>${esc(e.message)}</div></div>`; return; }
+    if (input.kind !== 'description') { snack('That looks like a participant\'s answers. Import participant files on the Workflow page; this page describes who you want to test with.'); return; }
     btn.disabled = true;
     try {
       if (input.kind === 'answers') return fromAnswers(input.doc, input.postTask, input.window);
@@ -442,11 +561,11 @@ function tryClose() { if (sheetDirty) $('#discard-dialog').show(); else closeShe
 function markSheetDirty(on) { sheetDirty = on; $('#sheet-save').disabled = !on; $('#sheet-title').innerHTML = (sheetCopy ? 'Edit persona' : 'Persona') + (on ? '<span class="dirty-dot" title="Unsaved changes"></span>' : ''); }
 async function saveSheet() {
   const p = sheetCopy.p; p.name = ($('#sheet-name').value || '').trim() || p.name;
-  const bundle = buildBundle(p);
+  const bundle = await buildBundle(p);
   const before = {id: sheetFor.id, parameters: clone(sheetFor.parameters), description: sheetFor.description};
   await api('/api/personas/update', {id: sheetFor.id, ...bundle, description: sheetCopy.description});
   closeSheet(); await render();
-  snack(`Saved “${p.name}”`, async () => { try { await api('/api/personas/update', {id: before.id, ...buildBundle(before.parameters), description: before.description}); render(); } catch (e) { fail(e); } });
+  snack(`Saved “${p.name}”`, async () => { try { await api('/api/personas/update', {id: before.id, ...await buildBundle(before.parameters), description: before.description}); render(); } catch (e) { fail(e); } });
 }
 function editing(el) { const root = el.closest('[data-editor]'); return root && (root.dataset.editor === 'sheet' ? sheetCopy && sheetCopy.p : draft && draft.p); }
 function refreshChips(el) {
@@ -460,38 +579,44 @@ let runs = 5;
 pages.run = async () => {
   await loadPersonas();
   const w = currentWf() || {}, ready = w.status && ['ready', 'changed'].includes(w.status.key);
-  const pick = p => `<label class="pick"><md-checkbox touch-target="wrapper" data-pick="${esc(p.id)}" ${p.kind !== 'self' && (!preselect || preselect === p.id) ? 'checked' : ''}></md-checkbox>${avatar(p, 40)}<div style="flex:1;min-width:0"><div>${esc(p.name)}</div><div class="muted small">${kindLabel(p)}</div></div></label>`;
+  const hasGroups = groupsOf(S.personas).length > 0;  // with a group on the page, the group is what runs by default; single personas are added by hand
+  const pick = p => `<label class="pick"><md-checkbox touch-target="wrapper" data-pick="${esc(p.id)}" ${p.kind !== 'self' && (preselect ? preselect === p.id : !hasGroups) ? 'checked' : ''}></md-checkbox>${avatar(p, 40)}<div style="flex:1;min-width:0"><div>${esc(p.name)}</div><div class="muted small">${kindLabel(p)}</div></div></label>`;
   return `<div class="page">
-    <div class="page-head"><div><h1>Run a test</h1><p class="muted">Each persona runs several times, so you see how often a problem happens.</p></div></div>
+    <div class="page-head"><div><h1>Run</h1></div></div>
     ${ready ? '' : `<div class="banner bad"><span class="ms">block</span><div>${esc(w.name || 'This workflow')} is not ready to test. <a href="#test/${esc(w.id)}">Finish setting it up</a> first.</div></div>`}
     <div class="run-grid">
       <div class="stack">
         <div class="card"><div class="row" style="justify-content:space-between"><div style="min-width:0"><h3>${esc(w.name || 'Workflow')}</h3><p class="muted small" style="margin:4px 0 0">${esc(String(w.task || '').split(/(?<=[.!?])\s/)[0])}</p></div></div></div>
         <div class="card"><h3 style="margin-bottom:8px">Who takes part</h3>
-          ${S.personas.map(pick).join('') || '<p class="muted">No personas yet. <a href="#new">Describe one</a>.</p>'}
+          ${groupsOf(S.personas).map(g => `<label class="pick"><md-checkbox touch-target="wrapper" data-pick-group="${esc(g.id)}" data-cards="${esc(g.variants.map(v => v.id).join(','))}" ${!preselect || preselect === g.id || g.variants.some(v => v.id === preselect) ? 'checked' : ''}></md-checkbox>${avatar(g.base || g.variants[0], 40)}<div style="flex:1;min-width:0"><div>${esc(g.name)}</div><div class="muted small">A group: ${g.variants.length} people, run together</div></div></label>`).join('')}
+          ${S.personas.filter(p => !inGroup(p) && p.from !== 'questionnaire' && p.from !== 'survey').map(pick).join('')}
+          ${groupsOf(S.personas).length || S.personas.some(p => !inGroup(p) && p.from !== 'questionnaire' && p.from !== 'survey') ? '' : '<p class="muted">No group yet. <a href="#new">Who do you want to test with?</a></p>'}
         </div>
-        <div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><h3>Runs per persona</h3><p class="muted small" style="margin:4px 0 0">More runs give steadier rates. 5 is a good start.</p></div>
-          <div class="stepper"><md-outlined-icon-button id="runs-minus" aria-label="Fewer runs"><span class="ms">remove</span></md-outlined-icon-button><span id="runs-n" style="font:400 22px var(--md-ref-typeface-brand);width:40px;text-align:center">${runs}</span><md-outlined-icon-button id="runs-plus" aria-label="More runs"><span class="ms">add</span></md-outlined-icon-button></div></div></div>
+        <div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><h3>Runs per person</h3><p class="muted small" style="margin:4px 0 0">More runs, steadier rates.</p></div>
+          <div class="stepper"><md-outlined-icon-button id="runs-minus" aria-label="Fewer runs"><span class="ms">remove</span></md-outlined-icon-button><span id="runs-n" style="font:400 22px var(--md-ref-typeface-brand);width:40px;text-align:center">${runs}</span><md-outlined-icon-button id="runs-plus" aria-label="More runs"><span class="ms">add</span></md-outlined-icon-button></div></div>
+</div>
       </div>
       <div class="card tonal summary"><h3>Summary</h3><p id="run-summary" class="muted"></p>
-        <md-filled-button id="start-run" style="width:100%" ${ready ? '' : 'disabled'}><span slot="icon" class="ms">play_arrow</span>Start test</md-filled-button>
-        <p class="small muted" style="margin:12px 0 0">You can leave this page while it runs.</p></div>
+        <md-filled-button id="start-run" style="width:100%" ${ready ? '' : 'disabled'}><span slot="icon" class="ms">play_arrow</span>Start</md-filled-button>
+</div>
     </div>
     <div id="progress-area"></div></div>`;
 };
 function setupRun() {
   const ready = (currentWf() || {}).status && ['ready', 'changed'].includes(currentWf().status.key);
-  const chosen = () => $$('[data-pick]').filter(c => c.checked).map(c => c.dataset.pick);
+  const chosen = () => [...new Set([...$$('[data-pick-group]').filter(c => c.checked).flatMap(c => c.dataset.cards.split(',')), ...$$('[data-pick]').filter(c => c.checked).map(c => c.dataset.pick)])];
+  const chosenGroup = () => { const g = $$('[data-pick-group]').filter(c => c.checked); return g.length === 1 ? g[0].dataset.pickGroup : null; };
   const summary = () => {
     const n = chosen().length;
-    $('#run-summary').innerHTML = n ? `${n} persona${n > 1 ? 's' : ''} × ${runs} runs = <b>${n * runs} runs</b>, about ${n * runs * 3} minutes.` : 'Choose at least one persona.';
+    $('#run-summary').innerHTML = n ? `${n} ${n > 1 ? 'people' : 'person'} × ${runs} runs = <b>${n * runs} runs</b>, about ${Math.ceil(n / 6) * runs * 5} minutes.` : 'Choose a group.';
     $('#start-run').disabled = !n || !ready || !!S.runJob;
   };
+  $$('[data-pick-group]').forEach(c => c.addEventListener('change', summary));
   $('#runs-minus').addEventListener('click', () => { runs = Math.max(1, runs - 1); $('#runs-n').textContent = runs; summary(); });
   $('#runs-plus').addEventListener('click', () => { runs = Math.min(10, runs + 1); $('#runs-n').textContent = runs; summary(); });
   $$('[data-pick]').forEach(c => c.addEventListener('change', summary));
   $('#start-run').addEventListener('click', async () => {
-    try { const r = await api('/api/tests/start', {cards: chosen(), runs}); S.runJob = {id: r.id, cards: chosen(), runs}; showProgress(); } catch (e) { fail(e); }
+    try { const r = await api('/api/tests/start', {cards: chosen(), runs, group: chosenGroup()}); S.runJob = {id: r.id, cards: chosen(), runs}; showProgress(); } catch (e) { fail(e); }
   });
   preselect = null;
   summary();
@@ -542,14 +667,16 @@ async function pollRun() {
     const j = await api(`/api/wjob?id=${job.id}`), v = j.view, total = job.cards.length * job.runs;
     if ($('#overall')) {
       $('#overall').value = v.done.length / total;
+      const currents = Array.isArray(v.current) ? v.current : v.current ? [v.current] : [];
       for (const c of job.cards) {
         const dots = document.querySelector(`[data-dots="${CSS.escape(c)}"]`); if (!dots) continue;
-        [...dots.children].forEach((d, i) => { const r = v.done.find(x => x.card === c && x.run === i + 1); d.className = r ? (r.pass ? 'ok' : 'fail') : (v.current && v.current.card === c && v.current.run === i + 1 ? 'now' : ''); });
+        const cur = currents.find(x => x.card === c);
+        [...dots.children].forEach((d, i) => { const r = v.done.find(x => x.card === c && x.run === i + 1); d.className = r ? (r.pass ? 'ok' : 'fail') : (cur && cur.run === i + 1 ? 'now' : ''); });
         const st = document.querySelector(`[data-status="${CSS.escape(c)}"]`);
-        if (v.current && v.current.card === c) st.textContent = `Run ${v.current.run} of ${job.runs} · step ${v.current.step} on ${v.current.route || 'the start page'}`;
+        if (cur) st.textContent = `Run ${cur.run} of ${job.runs} · step ${cur.step} on ${cur.route || 'the start page'}`;
         else if (v.done.filter(x => x.card === c).length === job.runs) st.textContent = `Done · ${v.done.filter(x => x.card === c && x.pass).length} of ${job.runs} passed`;
       }
-      const left = (total - v.done.length) * 3; $('#eta').textContent = j.state === 'running' ? (left ? `About ${left} minutes left` : 'Wrapping up…') : '';
+      const left = Math.ceil((total - v.done.length) / Math.max(1, job.cards.length)) * 5; $('#eta').textContent = j.state === 'running' ? (left ? `About ${left} minutes left` : 'Wrapping up…') : '';
     }
     if (j.state === 'running') { runTimer = setTimeout(pollRun, 2000); return; }
     S.runJob = null;
@@ -599,138 +726,198 @@ async function startLive() {
   tick();
 }
 /* ---- results ---- */
+/* ---------------- the result page: what the simulation says (2026-11-08) ----------------
+   Three numbers first, then the three questions, each as one chart and one table with the computation behind every
+   cell. Counts first, percentages beside them: with sixty runs, "45 of 60" is the honest number. Export: CSV, one row
+   per run; the page itself as PDF through the browser's print. */
+const PLAIN = {'Before the form': 'Finding the budget page', Define: 'Naming', Scope: 'Time, project, services', Amount: 'The amount', Actions: 'The alert', 'After the save': 'After the save'};
+const KIND = {'lost the way': 'lost the way', 'changed a value': 'changed a value', 'went back': 'went back', 'left unsaved': 'left unsaved', 'wrong when saved': 'saved wrong'};
+const KIND_COLOR = {'lost the way': '#0b57d0', 'changed a value': '#7cacf8', 'went back': '#c2d9ff', 'left unsaved': '#5a6a75', 'wrong when saved': '#b23c3c'};
+const pctOf = (n, d) => d ? `${Math.round(100 * n / d)}%` : '—';
+const countPct = (n, d) => `${n} of ${d} · ${pctOf(n, d)}`;
+const median = xs => { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const sumOf = o => Object.values(o || {}).reduce((a, b) => a + b, 0);
+const fmtTime = s => s >= 90 ? `${Math.round(s / 60)} min` : `${Math.round(s)} s`;
+
+/* One horizontal bar per row, one colour; the value at the end. Stacked when a row has segments. */
+/* Bars as HTML: a fixed label column, a track that fills the card, the value at the end. A row may be split into
+   segments. The longest bar fills the track, so the chart fills whatever width it is given. */
+function hbars(rows, fmt, max) {
+  const m = max || 1;
+  return `<div class="bars">${rows.map(r => {
+    const segs = (r.segments || [{value: r.value, color: 'var(--md-sys-color-primary)', title: ''}])
+      .map(s => `<span class="seg" style="width:${Math.max(0, 100 * s.value / m)}%;background:${s.color}" title="${esc(s.title || '')}"></span>`).join('');
+    return `<div class="bar-row"><span class="bar-label">${esc(r.label)}</span><span class="bar-track">${segs}</span><span class="bar-val">${esc(fmt(r.value))}</span></div>`;
+  }).join('')}</div>`;
+}
+function cell(text, title, lines, cls = '') {
+  return `<td><span class="cell-v ${cls}" tabindex="0">${text}<span class="pop"><b>${esc(title)}</b>${lines.length ? `<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</span></span></td>`;
+}
+const whoRun = x => `${x.name} run ${x.n}`;
+const inPart = (x, part) => x.trouble.filter(t => t[0] === part);
+const lostClicks = x => x.trouble.filter(t => t[1] === 'lost the way').length;
+const entryOf = x => /Budgets & caps/.test(x.entry) ? 'the left menu' : /Budgets & alerts/.test(x.entry) ? 'the search bar' : x.entry ? 'another way' : 'never reached the form';
+const amountOf = x => x.saved && x.saved.amount ? `$${x.saved.amount}` : null;
+const failWhy = x => Object.entries(x.checks || {}).filter(([, ok]) => !ok).map(([k]) => k.split(' (')[0]).join('; ');
+const outcomeOf = x => x.passed ? 'Done right' : !amountOf(x) ? 'Never saved' : `Saved wrong: ${amountOf(x)}, alerts at ${[...new Set((x.saved.rules || []).map(r => r.split(' ')[0]))].join(', ') || 'none'}`;
+const shortOutcome = k => k.startsWith('Saved wrong') ? `Saved ${k.split(': ')[1].split(',')[0]}, wrong` : k;
+const tally = (xs, f) => { const c = new Map(); xs.forEach(x => { const k = f(x); c.set(k, (c.get(k) || 0) + 1); }); return [...c].sort((a, b) => b[1] - a[1]); };
+
+function glanceHTML(T) {
+  const R = T.runs, n = R.length;
+  const done = R.filter(r => r.passed).length;
+  const moves = R.map(r => sumOf(r.moves)), secs = R.map(r => sumOf(r.seconds));
+  return `<div class="bignums3">
+    <div class="card bn"><span class="bn-n">${pctOf(done, n)}</span><span class="bn-l">did the task right</span><span class="muted small">${done} of ${n} runs</span></div>
+    <div class="card bn"><span class="bn-n">${Math.round(median(moves))}</span><span class="bn-l">moves per run, median</span><span class="muted small">from ${Math.min(...moves)} to ${Math.max(...moves)}</span></div>
+    <div class="card bn"><span class="bn-n">${fmtTime(median(secs))}</span><span class="bn-l">per run, median, estimated</span><span class="muted small">${T.definitions.seconds.split(';')[1] ? 'from words read and actions made' : ''}</span></div>
+  </div>`;
+}
+function directionHTML(T) {
+  const R = T.runs, n = R.length;
+  const rows = [
+    ['First click after landing', tally(R, x => x.first || '(none)'), x => x.first || '(none)'],
+    ['Way into the form', tally(R, entryOf), x => `${entryOf(x)} (${x.entry || '—'})`],
+    ['Route, first click → way in', tally(R, x => `${x.first || '?'} → ${entryOf(x)}`), x => `${x.first || '?'} → ${entryOf(x)}`],
+  ];
+  const back = R.filter(x => x.trouble.some(t => t[1] === 'went back'));
+  return `<div class="card"><h2>Is the direction right?</h2>
+    <table class="matrix q"><tr><th>What</th><th>Runs (${n})</th></tr>
+    ${rows.map(([what, t, f]) => `<tr><th scope="row">${esc(what)}</th>${cell(t.slice(0, 4).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(' · ') + (t.length > 4 ? ` · ${t.length - 4} more` : ''), what, R.map(x => `${whoRun(x)}: ${f(x)}`))}</tr>`).join('')}
+    <tr><th scope="row">Went back inside the form</th>${cell(countPct(back.length, n), T.definitions['went back'], back.map(x => `${whoRun(x)}: ${x.trouble.filter(t => t[1] === 'went back').map(t => t[2]).join('; ')}`))}</tr>
+    </table></div>`;
+}
+/* Where it goes wrong and where the time goes, side by side per part, then one table with every number. */
+function partsHTML(T) {
+  const R = T.runs, n = R.length, parts = T.parts;
+  const kinds = ['lost the way', 'changed a value', 'went back', 'left unsaved', 'wrong when saved'];
+  const share = (x, part) => (x.seconds[part] || 0) / (sumOf(x.seconds) || 1);
+  const rows = parts.map(part => {
+    const withTrouble = R.filter(x => inPart(x, part).length);
+    const byKind = kinds.map(k => ({kind: k, runs: R.filter(x => inPart(x, part).some(t => t[1] === k))})).filter(s => s.runs.length);
+    const seen = new Set(), segments = [];
+    for (const s of byKind) { const fresh = s.runs.filter(x => !seen.has(x)); fresh.forEach(x => seen.add(x)); if (fresh.length) segments.push({value: fresh.length / n, color: KIND_COLOR[s.kind], title: `${KIND[s.kind]}: ${fresh.length} run${fresh.length > 1 ? 's' : ''}`}); }
+    return {part, label: PLAIN[part] || part, trouble: withTrouble.length / n, segments, withTrouble, byKind,
+            time: R.reduce((s, x) => s + share(x, part), 0) / n, moves: R.reduce((s, x) => s + (x.moves[part] || 0), 0) / n};
+  });
+  const troubleRows = rows.filter(r => r.part !== 'After the save').map(r => ({label: r.label, value: r.trouble, segments: r.segments}));
+  const timeRows = rows.map(r => ({label: r.label, value: r.time}));
+  const legend = kinds.map(k => `<span class="lg"><i style="background:${KIND_COLOR[k]}"></i>${KIND[k]}</span>`).join('');
+  const detail = r => r.withTrouble.map(x => `${whoRun(x)}: ${[...new Set(inPart(x, r.part).map(t => `${KIND[t[1]]}${t[2] ? ` (${t[2]})` : ''}`))].join('; ')}`);
+  return `<div class="card">
+    <div class="two-col">
+      <div><h2>Where does it go wrong?</h2><p class="muted small" style="margin:4px 0 14px">Share of runs with trouble in each part.</p>${hbars(troubleRows, v => pctOf(Math.round(v * n), n), 1)}<div class="legend-row">${legend}</div></div>
+      <div><h2>Where does the time go?</h2><p class="muted small" style="margin:4px 0 14px">Share of each run's time, averaged. Estimated, not measured.</p>${hbars(timeRows, v => pctOf(Math.round(v * 1000), 1000), Math.max(0.01, ...timeRows.map(r => r.value)))}</div>
+    </div>
+    <table class="matrix q" style="margin-top:20px"><tr><th>Part</th><th>Runs with trouble</th>${kinds.map(k => `<th>${KIND[k]}</th>`).join('')}<th>Share of time</th><th>Moves, average</th></tr>
+    ${rows.map(r => `<tr><th scope="row">${esc(r.label)}</th>${cell(countPct(r.withTrouble.length, n), `Trouble in ${r.label}`, detail(r))}${kinds.map(k => { const s = r.byKind.find(x => x.kind === k); return `<td>${s ? s.runs.length : '·'}</td>`; }).join('')}${cell(pctOf(Math.round(r.time * 1000), 1000), `Time in ${r.label}`, R.map(x => `${whoRun(x)}: ${Math.round(x.seconds[r.part] || 0)} s of ${Math.round(sumOf(x.seconds))} s`))}${cell(r.moves.toFixed(1), `Moves in ${r.label}`, R.map(x => `${whoRun(x)}: ${x.moves[r.part] || 0}`))}</tr>`).join('')}
+    </table>
+    <p class="muted small" style="margin:10px 0 0">Trouble: ${esc(T.definitions['lost the way'])}; in the form, ${['changed a value', 'went back', 'left unsaved', 'wrong when saved'].map(k => T.definitions[k]).join('; ')}.</p></div>`;
+}
+function doneHTML(T) {
+  const R = T.runs, n = R.length;
+  const t = tally(R, outcomeOf);
+  const rows = t.map(([k, v]) => ({label: shortOutcome(k), value: v / n, segments: [{value: v / n, color: k === 'Done right' ? '#2c7a57' : k === 'Never saved' ? '#8a4a1f' : '#b23c3c', title: `${k}: ${v}`}]}));
+  return `<div class="card"><h2>Is the task done, and how does it fail?</h2><p class="muted small" style="margin:4px 0 12px">Done right: every check passes and the run said it was done. Failures are grouped by what was saved.</p>
+    ${hbars(rows, v => pctOf(Math.round(v * n), n), 1)}
+    <table class="matrix q" style="margin-top:16px"><tr><th>Outcome</th><th>Runs</th></tr>
+    ${t.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th>${cell(countPct(v, n), k, R.filter(x => outcomeOf(x) === k).map(x => `${whoRun(x)}${x.passed ? '' : `: ${failWhy(x) || x.stop || 'did not finish'}`}`))}</tr>`).join('')}
+    <tr><th scope="row">Checks</th><td>${T.checks.map(c => { const ok = R.filter(x => (x.checks || {})[c]).length; return `${esc(c.split(' (')[0])} <b>${ok}</b>`; }).join(' · ')}</td></tr>
+    </table></div>`;
+}
+function peopleHTML(T) {
+  const R = T.runs;
+  const names = [...new Set(R.map(r => r.name))];
+  return `<div class="card"><h2>Each person in the group</h2><p class="muted small" style="margin:4px 0 12px">One row per person, one dot per run. Click a dot for that run, step by step.</p>
+    <table class="matrix q people"><tr><th>Person</th><th>Runs</th><th>Done right</th><th>Moves, median</th><th>Trouble, most often</th></tr>
+    ${names.map(name => { const rs = R.filter(r => r.name === name); const tr = tally(rs.flatMap(r => [...new Set(r.trouble.map(t => `${PLAIN[t[0]] || t[0]}: ${KIND[t[1]]}`))]), x => x);
+      return `<tr><th scope="row"><span class="row" style="gap:8px">${avatar({id: rs[0].card, name}, 28)}${esc(name)}</span></th>
+        <td><span class="dots run">${rs.map(r => `<a class="${r.passed ? 'ok' : 'fail'}" href="${r.report}" target="_blank" title="run ${r.n}: ${r.passed ? 'done right' : (failWhy(r) || r.stop || 'did not finish')}"></a>`).join('')}</span></td>
+        <td>${countPct(rs.filter(r => r.passed).length, rs.length)}</td><td>${Math.round(median(rs.map(r => sumOf(r.moves))))}</td><td class="muted small">${tr.slice(0, 2).map(([k, v]) => `${esc(k)} (${v})`).join(' · ') || 'none'}</td></tr>`; }).join('')}
+    </table></div>`;
+}
+function resultCSV(T) {
+  const parts = T.parts, kinds = Object.keys(KIND);
+  const head = ['person', 'card', 'run', 'done_right', 'outcome', 'first_click', 'way_into_form', 'moves_total', 'seconds_estimated_total',
+    ...parts.map(p => `moves_${p}`), ...parts.map(p => `seconds_${p}`), ...parts.map(p => `trouble_${p}`), 'report'];
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = T.runs.map(r => [r.name, r.card, r.n, r.passed ? 'yes' : 'no', outcomeOf(r), r.first, entryOf(r), sumOf(r.moves), Math.round(sumOf(r.seconds)),
+    ...parts.map(p => r.moves[p] || 0), ...parts.map(p => Math.round(r.seconds[p] || 0)), ...parts.map(p => [...new Set(inPart(r, p).map(t => t[1]))].join('; ')), location.origin + r.report].map(q).join(','));
+  return [head.map(q).join(','), ...lines].join('\n');
+}
+function tablesHTML(T) {
+  return `${glanceHTML(T)}${partsHTML(T)}${doneHTML(T)}${directionHTML(T)}${peopleHTML(T)}`;
+}
 pages.results = async () => {
   await loadResults();
   if (!S.results.length) return `<div class="page"><div class="page-head"><div><h1>Results</h1></div></div>
-    <div class="card empty"><span class="ms">insights</span><h2>No results for this workflow yet</h2><p class="muted">Run a test and the problems it finds show up here.</p>
-    <md-filled-button data-go="run"><span slot="icon" class="ms">play_arrow</span>Run a test</md-filled-button></div></div>`;
+    <div class="card empty"><span class="ms">insights</span><h2>No results yet</h2><p class="muted">Run a group and what the simulation finds shows up here.</p>
+    <md-filled-button data-go="run"><span slot="icon" class="ms">play_arrow</span>Run a group</md-filled-button></div></div>`;
   return pages.result(S.results[0].id);
 };
-/* What happened at a step of the task in one run, as the researcher reads it. */
-/* Everything that happened at one step: per run with trouble, the screen they saw, where they
-   clicked, what they were thinking, and what should have happened. */
-/* ---------------- the result page: three questions, the computation behind every cell (2026-11-01) ---------------- */
-const PLAIN = {'Before the form': 'Finding the budget page', Define: 'Naming', Scope: 'Time, project, services', Amount: 'The amount', Actions: 'The alert', 'After the save': 'After the save'};
-const KIND = {'lost the way': 'lost the way', 'changed a value': 'changed a value', 'went back': 'went back', 'left unsaved': 'left unsaved', 'wrong when saved': 'saved wrong'};
-/* Bars, people beside the engine, drawn to one scale: label, two bars, the two values. */
-function barChart(title, rows, fmt, max) {
-  const W = 360, L = 150, H = 22, gap = 8, top = 26, right = 48, scale = (W - L - right) / (max || 1);
-  const bars = rows.map((r, i) => { const y = top + i * (2 * H + gap);
-    return `<text x="${L - 8}" y="${y + H}" text-anchor="end" class="lbl">${esc(r.label)}</text>
-      <rect x="${L}" y="${y}" width="${Math.max(1, r.a * scale)}" height="${H - 4}" rx="3" class="p"></rect><text x="${L + r.a * scale + 6}" y="${y + H - 7}" class="val">${esc(fmt(r.a))}</text>
-      <rect x="${L}" y="${y + H}" width="${Math.max(1, r.b * scale)}" height="${H - 4}" rx="3" class="e"></rect><text x="${L + r.b * scale + 6}" y="${y + 2 * H - 7}" class="val">${esc(fmt(r.b))}</text>`; }).join('');
-  const height = top + rows.length * (2 * H + gap);
-  return `<figure class="chart"><figcaption>${esc(title)}</figcaption><svg viewBox="0 0 ${W} ${height}" role="img" aria-label="${esc(title)}"><text x="${L}" y="14" class="legend"><tspan class="lp">■</tspan> people <tspan class="le">■</tspan> engine</text>${bars}</svg></figure>`;
-}
-function glanceHTML(T) {
-  const P = T.people, R = T.runs, parts = T.parts;
-  const name = p => (PLAIN[p] || p).replace('Finding the budget page', 'Finding the page');
-  const share = (xs, f) => xs.length ? xs.reduce((s, x) => s + f(x), 0) / xs.length : 0;
-  const total = x => Object.values(x.seconds).reduce((a, b) => a + b, 0) || 1;
-  const trouble = parts.filter(p => p !== 'After the save').map(p => ({label: name(p), a: share(P, x => x.trouble.some(t => t[0] === p) ? 1 : 0), b: share(R, x => x.trouble.some(t => t[0] === p) ? 1 : 0)}));
-  const time = parts.map(p => ({label: name(p), a: share(P, x => (x.seconds[p] || 0) / total(x)), b: share(R, x => (x.seconds[p] || 0) / total(x))}));
-  const moves = parts.map(p => ({label: name(p), a: share(P, x => x.moves[p] || 0), b: share(R, x => x.moves[p] || 0)}));
-  const pct = v => `${Math.round(v * 100)}%`;
-  const done = {a: share(P, x => x.passed ? 1 : 0), b: share(R, x => x.passed ? 1 : 0)};
-  return `<div class="card"><h2>At a glance</h2><p class="muted small" style="margin:4px 0 12px">${P.length ? `${P.length} people who did the task, beside ${R.length} engine runs.` : `${R.length} engine runs; no participant files for these personas, so the engine stands alone.`}</p>
-    <div class="charts">${barChart('Share who had trouble, by part', trouble, pct, 1)}${barChart('Share of the session\'s time, by part', time, pct, Math.max(0.01, ...time.flatMap(r => [r.a, r.b])))}${barChart('Moves made, by part (average)', moves, v => `${Math.round(v)}`, Math.max(1, ...moves.flatMap(r => [r.a, r.b])))}
-    <figure class="chart big"><figcaption>Did the task right</figcaption><div class="bignums"><div><span class="n p">${P.length ? pct(done.a) : '—'}</span><span class="muted small">people</span></div><div><span class="n e">${pct(done.b)}</span><span class="muted small">engine runs</span></div></div></figure></div></div>`;
-}
-function cell(text, title, lines, cls = '') {
-  // A value with what it was computed from: the definition, then one line per person or run.
-  return `<td><span class="cell-v ${cls}" tabindex="0">${text}<span class="pop"><b>${esc(title)}</b>${lines.length ? `<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</span></span></td>`;
-}
-function tablesHTML(T) {
-  const P = T.people, R = T.runs, nP = P.length, nR = R.length, D = T.definitions;
-  const who = x => x.n ? `${x.name} run ${x.n}` : x.name;
-  const tally = (xs, f) => { const c = new Map(); xs.forEach(x => { const k = f(x) || '(none)'; c.set(k, (c.get(k) || 0) + 1); }); return [...c].sort((a, b) => b[1] - a[1]); };
-  const top = (xs, f, n = 3) => tally(xs, f).slice(0, n).map(([k, v]) => `${k.slice(0, 26)} ${v}`).join(', ') || '—';
-  const entryOf = x => /Budgets & caps/.test(x.entry) ? 'side menu' : /Budgets & alerts/.test(x.entry) ? 'search' : x.entry ? 'other' : 'never reached';
-  const inPart = (x, part) => x.trouble.filter(t => t[0] === part);
-  const lost = x => x.trouble.filter(t => t[1] === 'lost the way').length;
-  const wentBack = x => x.trouble.some(t => t[1] === 'went back');
-  const head = `<tr><th>What</th><th>People (${nP})</th><th>Engine (${nR} runs)</th></tr>`;
-  const row = (what, pf, rf, title, pl, rl, cls) => `<tr><th scope="row">${esc(what)}</th>${nP ? cell(pf(P), title, pl(P), cls) : '<td class="muted">no participant files</td>'}${cell(rf(R), title, rl(R), cls)}</tr>`;
-  const list = (xs, f) => xs.map(x => `${who(x)}: ${f(x)}`);
-  const q1 = [
-    row('First click', xs => top(xs, x => x.first), xs => top(xs, x => x.first), 'The first control each one clicked', xs => list(xs, x => x.first || '(none)'), xs => list(xs, x => x.first || '(none)')),
-    row('Way into the form', xs => top(xs, entryOf), xs => top(xs, entryOf), 'The control clicked just before + CREATE BUDGET', xs => list(xs, x => `${entryOf(x)} (${x.entry || '—'})`), xs => list(xs, x => `${entryOf(x)} (${x.entry || '—'})`)),
-    row('Went back inside the form', xs => `${xs.filter(wentBack).length} of ${xs.length}`, xs => `${xs.filter(wentBack).length} of ${xs.length}`, D['went back'],
-        xs => list(xs.filter(wentBack), x => x.trouble.filter(t => t[1] === 'went back').map(t => t[2]).join('; ')), xs => list(xs.filter(wentBack), x => x.trouble.filter(t => t[1] === 'went back').map(t => t[2]).join('; '))),
-  ].join('');
-  const troubleRow = part => {
-    const f = xs => `${xs.filter(x => inPart(x, part).length).length} of ${xs.length}`;
-    const detail = xs => xs.filter(x => inPart(x, part).length).map(x => `${who(x)}: ${part === 'Before the form' ? `${lost(x)} wrong clicks (${[...new Set(inPart(x, part).map(t => t[2]))].slice(0, 6).join(', ')})` : [...new Set(inPart(x, part).map(t => `${KIND[t[1]]}: ${t[2]}`))].join('; ')}`);
-    const kinds = part === 'Before the form' ? D['lost the way'] : ['changed a value', 'went back', 'left unsaved', 'wrong when saved'].map(k => `${KIND[k]}: ${D[k]}`).join(' · ');
-    return row(PLAIN[part] || part, f, f, `Trouble here means: ${kinds}`, detail, detail);
-  };
-  const q2 = T.parts.filter(p => p !== 'After the save').map(troubleRow).join('');
-  const timeRow = part => {
-    const share = xs => xs.length ? `${Math.round(100 * xs.reduce((s, x) => s + (x.seconds[part] || 0) / (Object.values(x.seconds).reduce((a, b) => a + b, 0) || 1), 0) / xs.length)}%` : '—';
-    const detail = xs => list(xs, x => `${Math.round(x.seconds[part] || 0)} s of ${Math.round(Object.values(x.seconds).reduce((a, b) => a + b, 0))} s`);
-    return row(PLAIN[part] || part, share, share, `Share of the session's time spent here, averaged over sessions. ${D.seconds}`, detail, detail);
-  };
-  const q2t = T.parts.map(timeRow).join('');
-  const amountOf = x => x.saved && x.saved.amount ? `$${x.saved.amount}` : 'nothing saved';
-  const failWhy = x => Object.entries(x.checks || {}).filter(([, ok]) => !ok).map(([k]) => k.split(' (')[0]).join('; ');
-  const q3 = [
-    row('Did the task right', xs => `${xs.filter(x => x.passed).length} of ${xs.length}`, xs => `${xs.filter(x => x.passed).length} of ${xs.length}`, 'Every check passes and they said they were done',
-        xs => list(xs, x => x.passed ? 'yes' : `no: ${failWhy(x) || x.stop || 'did not finish'}`), xs => list(xs, x => x.passed ? 'yes' : `no: ${failWhy(x) || x.stop || 'did not finish'}`)),
-    row('Amount saved', xs => top(xs, amountOf), xs => top(xs, amountOf), 'The amount in the budget saved last', xs => list(xs, x => `${amountOf(x)}; rules ${(x.saved || {}).rules ? x.saved.rules.join(', ') : '—'}`), xs => list(xs, x => `${amountOf(x)}; rules ${(x.saved || {}).rules ? x.saved.rules.join(', ') : '—'}`)),
-  ].join('');
-  const byName = new Map(P.map(p => [p.name, p]));
-  const personTables = [...new Set(R.map(r => r.name))].map(name => {
-    const rs = R.filter(r => r.name === name), p = byName.get(name);
-    const seq = f => rs.map(f).join(', ');
-    const inForm = x => T.parts.slice(1, -1).reduce((s, k) => s + (x.moves[k] || 0), 0);
-    const ft = x => [...new Set(x.trouble.filter(t => t[1] !== 'lost the way').map(t => `${PLAIN[t[0]] || t[0]}: ${KIND[t[1]]}`))].join('; ') || 'none';
-    const rows = [['Did the task right', p ? (p.passed ? 'yes' : 'no') : '—', seq(r => r.passed ? 'yes' : 'no')], ['First click', p ? p.first : '—', seq(r => r.first)],
-      ['Wrong clicks before the form', p ? lost(p) : '—', seq(lost)], ['Moves inside the form', p ? inForm(p) : '—', seq(inForm)],
-      ['Amount saved', p ? amountOf(p) : '—', seq(amountOf)], ['Trouble inside the form', p ? ft(p) : '—', rs.map((r, i) => `run ${i + 1}: ${ft(r)}`).join('<br>')]];
-    return `<div class="card"><div class="row" style="gap:12px;margin-bottom:8px">${avatar({id: rs[0].card, name}, 36)}<h3>${esc(name)}</h3>${p ? '' : '<span class="muted small">no participant file</span>'}</div>
-      <table class="matrix q"><tr><th></th><th>Person</th><th>Engine, ${rs.length} run${rs.length > 1 ? 's' : ''}</th></tr>${rows.map(([a, b, c]) => `<tr><th scope="row">${a}</th><td>${a.startsWith('Trouble') ? b : esc(String(b))}</td><td>${a.startsWith('Trouble') ? c : esc(String(c))}</td></tr>`).join('')}</table>
-      <p class="muted small" style="margin:8px 0 0">${rs.map((r, i) => `<a href="${r.report}" target="_blank">run ${i + 1}</a>`).join(' · ')}</p></div>`;
-  }).join('');
-  return `${glanceHTML(T)}<div class="card"><h2>Is the direction right?</h2><table class="matrix q">${head}${q1}</table></div>
-    <div class="card"><h2>Where does it go wrong?</h2><p class="muted small" style="margin:4px 0 10px">How many had trouble in each part. Hover a number for who, and what.</p><table class="matrix q">${head}${q2}</table>
-      <h3 style="margin-top:20px">Where does the time go?</h3><table class="matrix q">${head}${q2t}</table></div>
-    <div class="card"><h2>Is the task done?</h2><table class="matrix q">${head}${q3}</table></div>
-    <h2 style="margin:24px 0 12px">Each persona</h2>${personTables}`;
-}
 pages.result = async (id) => {
   const [T] = await Promise.all([api(`/api/tables?id=${encodeURIComponent(id)}`), loadResults()]);
-  const others = (S.results || []).map(r => `<md-filter-chip label="${esc(when(r.at))} · ${r.runs} run${r.runs === 1 ? '' : 's'}" data-go="result/${esc(r.id)}" ${r.id === id ? 'selected' : ''}></md-filter-chip>`).join('');
-  return `<div class="page">
-    <div class="page-head"><div><h1>Result · ${esc(when(T.at))}</h1><p class="muted">${T.runs.length} runs of ${new Set(T.runs.map(r => r.card)).size} personas${T.people.length ? `, read against ${T.people.length} participant${T.people.length > 1 ? 's' : ''} who did the task` : ''}. Hover any number for how it was computed.</p></div>
-    </div>
-    ${others ? `<div class="chips" style="margin:0 0 16px">${others}</div>` : ''}
+  const others = (S.results || []).map(r => `<md-filter-chip label="${esc(when(r.at))} · ${r.groupName ? esc(r.groupName) + ' · ' : ''}${r.runs} run${r.runs === 1 ? '' : 's'}" data-go="result/${esc(r.id)}" ${r.id === id ? 'selected' : ''}></md-filter-chip>`).join('');
+  const thisResult = (S.results || []).find(r => r.id === id) || {};
+  S.lastTables = T;
+  return `<div class="page result">
+    <div class="page-head"><div><h1>${thisResult.groupName ? esc(thisResult.groupName) : 'Result'} · ${esc(when(T.at))}</h1><p class="muted">${T.runs.length} runs of ${new Set(T.runs.map(r => r.card)).size} people. Hover a number for how it was computed.</p></div>
+      <div class="row noprint"><md-outlined-button id="export-csv"><span slot="icon" class="ms">download</span>CSV</md-outlined-button><md-outlined-button id="export-pdf"><span slot="icon" class="ms">print</span>PDF</md-outlined-button></div></div>
+    ${others ? `<div class="chips noprint" style="margin:0 0 16px">${others}</div>` : ''}
     ${tablesHTML(T)}</div>`;
 };
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('#export-csv,#export-pdf');
+  if (!t || !S.lastTables) return;
+  if (t.id === 'export-pdf') return window.print();
+  const blob = new Blob([resultCSV(S.lastTables)], {type: 'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${S.lastTables.id}.csv`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
 
 /* ---------------- router ---------------- */
 function go(name) { location.hash = name; }
 let rendering = 0;
 async function render() {
   const n = ++rendering;
-  let [name, arg] = (location.hash || '#workflow').slice(1).split('/');
+  let remembered = null; try { remembered = localStorage.getItem('sue-page'); } catch (e) { /* no storage */ }
+  const shown = S.personas.filter(p => p.from !== 'questionnaire' && p.from !== 'survey').length;  // what the page shows, not the research cards
+  const start = !location.hash ? (remembered || (shown ? 'personas' : 'new')) : location.hash.slice(1);
+  let [name, arg] = start.split('/');
   name = {home: 'workflow', tests: 'workflow', workflows: 'workflow', 'new-test': 'workflow', test: 'workflow', 'new-workflow': 'workflow'}[name] || name;  // one workflow: those pages are gone
   const page = pages[name] ? name : 'workflow';
   try {
     const html = await pages[page](arg && decodeURIComponent(arg));
     if (n !== rendering) return;
     $('#main').innerHTML = html;
+    try { localStorage.setItem('sue-page', page === 'result' && arg ? `result/${arg}` : page); } catch (e) { /* no storage */ }
   } catch (e) { $('#main').innerHTML = `<div class="page"><div class="banner bad" style="margin-top:24px"><span class="ms">error</span><div>${esc(e.message)}</div></div></div>`; return; }
-  const nav = {new: 'personas', result: 'results'}[page] || page;
+  const nav = {new: null, result: 'results'}[page] === undefined ? page : {new: null, result: 'results'}[page];
   $$('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === nav));
+  $('#rail-fab').classList.toggle('on', page === 'new');
   if (page === 'new') setupComposer();
   if (page === 'run') setupRun();
 }
 
 /* ---------------- events ---------------- */
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-param],[data-vocab-clear],[data-go],[data-open],[data-remove],[data-know],[data-english],#rail-fab,#scrim,#sheet-close,#sheet-cancel,#sheet-save,#sheet-dup,#sheet-run,#discard-keep,#discard-yes,#create,#create-run,#help-btn');
+  const t = e.target.closest('[data-param],[data-vocab-clear],[data-go],[data-open],[data-remove],[data-remove-group],[data-make-group],[data-run-group],[data-know],[data-english],#rail-fab,#scrim,#sheet-close,#sheet-cancel,#sheet-save,#sheet-dup,#sheet-run,#discard-keep,#discard-yes,#create,#create-run,#create-group,#create-group-run,#help-btn,#group-go,#group-cancel');
   if (!t) return;
   try {
+    if (t.matches('[data-make-group]')) { e.stopPropagation(); return openGroupDialog(t.dataset.makeGroup); }
+    if (t.matches('#group-go')) return await makeGroup();
+    if (t.matches('#group-cancel')) return $('#group-dialog').close();
+    if (t.matches('[data-run-group]')) { preselect = t.dataset.runGroup; return go('run'); }
+    if (t.matches('[data-remove-group]')) {
+      e.stopPropagation();
+      const g = groupsOf(S.personas).find(x => x.id === t.dataset.removeGroup); if (!g) return;
+      if (!await confirmBox('Delete this group?', `“${g.name}”: the base persona and its ${g.variants.length} variants. Results already made from it stay.`, 'Delete')) return;
+      const ids = [g.base && g.base.id, ...g.variants.map(v => v.id)].filter(Boolean);
+      for (const id of ids) await api('/api/personas/delete', {id});
+      await render();
+      snack(`Deleted the group “${g.name}”`, async () => { for (const id of ids) await api('/api/personas/restore', {id}); render(); });
+      return;
+    }
     if (t.matches('[data-remove]')) {
       e.stopPropagation();
       const p = S.personas.find(x => x.id === t.dataset.remove);
@@ -747,13 +934,13 @@ document.addEventListener('click', async e => {
     if (t.matches('#sheet-save')) return await saveSheet();
     if (t.matches('#sheet-dup')) {
       const p = clone(sheetCopy.p); p.name = ('Copy of ' + (($('#sheet-name').value || '').trim() || p.name)).slice(0, 80);
-      const r = await api('/api/personas/save', {...buildBundle(p), description: sheetCopy.description});
+      const r = await api('/api/personas/save', {...await buildBundle(p), description: sheetCopy.description});
       closeSheet(); await render();
       snack(`Duplicated as “${p.name}”`, async () => { await api('/api/personas/delete', {id: r.id}); render(); });
       return;
     }
     if (t.matches('#sheet-run')) { const id = sheetFor.id; if (sheetDirty) await saveSheet(); else closeSheet(); preselect = id; return go('run'); }
-    if (t.matches('#help-btn')) return snack('Personas run the workflow; watch a run on the Run page; the results read each run against the people who did the task.');
+    if (t.matches('#help-btn')) return snack('Describe who you test with; the engine makes a group of them. Run the group on the workflow; the results read every run, beside the people who did the task when there are any.');
     if (t.matches('[data-know]')) {
       const p = editing(t); if (!p) return;
       PersonaParameters.setGroup(p, t.dataset.know, Number(t.dataset.v));
@@ -771,6 +958,25 @@ document.addEventListener('click', async e => {
       t.closest('[data-editor]').querySelector('[data-english-note]').textContent = englishNote(p); return refreshChips(t); }
     if (t.matches('[data-vocab-clear]')) { const p = editing(t); if (!p) return; p.vocabSize = null; const root = t.closest('[data-editor]');
       root.querySelector('[data-english-note]').textContent = englishNote(p); t.closest('[data-vocab-row]').remove(); return refreshChips(root); }
+    if (t.matches('#create-group,#create-group-run')) {
+      const typed = ($('#p-name').value || '').trim(); draft.p.name = typed || draft.p.name;
+      const count = Number($('#group-count').value), fields = $$('#draft-area [data-gfield]').filter(c => c.selected).map(c => c.dataset.gfield);
+      if (!Number.isInteger(count) || count < 2 || count > 20 || !fields.length) return snack('Choose 2 to 20 people and at least one setting that may differ.');
+      const status = s => { const el = $('#group-status'); if (el) el.textContent = s; };
+      t.disabled = true;
+      try {
+        status('Saving the base persona…');
+        const groupId = 'group-' + Date.now().toString(36);
+        const r = await api('/api/personas/save', {...await buildBundle(draft.p), description: draft.description, group: groupId, groupName: draft.p.name});
+        await loadPersonas();
+        const base = {id: r.id, name: draft.p.name, description: draft.description, parameters: draft.p, group: groupId};
+        const made = await generateVariants(base, count, fields, '', status);
+        draft = null;
+        snack(`Created “${base.name}”: a base persona and ${made.made} people like them.`);
+        preselect = t.id === 'create-group-run' ? groupId : null;
+        return go(t.id === 'create-group-run' ? 'run' : 'personas');
+      } catch (e) { t.disabled = false; status(e.message); throw e; }
+    }
     if (t.matches('#create,#create-run')) {
       const typed = ($('#p-name').value || '').trim();
       if (draft.kind !== 'description' && !/^[A-Za-z][A-Za-z0-9_-]{0,31}$/.test(typed)) return snack('Give the participant a code name, such as P4. Their name is never kept.');
@@ -778,11 +984,11 @@ document.addEventListener('click', async e => {
       if (draft.kind === 'answers') {
         const parameters = PersonaParameters.fromAnswers(paramsFromCard(draft.card, typed), draft.doc.answers, draft.postTask);
         r = await api('/api/personas/save-participant', {code: typed, card: draft.card, answers: draft.doc, parameters, postTask: draft.postTask, window: draft.window,
-          built: draft.postTask ? buildBundle(parameters).card : undefined});
+          built: draft.postTask ? (await buildBundle(parameters)).card : undefined});
         made = r.name;
       } else {
         draft.p.name = typed || draft.p.name;
-        r = await api('/api/personas/save', {...buildBundle(draft.p), description: draft.description, source: draft.kind === 'survey' ? 'survey' : undefined});
+        r = await api('/api/personas/save', {...await buildBundle(draft.p), description: draft.description, source: draft.kind === 'survey' ? 'survey' : undefined});
         made = draft.p.name;
       }
       draft = null;
@@ -813,12 +1019,14 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetFor && !$('#discard-dialog').open) tryClose(); });
 window.addEventListener('hashchange', render);
 /* ---------------- start ---------------- */
+let builderReady = null;
 (async () => {
   try {
     token = (await api('/api/status')).token;
-    await loadWorkflows();
-    await Promise.all([loadFlow(), waitBuilder()]);
-    await customElements.whenDefined('md-filled-button');
+    await Promise.all([loadWorkflows(), loadPersonas()]);
+    await loadFlow();
+    builderReady = waitBuilder();  // not awaited: cards are built later, and buildBundle waits for it then
+    await Promise.race([customElements.whenDefined('md-filled-button'), new Promise(r => setTimeout(r, 1500))]);
   } catch (e) { fail(e); }
   render();
 })();
